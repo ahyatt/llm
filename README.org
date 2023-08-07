@@ -1,0 +1,25 @@
+#+TITLE: llm package for emacs
+
+This is a library for interfacing with Large Language Models.  It allows elisp code to use LLMs, but gives the user an option to choose which LLM they would prefer.  This is especially useful for LLMs, since there are various high-quality ones that in which API access costs money, as well as  locally installed ones that are free, but of medium quality.  Applications using LLMs can use this library to make sure their application works regardless of whether the user has a local LLM or is paying for API access.
+
+The functionality supported by LLMs is not completely consistent, nor are their APIs.  In this library we attempt to abstract functionality to a higher level, because sometimes those higher level concepts are supported by an API, and othertimes they must be put in more low-level concepts.  Examples are an example of this; the GCloud Vertex API has an explicit API for examples, but for Open AI's API, examples must be specified by modifying the sytem prompt.  And Open AI has the concept of a system prompt, whereas Vertex API does not.  These are the kinds of API differences we attempt to hide by having higher-level concepts in our API.
+
+Some functionality may not be supported by LLMs.  Any unsupported functionality with throw a ='not-implemented= signal.
+
+This package is simple at the moment, but will grow as both LLMs and functionality is added.
+
+Clients should require the module, =llm=, and code against it.  Most functions are generic, and take a struct representing a provider as the first argument. The client code, or the user themselves can then require the specific module, such as =llm-openai=, and create a provider with a function such as ~(make-llm-openai :key user-api-key)~.  The client application will use this provider to call all the generic functions.
+
+A list of all the functions:
+
+- ~llm-chat-response provider prompt~:  With user-chosen ~provider~ , and a ~llm-chat-prompt~ structure (containing context, examples, interactions, and parameters such as temperature and max tokens), send that prompt to the LLM and wait for the string output.
+- ~llm-embedding provider string~: With the user-chosen ~provider~, send a string and get an embedding, which is a large vector of floating point values.  The embedding represents the semantic meaning of the string, and the vector can be compared against other vectors, where smaller distances between the vectors represent greater semantic similarity.
+
+All of the providers currently implemented.
+
+- =llm-openai=.  This is the interface to Open AI's Chat GPT.  The user must set their key, and select their preferred chat and embedding model.
+- =llm-vertex=.  This is the interface to Google Cloud's Vertex API.  The user needs to set their project number.  In addition, to get authenticated, the user must have logged in initially, and have a valid path in ~llm-vertex-gcloud-binary~.  Users can also configure ~llm-vertex-gcloud-region~ for using a region closer to their location.  It defaults to ="us-central1"=  The provider can also contain the user's chosen embedding and chat model.
+
+If you are interested in creating a provider, please send a pull request, or open a bug.
+
+This library is not yet part of any package archive.
