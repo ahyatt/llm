@@ -6,7 +6,6 @@
 ;; Homepage: https://github.com/ahyatt/llm
 ;; Package-Requires: ((request "0.3.3") (emacs "28.1"))
 ;; Package-Version: 0.1
-;; Keywords: outlines, hypermedia
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;
 ;; This program is free software; you can redistribute it and/or
