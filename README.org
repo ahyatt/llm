@@ -1,8 +1,24 @@
 #+TITLE: llm package for emacs
 
-This is a library for interfacing with Large Language Models.  It allows elisp code to use LLMs, but gives the user an option to choose which LLM they would prefer.  This is especially useful for LLMs, since there are various high-quality ones that in which API access costs money, as well as  locally installed ones that are free, but of medium quality.  Applications using LLMs can use this library to make sure their application works regardless of whether the user has a local LLM or is paying for API access.
+This is a library for interfacing with Large Language Models.  It
+allows elisp code to use LLMs, but gives the user an option to choose
+which LLM they would prefer.  This is especially useful for LLMs,
+since there are various high-quality ones that in which API access
+costs money, as well as locally installed ones that are free, but of
+medium quality.  Applications using LLMs can use this library to make
+sure their application works regardless of whether the user has a
+local LLM or is paying for API access.
 
-The functionality supported by LLMs is not completely consistent, nor are their APIs.  In this library we attempt to abstract functionality to a higher level, because sometimes those higher level concepts are supported by an API, and othertimes they must be put in more low-level concepts.  Examples are an example of this; the GCloud Vertex API has an explicit API for examples, but for Open AI's API, examples must be specified by modifying the sytem prompt.  And Open AI has the concept of a system prompt, whereas Vertex API does not.  These are the kinds of API differences we attempt to hide by having higher-level concepts in our API.
+The functionality supported by LLMs is not completely consistent, nor
+are their APIs.  In this library we attempt to abstract functionality
+to a higher level, because sometimes those higher level concepts are
+supported by an API, and othertimes they must be put in more low-level
+concepts.  Examples: the GCloud Vertex API has
+an explicit API, but for Open AI's API, examples must be
+specified by modifying the system prompt.   Open AI has the concept
+of a system prompt, whereas Vertex API does not.  These are the kinds
+of API differences we attempt to hide by having higher-level concepts
+in our API.
 
 Some functionality may not be supported by LLMs.  Any unsupported functionality with throw a ='not-implemented= signal.
 
