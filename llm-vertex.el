@@ -63,9 +63,10 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
   (unless (and (llm-vertex-key provider)
                (> (* 60 60)
                   (float-time (time-subtract (current-time) (or (llm-vertex-key-gentime provider) 0)))))
-    (setf (llm-vertex-key provider)
-          (string-trim
-           (shell-command-to-string (concat llm-vertex-gcloud-binary " auth print-access-token"))))
+    (let ((result (string-trim (shell-command-to-string (concat llm-vertex-gcloud-binary " auth print-access-token")))))
+      (when (string-match-p "ERROR" result)
+        (error "Could not refresh gcloud access token, received the following error: %s" result))
+      (setf (llm-vertex-key provider) result))
     (setf (llm-vertex-key-gentime provider) (current-time))))
 
 (cl-defmethod llm-embedding ((provider llm-vertex) string)
