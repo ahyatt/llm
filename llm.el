@@ -69,15 +69,48 @@ MAX-TOKENS is the maximum number of tokens to generate.  This is optional.
 ROLE can a symbol, of either `user' or `assistant'."
   role content)
 
+(defun llm--run-async-as-sync (f &rest args)
+  "Call async function F, passing ARGS.
+Two args will be appended to the end; a success callback, and an
+error callback. This will block until the async function calls
+one of the callbacks.
+
+The return value will be the value passed into the success callback."
+  (let ((cv (make-condition-variable (make-mutex "llm-chat-response")))
+        (response))
+    (apply f (append args
+                     (list
+                      (lambda (result)
+       (setq response result)
+       (condition-notify cv))
+     (lambda (type msg)
+       (signal type msg)
+       (condition-notify cv)))))
+    response))
+
 (cl-defgeneric llm-chat-response (provider prompt)
   "Return a response to PROMPT from PROVIDER.
 PROMPT is a `llm-chat-prompt'. The response is a string."
-  (ignore provider prompt)
+  (llm--run-async-as-sync #'llm-chat-response-async provider prompt))
+
+(cl-defgeneric llm-chat-response-async (provider prompt response-callback error-callback)
+  "Return a response to PROMPT from PROVIDER.
+PROMPT is a `llm-chat-prompt'.
+RESPONSE-CALLBACK receives the string response.
+ERROR-CALLBACK receives the error response."
+  (ignore provider prompt response-callback error-callback)
   (signal 'not-implemented nil))
 
 (cl-defgeneric llm-embedding (provider string)
   "Return a vector embedding of STRING from PROVIDER."
-  (ignore provider string)
+  (llm--run-async-as-sync #'llm-embedding-async provider string))
+
+(cl-defgeneric llm-embedding-async (provider string vector-callback error-callback)
+  "Calculate a vector embedding of STRING from PROVIDER.
+VECTOR-CALLBACK will be called with the vector embedding.
+ERROR-CALLBACK will be called in the event of an error, with an
+error signal and a string message."
+  (ignore provider string vector-callback error-callback)
   (signal 'not-implemented nil))
 
 (cl-defgeneric llm-count-tokens (provider string)
