@@ -69,7 +69,7 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
       (setf (llm-vertex-key provider) result))
     (setf (llm-vertex-key-gentime provider) (current-time))))
 
-(cl-defmethod llm-embedding ((provider llm-vertex) string)
+(cl-defmethod llm-embedding-async ((provider llm-vertex) string vector-callback error-callback)
   (llm-vertex-refresh-key provider)
   (let ((resp (request (format "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:predict"
                                llm-vertex-gcloud-region
@@ -81,13 +81,16 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
                            ("Content-Type" . "application/json"))
                 :data (json-encode `(("instances" . [(("content" . ,string))])))
                 :parser 'json-read
+                :success (cl-function
+                          (lambda (&key data &allow-other-keys)
+                            (funcall vector-callback
+                                     (cdr (assoc 'values (cdr (assoc 'embeddings (aref (cdr (assoc 'predictions data)) 0))))))))
                 :error (cl-function (lambda (&key error-thrown data &allow-other-keys)
-                                      (error (format "Problem calling GCloud AI: %s"
-                                                     (cdr error-thrown)))))
-                :sync t)))
-    (cdr (assoc 'values (cdr (assoc 'embeddings (aref (cdr (assoc 'predictions (request-response-data resp))) 0)))))))
+                                      (funcall error-callback
+                                               (error (format "Problem calling GCloud AI: %s"
+                                                     (cdr error-thrown)))))))))))
 
-(cl-defmethod llm-chat-response ((provider llm-vertex) prompt)
+(cl-defmethod llm-chat-response-async ((provider llm-vertex) prompt response-callback error-callback)
   (llm-vertex-refresh-key provider)
   (let ((request-alist))
     (when (llm-chat-prompt-context prompt)
@@ -123,14 +126,16 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
                                  ("Content-Type" . "application/json"))
                       :data (json-encode `(("instances" . [,request-alist])))
                       :parser 'json-read
+                      :success (cl-function (lambda (&key data &allow-other-keys)
+                                              (funcall response-callback
+                                                       (cdr (assoc 'content (aref (cdr (assoc 'candidates (aref (cdr (assoc 'predictions data)) 0))) 0))))))
                       :error (cl-function (lambda (&key error-thrown data &allow-other-keys)
-                                          (error (format "Problem calling GCloud AI: %s, status: %s message: %s (%s)"
-                                                           (cdr error-thrown)
+                                            (funcall error-callback 'error
+                                                     (error (format "Problem calling GCloud AI: %s, status: %s message: %s (%s)"
+                                                                    'error(cdr error-thrown)
                                                            (assoc-default 'status (assoc-default 'error data))
                                                            (assoc-default 'message (assoc-default 'error data))
-                                                           data))))
-                      :sync t)))
-      (cdr (assoc 'content (aref (cdr (assoc 'candidates (aref (cdr (assoc 'predictions (request-response-data resp))) 0))) 0))))))
+                                                           data)))))))))))
 
 (provide 'llm-vertex)
 

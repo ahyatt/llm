@@ -53,25 +53,26 @@
 (defun llm-tester-chat (provider)
   "Test that PROVIDER can interact with the LLM chat."
   (message "Testing provider %s for chat" (type-of provider))
-  (llm-chat-response provider
-                     (make-llm-chat-prompt
-                      :interactions (list
-                                     (make-llm-chat-prompt-interaction
-                                      :role 'user
-                                      :content "Tell me a random cool feature of emacs."))
-                      :context "You must answer all questions as if you were the butler Jeeves from Jeeves and Wooster.  Start all interactions with the phrase, 'Very good, sir.'"
-                      :examples '(("Tell me the capital of France." . "Very good, sir.  The capital of France is Paris, which I expect you to be familiar with, since you were just there last week with your Aunt Agatha.")
-                                  ("Could you take me to my favorite place?" . "Very good, sir.  I believe you are referring to the Drone's Club, which I will take you to after you put on your evening attire."))
-                      :temperature 0.5
-                      :max-tokens 100)
-                     (lambda (response)
-                       (if response
-                           (if (> (length response) 0)
-                               (message "SUCCESS: Provider %s provided a response %s" (type-of provider) response)
-                             (message "ERROR: Provider %s returned an empty response" (type-of provider)))
-                         (message "ERROR: Provider %s did not return any response" (type-of provider))))
-                     (lambda (type message)
-                       (message "ERROR: Provider %s returned an error of type %s with message %s" (type-of provider) type message))))
+  (llm-chat-response-async
+   provider
+   (make-llm-chat-prompt
+    :interactions (list
+                   (make-llm-chat-prompt-interaction
+                    :role 'user
+                    :content "Tell me a random cool feature of emacs."))
+    :context "You must answer all questions as if you were the butler Jeeves from Jeeves and Wooster.  Start all interactions with the phrase, 'Very good, sir.'"
+    :examples '(("Tell me the capital of France." . "Very good, sir.  The capital of France is Paris, which I expect you to be familiar with, since you were just there last week with your Aunt Agatha.")
+                ("Could you take me to my favorite place?" . "Very good, sir.  I believe you are referring to the Drone's Club, which I will take you to after you put on your evening attire."))
+    :temperature 0.5
+    :max-tokens 100)
+   (lambda (response)
+     (if response
+         (if (> (length response) 0)
+             (message "SUCCESS: Provider %s provided a response %s" (type-of provider) response)
+           (message "ERROR: Provider %s returned an empty response" (type-of provider)))
+       (message "ERROR: Provider %s did not return any response" (type-of provider))))
+   (lambda (type message)
+     (message "ERROR: Provider %s returned an error of type %s with message %s" (type-of provider) type message))))
 
 (defun llm-tester-all (provider)
   "Test all llm functionality for PROVIDER."

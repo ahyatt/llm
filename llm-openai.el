@@ -69,10 +69,12 @@ will use a reasonable default."
                                                      (assoc-default 'type (cdar data))
                                                      (assoc-default 'message (cdar data))))))))
 
-(defun llm-openai--chat-response (prompt response-callback error-callback &optional return-json-spec)
+(defun llm-openai--chat-response (provider prompt response-callback error-callback &optional return-json-spec)
   "Main method to send a PROMPT as a chat prompt to Open AI.
 RETURN-JSON-SPEC, if specified, is a JSON spec to return from the
 Open AI API.
+
+PROVIDER is a `llm-openai' struct which holds the key and other options.
 
 RESPONSE-CALLBACK is a function to call with the LLM response.
 
@@ -121,22 +123,20 @@ signal and message."
                              ("Content-Type" . "application/json"))
                   :data (json-encode request-alist)
                   :parser 'json-read
+                  :success (cl-function
+                            (lambda (&key data &allow-other-keys)
+                              (let ((result (cdr (assoc 'content (cdr (assoc 'message (aref (cdr (assoc 'choices data)) 0))))))
+                                    (func-result (cdr (assoc 'arguments (cdr (assoc 'function_call (cdr (assoc 'message (aref (cdr (assoc 'choices data)) 0)))))))))        
+                                (funcall response-callback (or func-result result)))))
                   :error (cl-function (lambda (&key error-thrown data &allow-other-keys)
                                         (funcall error-callback
                                                  (format "Problem calling Open AI: %s, type: %s message: %s"
                                                          (cdr error-thrown)
                                                          (assoc-default 'type (cdar data))
-                                                         (assoc-default 'message (cdar data)))))))))
-      (let ((result (cdr (assoc 'content (cdr (assoc 'message (aref (cdr (assoc 'choices (request-response-data resp))) 0))))))
-            (func-result (cdr (assoc 'arguments (cdr (assoc 'function_call (cdr (assoc 'message (aref (cdr (assoc 'choices (request-response-data resp))) 0)))))))))        
-        (funcall result-callback (or func-result result))))))
+                                                         (assoc-default 'message (cdar data))))))))))))
 
-(cl-defmethod llm-chat-response ((provider llm-openai) prompt)
-  (llm-openai--chat-response prompt nil))
-
-(cl-defmethod llm-chat-structured-response ((provider llm-openai) prompt spec)
-  (llm-openai--chat-response prompt spec))
-
+(cl-defmethod llm-chat-response-async ((provider llm-openai) prompt response-callback error-callback)
+  (llm-openai--chat-response provider prompt response-callback error-callback))
 
 (provide 'llm-openai)
 
