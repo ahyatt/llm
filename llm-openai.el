@@ -50,28 +50,34 @@ EMBEDDING-MODEL is the model to use for embeddings.  If unset, it
 will use a reasonable default."
   key chat-model embedding-model)
 
-(cl-defmethod llm-embedding ((provider llm-openai) string)
+(cl-defmethod llm-embedding-async ((provider llm-openai) string vector-callback error-callback)
   (unless (llm-openai-key provider)
     (error "To call Open AI API, provide the ekg-embedding-api-key"))
-  (let ((resp (request "https://api.openai.com/v1/embeddings"
+  (request "https://api.openai.com/v1/embeddings"
                 :type "POST"
                 :headers `(("Authorization" . ,(format "Bearer %s" ekg-embedding-api-key))
                            ("Content-Type" . "application/json"))
                 :data (json-encode `(("input" . ,string) ("model" . ,(or (llm-openai-embedding-model provider) "text-embedding-ada-002"))))
                 :parser 'json-read
+                :success (cl-function (lambda (&key data &allow-other-keys)
+                                        (funcall vector-callback
+                                                 (cdr (assoc 'embedding (aref (cdr (assoc 'data data)) 0))))))
                 :error (cl-function (lambda (&key error-thrown data &allow-other-keys)
-                                      (error (format "Problem calling Open AI: %s, type: %s message: %s"
+                                      (funcall error-callback 'error
+                                               (format "Problem calling Open AI: %s, type: %s message: %s"
                                                      (cdr error-thrown)
                                                      (assoc-default 'type (cdar data))
-                                                     (assoc-default 'message (cdar data))))))
-                :timeout 2
-                :sync t)))
-    (cdr (assoc 'embedding (aref (cdr (assoc 'data (request-response-data resp))) 0)))))
+                                                     (assoc-default 'message (cdar data))))))))
 
-(defun llm-openai--chat-response (prompt &optional return-json-spec)
+(defun llm-openai--chat-response (prompt response-callback error-callback &optional return-json-spec)
   "Main method to send a PROMPT as a chat prompt to Open AI.
 RETURN-JSON-SPEC, if specified, is a JSON spec to return from the
-Open AI API."
+Open AI API.
+
+RESPONSE-CALLBACK is a function to call with the LLM response.
+
+ERROR-CALLBACK is called if there is an error, with the error
+signal and message."
   (unless (llm-openai-key provider)
     (error "To call Open AI API, the key must have been set"))
   (let (request-alist system-prompt)
@@ -116,14 +122,14 @@ Open AI API."
                   :data (json-encode request-alist)
                   :parser 'json-read
                   :error (cl-function (lambda (&key error-thrown data &allow-other-keys)
-                                        (error (format "Problem calling Open AI: %s, type: %s message: %s"
-                                                       (cdr error-thrown)
-                                                       (assoc-default 'type (cdar data))
-                                                       (assoc-default 'message (cdar data))))))
-                  :sync t)))
+                                        (funcall error-callback
+                                                 (format "Problem calling Open AI: %s, type: %s message: %s"
+                                                         (cdr error-thrown)
+                                                         (assoc-default 'type (cdar data))
+                                                         (assoc-default 'message (cdar data)))))))))
       (let ((result (cdr (assoc 'content (cdr (assoc 'message (aref (cdr (assoc 'choices (request-response-data resp))) 0))))))
             (func-result (cdr (assoc 'arguments (cdr (assoc 'function_call (cdr (assoc 'message (aref (cdr (assoc 'choices (request-response-data resp))) 0)))))))))        
-        (or func-result result)))))
+        (funcall result-callback (or func-result result))))))
 
 (cl-defmethod llm-chat-response ((provider llm-openai) prompt)
   (llm-openai--chat-response prompt nil))

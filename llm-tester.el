@@ -1,4 +1,4 @@
-;;; llm-tester.el --- Helpers for testing LLM implementation
+;;; llm-tester.el --- Helpers for testing LLM implementation -*- lexical-binding: t -*-
 
 ;; Copyright (c) 2023  Andrew Hyatt <ahyatt@gmail.com>
 
@@ -36,39 +36,42 @@
 
 (defun llm-tester-embedding (provider)
   "Test that PROVIDER can provide embeddings."
-  (condition-case nil
-      (let ((embedding (llm-embedding provider "This is a test.")))
-        (if embedding
-            (if (eq (type-of embedding) 'vector)
-                (if (> (length embedding) 0)
-                    (message "SUCCESS: Provider %s provided an embedding of length %d.  First 10 values: %S" (type-of provider)
-                             (length embedding)
-                             (seq-subseq embedding 0 (min 10 (length embedding))))
-                  (message "ERROR: Provider %s returned an empty embedding" (type-of provider))))
-          (message "ERROR: Provider %s did not return any embedding" (type-of provider))))
-    (not-implemented (message "ERROR: Provider %s could not provide embeddings." (type-of provider)))))
+  (message "Testing provider %s for embeddings" (type-of provider))
+  (llm-embedding-async provider "This is a test."
+                       (lambda (embedding)
+                         (if embedding
+                             (if (eq (type-of embedding) 'vector)
+                                 (if (> (length embedding) 0)
+                                     (message "SUCCESS: Provider %s provided an embedding of length %d.  First 10 values: %S" (type-of provider)
+                                              (length embedding)
+                                              (seq-subseq embedding 0 (min 10 (length embedding))))
+                                   (message "ERROR: Provider %s returned an empty embedding" (type-of provider))))
+                           (message "ERROR: Provider %s did not return any embedding" (type-of provider))))
+                       (lambda (type message)
+                         (message "ERROR: Provider %s returned an error of type %s with message %s" (type-of provider) type message))))
 
 (defun llm-tester-chat (provider)
   "Test that PROVIDER can interact with the LLM chat."
-  (condition-case nil
-      (let ((response (llm-chat-response 
-                   provider
-                   (make-llm-chat-prompt
-                    :interactions (list
-                                   (make-llm-chat-prompt-interaction
-                                    :role 'user
-                                    :content "Tell me a random cool feature of emacs."))
-                    :context "You must answer all questions as if you were the butler Jeeves from Jeeves and Wooster.  Start all interactions with the phrase, 'Very good, sir.'"
-                    :examples '(("Tell me the capital of France." . "Very good, sir.  The capital of France is Paris, which I expect you to be familiar with, since you were just there last week with your Aunt Agatha.")
-                                ("Could you take me to my favorite place?" . "Very good, sir.  I believe you are referring to the Drone's Club, which I will take you to after you put on your evening attire."))
-                    :temperature 0.5
-                    :max-tokens 100))))
-        (if response
-            (if (> (length response) 0)
-                (message "SUCCESS: Provider %s provided a response %s" (type-of provider) response)
-              (message "ERROR: Provider %s returned an empty response" (type-of provider)))
-          (message "ERROR: Provider %s did not return any response" (type-of provider))))
-    (not-implemented (message "ERROR: Provider %s could not get a chat." (type-of provider)))))
+  (message "Testing provider %s for chat" (type-of provider))
+  (llm-chat-response provider
+                     (make-llm-chat-prompt
+                      :interactions (list
+                                     (make-llm-chat-prompt-interaction
+                                      :role 'user
+                                      :content "Tell me a random cool feature of emacs."))
+                      :context "You must answer all questions as if you were the butler Jeeves from Jeeves and Wooster.  Start all interactions with the phrase, 'Very good, sir.'"
+                      :examples '(("Tell me the capital of France." . "Very good, sir.  The capital of France is Paris, which I expect you to be familiar with, since you were just there last week with your Aunt Agatha.")
+                                  ("Could you take me to my favorite place?" . "Very good, sir.  I believe you are referring to the Drone's Club, which I will take you to after you put on your evening attire."))
+                      :temperature 0.5
+                      :max-tokens 100)
+                     (lambda (response)
+                       (if response
+                           (if (> (length response) 0)
+                               (message "SUCCESS: Provider %s provided a response %s" (type-of provider) response)
+                             (message "ERROR: Provider %s returned an empty response" (type-of provider)))
+                         (message "ERROR: Provider %s did not return any response" (type-of provider))))
+                     (lambda (type message)
+                       (message "ERROR: Provider %s returned an error of type %s with message %s" (type-of provider) type message))))
 
 (defun llm-tester-all (provider)
   "Test all llm functionality for PROVIDER."
