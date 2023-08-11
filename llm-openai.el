@@ -117,7 +117,7 @@ signal and message."
             request-alist)
       (push '("function_call" . (("name" . "output"))) request-alist))
     
-    (let* ((resp (request "https://api.openai.com/v1/chat/completions"
+    (request "https://api.openai.com/v1/chat/completions"
                   :type "POST"
                   :headers `(("Authorization" . ,(format "Bearer %s" (llm-openai-key provider)))
                              ("Content-Type" . "application/json"))
@@ -133,7 +133,7 @@ signal and message."
                                                  (format "Problem calling Open AI: %s, type: %s message: %s"
                                                          (cdr error-thrown)
                                                          (assoc-default 'type (cdar data))
-                                                         (assoc-default 'message (cdar data))))))))))))
+                                                         (assoc-default 'message (cdar data)))))))))
 
 (cl-defmethod llm-chat-response-async ((provider llm-openai) prompt response-callback error-callback)
   (llm-openai--chat-response provider prompt response-callback error-callback))

@@ -71,7 +71,7 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
 
 (cl-defmethod llm-embedding-async ((provider llm-vertex) string vector-callback error-callback)
   (llm-vertex-refresh-key provider)
-  (let ((resp (request (format "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:predict"
+  (request (format "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:predict"
                                llm-vertex-gcloud-region
                                (llm-vertex-project provider)
                                llm-vertex-gcloud-region
@@ -87,8 +87,8 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
                                      (cdr (assoc 'values (cdr (assoc 'embeddings (aref (cdr (assoc 'predictions data)) 0))))))))
                 :error (cl-function (lambda (&key error-thrown data &allow-other-keys)
                                       (funcall error-callback
-                                               (error (format "Problem calling GCloud AI: %s"
-                                                     (cdr error-thrown)))))))))))
+                                               (error (format "Problem calling GCloud AI: %s (%S)"
+                                                     (cdr error-thrown) data)))))))
 
 (cl-defmethod llm-chat-response-async ((provider llm-vertex) prompt response-callback error-callback)
   (llm-vertex-refresh-key provider)
@@ -116,7 +116,7 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
             request-alist))
     (when (llm-chat-prompt-max-tokens prompt)
       (push `("max_tokens" . ,(llm-chat-prompt-max-tokens prompt)) request-alist))
-    (let ((resp (request (format "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:predict"
+    (request (format "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:predict"
                                    llm-vertex-gcloud-region
                                    (llm-vertex-project provider)
                                    llm-vertex-gcloud-region
@@ -132,10 +132,10 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
                       :error (cl-function (lambda (&key error-thrown data &allow-other-keys)
                                             (funcall error-callback 'error
                                                      (error (format "Problem calling GCloud AI: %s, status: %s message: %s (%s)"
-                                                                    'error(cdr error-thrown)
-                                                           (assoc-default 'status (assoc-default 'error data))
-                                                           (assoc-default 'message (assoc-default 'error data))
-                                                           data)))))))))))
+                                                                    (cdr error-thrown)
+                                                                    (assoc-default 'status (assoc-default 'error data))
+                                                                    (assoc-default 'message (assoc-default 'error data))
+                                                                    data))))))))
 
 (provide 'llm-vertex)
 
