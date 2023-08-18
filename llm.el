@@ -93,6 +93,9 @@ The return value will be the value passed into the success callback."
 PROMPT is a `llm-chat-prompt'. The response is a string."
   (llm--run-async-as-sync #'llm-chat-response-async provider prompt))
 
+(cl-defmethod llm-chat-response ((_ (eql nil)) _)
+  (error "LLM provider was nil.  Please set the provider in the application you are using."))
+
 (cl-defgeneric llm-chat-response-async (provider prompt response-callback error-callback)
   "Return a response to PROMPT from PROVIDER.
 PROMPT is a `llm-chat-prompt'.
@@ -101,9 +104,15 @@ ERROR-CALLBACK receives the error response."
   (ignore provider prompt response-callback error-callback)
   (signal 'not-implemented nil))
 
+(cl-defmethod llm-chat-response-async ((_ (eql nil)) _ _ _)
+  (error "LLM provider was nil.  Please set the provider in the application you are using."))
+
 (cl-defgeneric llm-embedding (provider string)
   "Return a vector embedding of STRING from PROVIDER."
   (llm--run-async-as-sync #'llm-embedding-async provider string))
+
+(cl-defmethod llm-chat-embedding ((_ (eql nil)) _)
+  (error "LLM provider was nil.  Please set the provider in the application you are using."))
 
 (cl-defgeneric llm-embedding-async (provider string vector-callback error-callback)
   "Calculate a vector embedding of STRING from PROVIDER.
@@ -112,6 +121,9 @@ ERROR-CALLBACK will be called in the event of an error, with an
 error signal and a string message."
   (ignore provider string vector-callback error-callback)
   (signal 'not-implemented nil))
+
+(cl-defmethod llm-embedding-async ((_ (eql nil)) _ _ _)
+  (error "LLM provider was nil.  Please set the provider in the application you are using."))
 
 (cl-defgeneric llm-count-tokens (provider string)
   "Return the number of tokens in STRING from PROVIDER.
