@@ -81,11 +81,11 @@ The return value will be the value passed into the success callback."
     (apply f (append args
                      (list
                       (lambda (result)
-       (setq response result)
-       (condition-notify cv))
-     (lambda (type msg)
-       (signal type msg)
-       (condition-notify cv)))))
+                        (setq response result)
+                        (condition-notify cv))
+                      (lambda (type msg)
+                        (signal type msg)
+                        (condition-notify cv)))))
     response))
 
 (cl-defgeneric llm-chat-response (provider prompt)
