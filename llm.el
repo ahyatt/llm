@@ -76,16 +76,20 @@ error callback. This will block until the async function calls
 one of the callbacks.
 
 The return value will be the value passed into the success callback."
-  (let ((cv (make-condition-variable (make-mutex "llm-chat-response")))
-        (response))
+  (let* ((mutex (make-mutex "llm-chat-response"))
+         (cv (make-condition-variable mutex))
+         (response))
     (apply f (append args
                      (list
                       (lambda (result)
-                        (setq response result)
-                        (condition-notify cv))
+                        (with-mutex mutex
+                          (setq response result)
+                          (condition-notify cv)))
                       (lambda (type msg)
-                        (signal type msg)
-                        (condition-notify cv)))))
+                        (with-mutex mutex
+                          (message "async to sync, got error")
+                          (signal type msg)
+                          (condition-notify cv))))))
     response))
 
 (cl-defgeneric llm-chat-response (provider prompt)
