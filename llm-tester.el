@@ -34,8 +34,8 @@
 
 (require 'llm)
 
-(defun llm-tester-embedding (provider)
-  "Test that PROVIDER can provide embeddings."
+(defun llm-tester-embedding-async (provider)
+  "Test that PROVIDER can provide embeddings in an async call."
   (message "Testing provider %s for embeddings" (type-of provider))
   (llm-embedding-async provider "This is a test."
                        (lambda (embedding)
@@ -50,7 +50,20 @@
                        (lambda (type message)
                          (message "ERROR: Provider %s returned an error of type %s with message %s" (type-of provider) type message))))
 
-(defun llm-tester-chat (provider)
+(defun llm-tester-embedding-sync (provider)
+  "Test that PROVIDER can provide embeddings in a sync call."
+  (message "Testing provider %s for embeddings" (type-of provider))
+  (let ((embedding (llm-embedding provider "This is a test.")))
+    (if embedding
+        (if (eq (type-of embedding) 'vector)
+            (if (> (length embedding) 0)
+                (message "SUCCESS: Provider %s provided an embedding of length %d.  First 10 values: %S" (type-of provider)
+                         (length embedding)
+                         (seq-subseq embedding 0 (min 10 (length embedding))))
+              (message "ERROR: Provider %s returned an empty embedding" (type-of provider))))
+      (message "ERROR: Provider %s did not return any embedding" (type-of provider)))))
+
+(defun llm-tester-chat-async (provider)
   "Test that PROVIDER can interact with the LLM chat."
   (message "Testing provider %s for chat" (type-of provider))
   (llm-chat-response-async
@@ -74,10 +87,33 @@
    (lambda (type message)
      (message "ERROR: Provider %s returned an error of type %s with message %s" (type-of provider) type message))))
 
+(defun llm-tester-chat-sync (provider)
+  "Test that PROVIDER can interact with the LLM chat."
+  (message "Testing provider %s for chat" (type-of provider))
+  (let ((response (llm-chat-response
+                   provider
+                   (make-llm-chat-prompt
+                    :interactions (list
+                                   (make-llm-chat-prompt-interaction
+                                    :role 'user
+                                    :content "Tell me a random cool feature of emacs."))
+                    :context "You must answer all questions as if you were the butler Jeeves from Jeeves and Wooster.  Start all interactions with the phrase, 'Very good, sir.'"
+                    :examples '(("Tell me the capital of France." . "Very good, sir.  The capital of France is Paris, which I expect you to be familiar with, since you were just there last week with your Aunt Agatha.")
+                                ("Could you take me to my favorite place?" . "Very good, sir.  I believe you are referring to the Drone's Club, which I will take you to after you put on your evening attire."))
+                    :temperature 0.5
+                    :max-tokens 100))))
+    (if response
+        (if (> (length response) 0)
+            (message "SUCCESS: Provider %s provided a response %s" (type-of provider) response)
+          (message "ERROR: Provider %s returned an empty response" (type-of provider)))
+      (message "ERROR: Provider %s did not return any response" (type-of provider)))))
+
 (defun llm-tester-all (provider)
   "Test all llm functionality for PROVIDER."
-  (llm-tester-embedding provider)
-  (llm-tester-chat provider))
+  (llm-tester-embedding-sync provider)
+  (llm-tester-chat-sync provider)
+  (llm-tester-embedding-async provider)
+  (llm-tester-chat-async provider))
 
 (provide 'llm-tester)
 
