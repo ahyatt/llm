@@ -1,0 +1,75 @@
+;;; llm-fake.el --- Use for developers looking at llm calls. -*- lexical-binding: t -*-
+
+;; Copyright (c) 2023  Andrew Hyatt <ahyatt@gmail.com>
+
+;; Author: Andrew Hyatt <ahyatt@gmail.com>
+;; Homepage: https://github.com/ahyatt/llm
+;; SPDX-License-Identifier: GPL-3.0-or-later
+;;
+;; This program is free software; you can redistribute it and/or
+;; modify it under the terms of the GNU General Public License as
+;; published by the Free Software Foundation; either version 3 of the
+;; License, or (at your option) any later version.
+;;
+;; This program is distributed in the hope that it will be useful, but
+;; WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;; General Public License for more details.
+;;
+;; You should have received a copy of the GNU General Public License
+;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+
+;;; Commentary:
+;; This file implements the llm functionality defined in llm.el, for developers
+;; who want to just understand what llm calls are made, and with what data. Or,
+;; to test out various functionality they have. The functions return something,
+;; or throw errors, depending on how the `llm-fake' provider is configured.
+
+(require 'cl-lib)
+(require 'llm)
+
+;;; Code:
+
+(cl-defstruct llm-fake
+ "A provider for the fake LLM provider.
+
+OUTPUT-TO-BUFFER can be nil, in which case, nothing will be
+output. If a string or a buffer, it will append the request as
+text to that buffer.
+
+CHAT-ACTION-FUNC will be called with no arguments to produce
+either a string response for the chat, or a signal symbol and
+message cons. If nil, the response will be a short text string.
+
+EMBEDDING-ACTION-FUNC will be called with no arguments to produce
+either a vector response for the chat, or a signal symbol and
+message cons. If nil, the response will be a simple vector."
+ output-to-buffer chat-action-func embedding-action-func)
+
+(cl-defmethod llm-chat-response-async ((provider llm-fake) prompt response-callback error-callback)
+  (when (llm-fake-output-to-buffer provider)
+    (with-current-buffer (get-buffer-create (llm-fake-output-to-buffer provider))
+      (goto-char (point-max))
+      (insert "\nCall to llm-chat-response\n"  (llm-chat-prompt-to-text prompt) "\n")))
+  (or (when-let (f (llm-fake-chat-action-func provider))
+        (let ((result (funcall f)))
+          (pcase (type-of result)
+            ('string (funcall response-callback result))
+            ('cons (funcall error-callback (car result) (cdr result)))
+            (_ (error "Incorrect type found in `chat-action-func': %s" (type-of-result))))))
+      (funcall response-callback "Sample response from `llm-chat-response-async'")))
+
+(cl-defmethod llm-embedding-async ((provider llm-openai) string vector-callback error-callback)
+  (when (llm-fake-output-to-buffer provider)
+    (with-current-buffer (get-buffer-create (llm-fake-output-to-buffer provider))
+      (goto-char (point-max))
+      (insert "\nCall to llm-embedding with text: " string "\n")))
+  (or (when-let (f (llm-fake-chat-action-func provider))
+        (let ((result (funcall f)))
+          (pcase (type-of result)
+            ('vector (funcall vector-callback result))
+            ('cons (funcall error-callback (car result) (cdr result)))
+            (_ (error "Incorrect type found in `chat-embedding-func': %s" (type-of-result))))))
+      (funcall response-callback [0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9])))
+
+(provide 'llm-fake)
