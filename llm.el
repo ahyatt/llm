@@ -142,10 +142,10 @@ ways."
 (defun llm-chat-prompt-to-text (prompt)
   "Convert PROMPT `llm-chat-prompt' to a simple text.
 This should only be used for logging or debugging."
-  (format "Context: %s\nExamples: %s\nInteractions: %s\nTemperature: %f\nMax tokens: %d\n"
+  (format "Context: %s\nExamples: %s\nInteractions: %s\n%s%s\n"
           (llm-chat-prompt-context prompt)
           (mapconcat (lambda (e) (format "User: %s\nResponse: %s" (car e) (cdr e)))
-                     (llm-chat-prompt-interactions prompt) "\n")
+                     (llm-chat-prompt-examples prompt) "\n")
           (mapconcat (lambda (i)
                (format "%s: %s"
                        (pcase (llm-chat-prompt-interaction-role i)
@@ -154,8 +154,12 @@ This should only be used for logging or debugging."
                          ('assistant "Assistant"))
                        (llm-chat-prompt-interaction-content i)))
                      (llm-chat-prompt-interactions prompt) "\n")
-          (llm-chat-prompt-temperature prompt)
-          (llm-chat-prompt-max-tokens prompt)))
+          (if (llm-chat-prompt-temperature prompt)
+              (format "Temperature: %s\n" (llm-chat-prompt-temperature prompt))
+            "")
+          (if (llm-chat-prompt-max-tokens prompt)
+              (format "Max tokens: %s\n" (llm-chat-prompt-max-tokens prompt))
+            "")))
 
 (provide 'llm)
 
