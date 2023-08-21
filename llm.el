@@ -115,7 +115,7 @@ ERROR-CALLBACK receives the error response."
   "Return a vector embedding of STRING from PROVIDER."
   (llm--run-async-as-sync #'llm-embedding-async provider string))
 
-(cl-defmethod llm-chat-embedding ((_ (eql nil)) _)
+(cl-defmethod llm-embedding ((_ (eql nil)) _)
   (error "LLM provider was nil.  Please set the provider in the application you are using."))
 
 (cl-defgeneric llm-embedding-async (provider string vector-callback error-callback)
