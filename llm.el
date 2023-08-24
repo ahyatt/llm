@@ -69,33 +69,18 @@ MAX-TOKENS is the maximum number of tokens to generate.  This is optional.
 ROLE can a symbol, of either `user' or `assistant'."
   role content)
 
-(defun llm--run-async-as-sync (f &rest args)
-  "Call async function F, passing ARGS.
-Two args will be appended to the end; a success callback, and an
-error callback. This will block until the async function calls
-one of the callbacks.
-
-The return value will be the value passed into the success callback."
-  (let* ((mutex (make-mutex "llm-chat-response"))
-         (cv (make-condition-variable mutex))
-         (response))
-    (apply f (append args
-                     (list
-                      (lambda (result)
-                        (with-mutex mutex
-                          (setq response result)
-                          (condition-notify cv)))
-                      (lambda (type msg)
-                        (with-mutex mutex
-                          (message "async to sync, got error")
-                          (signal type msg)
-                          (condition-notify cv))))))
-    response))
+(defun llm-make-simple-chat-prompt (text)
+  "Create a `llm-chat-prompt' with TEXT sent to the LLM provider.
+This is a helper function for when you just need to send text to
+an LLM, and don't need the more advanced features that the
+`llm-chat-prompt' struct makes available."
+  (make-llm-chat-prompt :interactions (list (make-llm-chat-prompt-interaction :role 'user :content text))))
 
 (cl-defgeneric llm-chat-response (provider prompt)
   "Return a response to PROMPT from PROVIDER.
 PROMPT is a `llm-chat-prompt'. The response is a string."
-  (llm--run-async-as-sync #'llm-chat-response-async provider prompt))
+  (ignore provider prompt)
+  (signal 'not-implemented nil))
 
 (cl-defmethod llm-chat-response ((_ (eql nil)) _)
   (error "LLM provider was nil.  Please set the provider in the application you are using."))
@@ -113,7 +98,8 @@ ERROR-CALLBACK receives the error response."
 
 (cl-defgeneric llm-embedding (provider string)
   "Return a vector embedding of STRING from PROVIDER."
-  (llm--run-async-as-sync #'llm-embedding-async provider string))
+  (ignore provider string)
+  (signal 'not-implemented nil))
 
 (cl-defmethod llm-embedding ((_ (eql nil)) _)
   (error "LLM provider was nil.  Please set the provider in the application you are using."))
@@ -162,5 +148,3 @@ This should only be used for logging or debugging."
             "")))
 
 (provide 'llm)
-
-;;; llm.el ends here

@@ -46,7 +46,18 @@ either a vector response for the chat, or a signal symbol and
 message cons. If nil, the response will be a simple vector."
  output-to-buffer chat-action-func embedding-action-func)
 
+(defun llm-fake--chat-response (provider prompt)
+  "Produce a fake chat response.
+PROVIDER, PROMPT are as in `llm-chat-response.'"
+  )
+
 (cl-defmethod llm-chat-response-async ((provider llm-fake) prompt response-callback error-callback)
+  (condition-case err
+      (funcall response-callback (llm-chat-response provider prompt))
+    (t (funcall error-callback (car err) (cdr err))))
+  nil)
+
+(cl-defmethod llm-chat-response ((provider llm-fake) prompt)
   (when (llm-fake-output-to-buffer provider)
     (with-current-buffer (get-buffer-create (llm-fake-output-to-buffer provider))
       (goto-char (point-max))
@@ -55,12 +66,12 @@ message cons. If nil, the response will be a simple vector."
       (let* ((f (llm-fake-chat-action-func provider))
              (result (funcall f)))
         (pcase (type-of result)
-                ('string (funcall response-callback result))
-                ('cons (funcall error-callback (car result) (cdr result)))
+                ('string result)
+                ('cons (signal (car result) (cdr result)))
                 (_ (error "Incorrect type found in `chat-action-func': %s" (type-of-result)))))
-    (funcall response-callback "Sample response from `llm-chat-response-async'")))
+    "Sample response from `llm-chat-response-async'"))
 
-(cl-defmethod llm-embedding-async ((provider llm-fake) string vector-callback error-callback)
+(cl-defmethod llm-embedding ((provider llm-fake) string)
   (when (llm-fake-output-to-buffer provider)
     (with-current-buffer (get-buffer-create (llm-fake-output-to-buffer provider))
       (goto-char (point-max))
@@ -70,8 +81,14 @@ message cons. If nil, the response will be a simple vector."
              (result (funcall f)))
         (pcase (type-of result)
                 ('vector (funcall vector-callback result))
-                ('cons (funcall error-callback (car result) (cdr result)))
+                ('cons (signal (car result) (cdr result)))
                 (_ (error "Incorrect type found in `chat-embedding-func': %s" (type-of-result)))))
-    (funcall vector-callback [0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9])))
+    [0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9]))
+
+(cl-defmethod llm-embedding-async ((provider llm-fake) string vector-callback error-callback)
+  (condition-case err
+      (funcall vector-callback (llm-embedding provider string))
+    (t (funcall error-callback (car err) (cdr err))))
+  nil)
 
 (provide 'llm-fake)

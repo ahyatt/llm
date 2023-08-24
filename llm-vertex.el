@@ -69,28 +69,46 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
       (setf (llm-vertex-key provider) result))
     (setf (llm-vertex-key-gentime provider) (current-time))))
 
-(cl-defmethod llm-embedding-async ((provider llm-vertex) string vector-callback error-callback)
+(defun llm-vertex--embedding (provider string vector-callback error-callback sync)
+  "Get the embedding for STRING.
+PROVIDER, VECTOR-CALLBACK, ERROR-CALLBACK are all the same as `llm-embedding-async'.
+SYNC, when non-nil, will wait until the response is available to return."
   (llm-vertex-refresh-key provider)
   (request (format "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:predict"
                                llm-vertex-gcloud-region
                                (llm-vertex-project provider)
                                llm-vertex-gcloud-region
                                (or (llm-vertex-embedding-model provider) "textembedding-gecko"))
-                :type "POST"
-                :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider)))
-                           ("Content-Type" . "application/json"))
-                :data (json-encode `(("instances" . [(("content" . ,string))])))
-                :parser 'json-read
-                :success (cl-function
-                          (lambda (&key data &allow-other-keys)
-                            (funcall vector-callback
-                                     (cdr (assoc 'values (cdr (assoc 'embeddings (aref (cdr (assoc 'predictions data)) 0))))))))
-                :error (cl-function (lambda (&key error-thrown data &allow-other-keys)
-                                      (funcall error-callback
-                                               (error (format "Problem calling GCloud AI: %s (%S)"
-                                                     (cdr error-thrown) data)))))))
+    :sync sync
+    :timeout 5
+    :type "POST"
+    :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider)))
+               ("Content-Type" . "application/json"))
+    :data (json-encode `(("instances" . [(("content" . ,string))])))
+    :parser 'json-read
+    :success (cl-function
+              (lambda (&key data &allow-other-keys)
+                (funcall vector-callback
+                         (cdr (assoc 'values (cdr (assoc 'embeddings (aref (cdr (assoc 'predictions data)) 0))))))))
+    :error (cl-function (lambda (&key error-thrown data &allow-other-keys)
+                          (funcall error-callback
+                                   (error (format "Problem calling GCloud AI: %s (%S)"
+                                                  (cdr error-thrown) data)))))))
 
-(cl-defmethod llm-chat-response-async ((provider llm-vertex) prompt response-callback error-callback)
+(cl-defmethod llm-embedding-async ((provider llm-vertex) string vector-callback error-callback)
+  (llm-vertex--embedding provider string vector-callback error-callback nil))
+
+(cl-defmethod llm-embedding ((provider llm-vertex) string)
+  (let ((response))
+    (llm-vertex--embedding provider string
+                           (lambda (vector) (setq response vector))
+                           (lambda (_ error-message) (error error-message)) t)
+    response))
+
+(defun llm-vertex--chat-response (provider prompt response-callback error-callback sync)
+  "Get the chat response for PROMPT.
+PROVIDER, RESPONSE-CALLBACK, ERROR-CALLBACK are all the same as `llm-chat-response-async'.
+SYNC, when non-nil, will wait until the response is available to return."
   (llm-vertex-refresh-key provider)
   (let ((request-alist))
     (when (llm-chat-prompt-context prompt)
@@ -121,21 +139,32 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
                                    (llm-vertex-project provider)
                                    llm-vertex-gcloud-region
                                    (or (llm-vertex-chat-model provider) "chat-bison"))
-                      :type "POST"
-                      :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider)))
-                                 ("Content-Type" . "application/json"))
-                      :data (json-encode `(("instances" . [,request-alist])))
-                      :parser 'json-read
-                      :success (cl-function (lambda (&key data &allow-other-keys)
-                                              (funcall response-callback
-                                                       (cdr (assoc 'content (aref (cdr (assoc 'candidates (aref (cdr (assoc 'predictions data)) 0))) 0))))))
-                      :error (cl-function (lambda (&key error-thrown data &allow-other-keys)
-                                            (funcall error-callback 'error
-                                                     (error (format "Problem calling GCloud AI: %s, status: %s message: %s (%s)"
-                                                                    (cdr error-thrown)
-                                                                    (assoc-default 'status (assoc-default 'error data))
-                                                                    (assoc-default 'message (assoc-default 'error data))
-                                                                    data))))))))
+      :type "POST"
+      :sync sync
+      :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider)))
+                 ("Content-Type" . "application/json"))
+      :data (json-encode `(("instances" . [,request-alist])))
+      :parser 'json-read
+      :success (cl-function (lambda (&key data &allow-other-keys)
+                              (funcall response-callback
+                                       (cdr (assoc 'content (aref (cdr (assoc 'candidates (aref (cdr (assoc 'predictions data)) 0))) 0))))))
+      :error (cl-function (lambda (&key error-thrown data &allow-other-keys)
+                            (funcall error-callback 'error
+                                     (error (format "Problem calling GCloud AI: %s, status: %s message: %s (%s)"
+                                                    (cdr error-thrown)
+                                                    (assoc-default 'status (assoc-default 'error data))
+                                                    (assoc-default 'message (assoc-default 'error data))
+                                                    data))))))))
+
+(cl-defmethod llm-chat-response-async ((provider llm-vertex) prompt response-callback error-callback)
+  (llm-vertex--chat-response provider prompt response-callback error-callback nil))
+
+(cl-defmethod llm-chat-response ((provider llm-vertex) prompt)
+  (let ((response))
+    (llm-vertex--chat-response provider prompt
+                               (lambda (result) (setq response result))
+                               (lambda (_ error-message) (error error-message)) t)
+    response))
 
 (provide 'llm-vertex)
 
