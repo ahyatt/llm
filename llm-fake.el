@@ -80,7 +80,7 @@ PROVIDER, PROMPT are as in `llm-chat-response.'"
       (let* ((f (llm-fake-embedding-action-func provider))
              (result (funcall f)))
         (pcase (type-of result)
-                ('vector (funcall vector-callback result))
+                ('vector result)
                 ('cons (signal (car result) (cdr result)))
                 (_ (error "Incorrect type found in `chat-embedding-func': %s" (type-of-result)))))
     [0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9]))

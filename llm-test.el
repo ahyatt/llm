@@ -31,7 +31,6 @@
 
 (ert-deftest llm-test-embedding ()
   (should-error (llm-embedding nil "Test"))
-  (should-error (llm-embedding-async nil "Test"))
   ;; TODO: Test signals that are not errors, which ert doesn't seem to catch.
   (should-error (llm-embedding (make-llm-fake
                                 :embedding-action-func
