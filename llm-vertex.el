@@ -71,8 +71,9 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
 
 (defun llm-vertex--embedding (provider string vector-callback error-callback sync)
   "Get the embedding for STRING.
-PROVIDER, VECTOR-CALLBACK, ERROR-CALLBACK are all the same as `llm-embedding-async'.
-SYNC, when non-nil, will wait until the response is available to return."
+PROVIDER, VECTOR-CALLBACK, ERROR-CALLBACK are all the same as
+`llm-embedding-async'. SYNC, when non-nil, will wait until the
+response is available to return."
   (llm-vertex-refresh-key provider)
   (request (format "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:predict"
                                llm-vertex-gcloud-region
@@ -107,8 +108,9 @@ SYNC, when non-nil, will wait until the response is available to return."
 
 (defun llm-vertex--chat-response (provider prompt response-callback error-callback sync)
   "Get the chat response for PROMPT.
-PROVIDER, RESPONSE-CALLBACK, ERROR-CALLBACK are all the same as `llm-chat-response-async'.
-SYNC, when non-nil, will wait until the response is available to return."
+PROVIDER, RESPONSE-CALLBACK, ERROR-CALLBACK are all the same as
+`llm-chat-response-async'. SYNC, when non-nil, will wait until
+the response is available to return."
   (llm-vertex-refresh-key provider)
   (let ((request-alist))
     (when (llm-chat-prompt-context prompt)
