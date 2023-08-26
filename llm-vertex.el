@@ -69,12 +69,18 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
       (setf (llm-vertex-key provider) result))
     (setf (llm-vertex-key-gentime provider) (current-time))))
 
+(defun llm-vertex-maybe-warn ()
+  (when llm-warn-on-nonfree
+    (warn "Google Cloud's Vertex AI is not free software, and your freedom to use it is restricted by Google's terms of service.
+See https://policies.google.com/terms/generative-ai for more information.")))
+
 (defun llm-vertex--embedding (provider string vector-callback error-callback sync)
   "Get the embedding for STRING.
 PROVIDER, VECTOR-CALLBACK, ERROR-CALLBACK are all the same as
 `llm-embedding-async'. SYNC, when non-nil, will wait until the
 response is available to return."
   (llm-vertex-refresh-key provider)
+  (llm-vertex-maybe-warn)
   (request (format "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:predict"
                                llm-vertex-gcloud-region
                                (llm-vertex-project provider)
@@ -112,6 +118,7 @@ PROVIDER, RESPONSE-CALLBACK, ERROR-CALLBACK are all the same as
 `llm-chat-response-async'. SYNC, when non-nil, will wait until
 the response is available to return."
   (llm-vertex-refresh-key provider)
+  (llm-vertex-maybe-warn)
   (let ((request-alist))
     (when (llm-chat-prompt-context prompt)
       (push `("context" . ,(llm-chat-prompt-context prompt)) request-alist))

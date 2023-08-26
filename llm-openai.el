@@ -50,11 +50,17 @@ EMBEDDING-MODEL is the model to use for embeddings.  If unset, it
 will use a reasonable default."
   key chat-model embedding-model)
 
+(defun llm-openai--maybe-warn ()
+  (when llm-warn-on-nonfree
+    (warn "Open AI's API is not free software, and your freedom to use it is restricted by Open AI's terms of service.
+See https://openai.com/policies/terms-of-use for the restrictions on use.")))
+
 (defun llm-openai--embedding-make-request (provider string vector-callback error-callback sync)
   "Make a request to Open AI to get an embedding for STRING.
 PROVIDER, VECTOR-CALLBACK and ERROR-CALLBACK are as in the
 `llm-embedding-async' call. SYNC is non-nil when the request
 should wait until the response is received."
+  (llm-openai--maybe-warn)
   (unless (llm-openai-key provider)
     (error "To call Open AI API, add a key to the `llm-openai' provider."))
   (request "https://api.openai.com/v1/embeddings"
@@ -98,6 +104,7 @@ ERROR-CALLBACK is called if there is an error, with the error
 signal and message.
 
 SYNC is non-nil when the request should wait until the response is received."
+  (llm-openai--maybe-warn)
   (unless (llm-openai-key provider)
     (error "To call Open AI API, the key must have been set"))
   (let (request-alist system-prompt)

@@ -40,6 +40,14 @@
 
 (require 'cl-lib)
 
+(defgroup llm nil
+  "Interface to pluggable llm backends."
+  :group 'external)
+
+(defcustom llm-warn-on-nonfree t
+  "Whether to issue a warning when using a non-free LLM."
+  :type 'boolean)
+
 (cl-defstruct llm-chat-prompt
   "This stores all the information needed for a structured chat prompt.
 
