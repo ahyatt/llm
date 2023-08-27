@@ -89,7 +89,7 @@ should wait until the response is received."
                                         (lambda (_ error-message) (error error-message)) t)
     response))
 
-(defun llm-openai--chat-response (provider prompt response-callback error-callback &optional return-json-spec sync)
+(defun llm-openai--chat (provider prompt response-callback error-callback &optional return-json-spec sync)
   "Main method to send a PROMPT as a chat prompt to Open AI.
 RETURN-JSON-SPEC, if specified, is a JSON spec to return from the
 Open AI API.
@@ -160,12 +160,12 @@ SYNC is non-nil when the request should wait until the response is received."
                                              (assoc-default 'type (cdar data))
                                              (assoc-default 'message (cdar data)))))))))
 
-(cl-defmethod llm-chat-response-async ((provider llm-openai) prompt response-callback error-callback)
-  (llm-openai--chat-response provider prompt response-callback error-callback))
+(cl-defmethod llm-chat-async ((provider llm-openai) prompt response-callback error-callback)
+  (llm-openai--chat provider prompt response-callback error-callback))
 
-(cl-defmethod llm-chat-response ((provider llm-openai) prompt)
+(cl-defmethod llm-chat ((provider llm-openai) prompt)
   (let ((response))
-    (llm-openai--chat-response provider prompt
+    (llm-openai--chat provider prompt
                                (lambda (result) (setq response result))
                                (lambda (_ msg) (error msg))
                                nil t)

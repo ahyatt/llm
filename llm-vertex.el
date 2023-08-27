@@ -110,10 +110,10 @@ response is available to return."
                            (lambda (_ error-message) (error error-message)) t)
     response))
 
-(defun llm-vertex--chat-response (provider prompt response-callback error-callback sync)
+(defun llm-vertex--chat (provider prompt response-callback error-callback sync)
   "Get the chat response for PROMPT.
 PROVIDER, RESPONSE-CALLBACK, ERROR-CALLBACK are all the same as
-`llm-chat-response-async'. SYNC, when non-nil, will wait until
+`llm-chat-async'. SYNC, when non-nil, will wait until
 the response is available to return."
   (llm-vertex-refresh-key provider)
   (llm-vertex-maybe-warn)
@@ -163,12 +163,12 @@ the response is available to return."
                                                     (assoc-default 'message (assoc-default 'error data))
                                                     data))))))))
 
-(cl-defmethod llm-chat-response-async ((provider llm-vertex) prompt response-callback error-callback)
-  (llm-vertex--chat-response provider prompt response-callback error-callback nil))
+(cl-defmethod llm-chat-async ((provider llm-vertex) prompt response-callback error-callback)
+  (llm-vertex--chat provider prompt response-callback error-callback nil))
 
-(cl-defmethod llm-chat-response ((provider llm-vertex) prompt)
+(cl-defmethod llm-chat ((provider llm-vertex) prompt)
   (let ((response))
-    (llm-vertex--chat-response provider prompt
+    (llm-vertex--chat provider prompt
                                (lambda (result) (setq response result))
                                (lambda (_ error-message) (error error-message)) t)
     response))

@@ -12,13 +12,16 @@ Clients should require the module, =llm=, and code against it.  Most functions a
 
 A list of all the functions:
 
-- ~llm-chat-response provider prompt~:  With user-chosen ~provider~ , and a ~llm-chat-prompt~ structure (containing context, examples, interactions, and parameters such as temperature and max tokens), send that prompt to the LLM and wait for the string output.
+- ~llm-chat provider prompt~:  With user-chosen ~provider~ , and a ~llm-chat-prompt~ structure (containing context, examples, interactions, and parameters such as temperature and max tokens), send that prompt to the LLM and wait for the string output.
+- ~llm-chat-async provider prompt response-callback error-callback~: Same as ~llm-chat~, but executes in the background.  Takes a ~response-callback~ which will be called with the text response.  The ~error-callback~ will be called in case of error, with the error symbol and an error message.
 - ~llm-embedding provider string~: With the user-chosen ~provider~, send a string and get an embedding, which is a large vector of floating point values.  The embedding represents the semantic meaning of the string, and the vector can be compared against other vectors, where smaller distances between the vectors represent greater semantic similarity.
+- ~llm-embedding-async provider string vector-callback error-callback~: Same as ~llm-embedding~ but this is processed asynchronously. ~vector-callback~ is called with the vector embedding, and, in case of error, ~error-callback~ is called with the same arguments as in ~llm-chat-async~.
 
 All of the providers currently implemented.
 
 - =llm-openai=.  This is the interface to Open AI's Chat GPT.  The user must set their key, and select their preferred chat and embedding model.
 - =llm-vertex=.  This is the interface to Google Cloud's Vertex API.  The user needs to set their project number.  In addition, to get authenticated, the user must have logged in initially, and have a valid path in ~llm-vertex-gcloud-binary~.  Users can also configure ~llm-vertex-gcloud-region~ for using a region closer to their location.  It defaults to ="us-central1"=  The provider can also contain the user's chosen embedding and chat model.
+- =llm-fake=.  This is a provider that is useful for developers using this library, to be able to understand what is being sent to the =llm= library without actually sending anything over the wire.
 
 If you are interested in creating a provider, please send a pull request, or open a bug.
 

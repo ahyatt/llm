@@ -66,7 +66,7 @@
 (defun llm-tester-chat-async (provider)
   "Test that PROVIDER can interact with the LLM chat."
   (message "Testing provider %s for chat" (type-of provider))
-  (llm-chat-response-async
+  (llm-chat-async
    provider
    (make-llm-chat-prompt
     :interactions (list
@@ -90,7 +90,7 @@
 (defun llm-tester-chat-sync (provider)
   "Test that PROVIDER can interact with the LLM chat."
   (message "Testing provider %s for chat" (type-of provider))
-  (let ((response (llm-chat-response
+  (let ((response (llm-chat
                    provider
                    (make-llm-chat-prompt
                     :interactions (list

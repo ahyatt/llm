@@ -90,16 +90,16 @@ an LLM, and don't need the more advanced features that the
 `llm-chat-prompt' struct makes available."
   (make-llm-chat-prompt :interactions (list (make-llm-chat-prompt-interaction :role 'user :content text))))
 
-(cl-defgeneric llm-chat-response (provider prompt)
+(cl-defgeneric llm-chat (provider prompt)
   "Return a response to PROMPT from PROVIDER.
 PROMPT is a `llm-chat-prompt'. The response is a string."
   (ignore provider prompt)
   (signal 'not-implemented nil))
 
-(cl-defmethod llm-chat-response ((_ (eql nil)) _)
+(cl-defmethod llm-chat ((_ (eql nil)) _)
   (error "LLM provider was nil.  Please set the provider in the application you are using."))
 
-(cl-defgeneric llm-chat-response-async (provider prompt response-callback error-callback)
+(cl-defgeneric llm-chat-async (provider prompt response-callback error-callback)
   "Return a response to PROMPT from PROVIDER.
 PROMPT is a `llm-chat-prompt'.
 RESPONSE-CALLBACK receives the string response.
@@ -107,7 +107,7 @@ ERROR-CALLBACK receives the error response."
   (ignore provider prompt response-callback error-callback)
   (signal 'not-implemented nil))
 
-(cl-defmethod llm-chat-response-async ((_ (eql nil)) _ _ _)
+(cl-defmethod llm-chat-async ((_ (eql nil)) _ _ _)
   (error "LLM provider was nil.  Please set the provider in the application you are using."))
 
 (cl-defgeneric llm-embedding (provider string)

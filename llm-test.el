@@ -42,15 +42,15 @@
                           "Test"))))
 
 (ert-deftest llm-test-chat ()
-  (should-error (llm-chat-response nil "Test"))
-  (should-error (llm-chat-response-async nil "Test"))
-  (should-error (llm-chat-response
+  (should-error (llm-chat nil "Test"))
+  (should-error (llm-chat-async nil "Test"))
+  (should-error (llm-chat
                  (make-llm-fake
                   :chat-action-func (lambda () (cons 'error "my message")))
                  (make-llm-chat-prompt)))
   (should (equal
            "Response"
-           (llm-chat-response (make-llm-fake :chat-action-func (lambda () "Response"))
+           (llm-chat (make-llm-fake :chat-action-func (lambda () "Response"))
                               (make-llm-chat-prompt)))))
 
 ;;; llm-test.el ends here

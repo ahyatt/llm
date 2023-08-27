@@ -52,11 +52,11 @@ message cons. If nil, the response will be a simple vector."
     (t (funcall error-callback (car err) (cdr err))))
   nil)
 
-(cl-defmethod llm-chat-response ((provider llm-fake) prompt)
+(cl-defmethod llm-chat ((provider llm-fake) prompt)
   (when (llm-fake-output-to-buffer provider)
     (with-current-buffer (get-buffer-create (llm-fake-output-to-buffer provider))
       (goto-char (point-max))
-      (insert "\nCall to llm-chat-response\n"  (llm-chat-prompt-to-text prompt) "\n")))
+      (insert "\nCall to llm-chat\n"  (llm-chat-prompt-to-text prompt) "\n")))
   (if (llm-fake-chat-action-func provider)
       (let* ((f (llm-fake-chat-action-func provider))
              (result (funcall f)))
@@ -64,7 +64,7 @@ message cons. If nil, the response will be a simple vector."
                 ('string result)
                 ('cons (signal (car result) (cdr result)))
                 (_ (error "Incorrect type found in `chat-action-func': %s" (type-of result)))))
-    "Sample response from `llm-chat-response-async'"))
+    "Sample response from `llm-chat-async'"))
 
 (cl-defmethod llm-embedding ((provider llm-fake) string)
   (when (llm-fake-output-to-buffer provider)
