@@ -49,7 +49,13 @@
   :type 'boolean)
 
 (defun llm--warn-on-nonfree (name tos)
-  "Issue a warning if `llm-warn-on-nonfree' is non-nil."
+  "Issue a warning if `llm-warn-on-nonfree' is non-nil.
+NAME is the human readable name of the LLM (e.g 'Open AI').
+
+TOS is the URL of the terms of service for the LLM.
+
+All non-free LLMs should call this function on each llm function
+invocation."
   (when llm-warn-on-nonfree
     (lwarn '(llm nonfree) :warning "%s API is not free software, and your freedom to use it is restricted.
 See %s for the details on the restrictions on use." name tos)))
