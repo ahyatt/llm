@@ -48,6 +48,12 @@
   "Whether to issue a warning when using a non-free LLM."
   :type 'boolean)
 
+(defun llm--warn-on-nonfree (name tos)
+  "Issue a warning if `llm-warn-on-nonfree' is non-nil."
+  (when llm-warn-on-nonfree
+    (lwarn '(llm nonfree) :warning "%s API is not free software, and your freedom to use it restricted.
+See %s for the details on the restrictions on use." name tos)))
+
 (cl-defstruct llm-chat-prompt
   "This stores all the information needed for a structured chat prompt.
 

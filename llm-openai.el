@@ -51,9 +51,7 @@ will use a reasonable default."
   key chat-model embedding-model)
 
 (defun llm-openai--maybe-warn ()
-  (when llm-warn-on-nonfree
-    (warn "Open AI's API is not free software, and your freedom to use it is restricted by Open AI's terms of service.
-See https://openai.com/policies/terms-of-use for the restrictions on use.")))
+  (llm--warn-on-nonfree "Open AI" "https://openai.com/policies/terms-of-use"))
 
 (defun llm-openai--embedding-make-request (provider string vector-callback error-callback sync)
   "Make a request to Open AI to get an embedding for STRING.

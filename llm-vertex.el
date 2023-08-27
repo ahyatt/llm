@@ -70,9 +70,7 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
     (setf (llm-vertex-key-gentime provider) (current-time))))
 
 (defun llm-vertex-maybe-warn ()
-  (when llm-warn-on-nonfree
-    (warn "Google Cloud's Vertex AI is not free software, and your freedom to use it is restricted by Google's terms of service.
-See https://policies.google.com/terms/generative-ai for more information.")))
+  (llm--warn-on-nonfree "Google Cloud Vertex" "https://policies.google.com/terms/generative-ai"))
 
 (defun llm-vertex--embedding (provider string vector-callback error-callback sync)
   "Get the embedding for STRING.
