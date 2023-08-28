@@ -57,7 +57,7 @@ TOS is the URL of the terms of service for the LLM.
 All non-free LLMs should call this function on each llm function
 invocation."
   (when llm-warn-on-nonfree
-    (lwarn '(llm nonfree) :warning "%s API is not free software, and your freedom to use it is restricted.
+    (lwarn 'llm :warning "%s API is not free software, and your freedom to use it is restricted.
 See %s for the details on the restrictions on use." name tos)))
 
 (cl-defstruct llm-chat-prompt
@@ -96,6 +96,17 @@ an LLM, and don't need the more advanced features that the
 `llm-chat-prompt' struct makes available."
   (make-llm-chat-prompt :interactions (list (make-llm-chat-prompt-interaction :role 'user :content text))))
 
+(cl-defgeneric llm-nonfree-message-info (provider)
+  "If PROVIDER is non-free, return info for a warning.
+This should be a cons of the name of the LLM, and the URL of the
+terms of service.
+
+If the LLM is free and has no restrictions on use, this should
+return nil. Since this function already returns nil, there is no
+need to override it."
+  (ignore provider)
+  nil)
+
 (cl-defgeneric llm-chat (provider prompt)
   "Return a response to PROMPT from PROVIDER.
 PROMPT is a `llm-chat-prompt'. The response is a string."
@@ -104,6 +115,11 @@ PROMPT is a `llm-chat-prompt'. The response is a string."
 
 (cl-defmethod llm-chat ((_ (eql nil)) _)
   (error "LLM provider was nil.  Please set the provider in the application you are using."))
+
+(cl-defmethod llm-chat :before (provider _ _ _)
+  "Issue a warning if the LLM is non-free."
+  (when-let (info (llm-nonfree-message-info provider))
+    (llm--warn-on-nonfree (car info) (cdr info))))
 
 (cl-defgeneric llm-chat-async (provider prompt response-callback error-callback)
   "Return a response to PROMPT from PROVIDER.
@@ -116,6 +132,11 @@ ERROR-CALLBACK receives the error response."
 (cl-defmethod llm-chat-async ((_ (eql nil)) _ _ _)
   (error "LLM provider was nil.  Please set the provider in the application you are using."))
 
+(cl-defmethod llm-chat-async :before (provider _ _ _)
+  "Issue a warning if the LLM is non-free."
+  (when-let (info (llm-nonfree-message-info provider))
+    (llm--warn-on-nonfree (car info) (cdr info))))
+
 (cl-defgeneric llm-embedding (provider string)
   "Return a vector embedding of STRING from PROVIDER."
   (ignore provider string)
@@ -123,6 +144,11 @@ ERROR-CALLBACK receives the error response."
 
 (cl-defmethod llm-embedding ((_ (eql nil)) _)
   (error "LLM provider was nil.  Please set the provider in the application you are using."))
+
+(cl-defmethod llm-embedding :before (provider _)
+  "Issue a warning if the LLM is non-free."
+  (when-let (info (llm-nonfree-message-info provider))
+    (llm--warn-on-nonfree (car info) (cdr info))))
 
 (cl-defgeneric llm-embedding-async (provider string vector-callback error-callback)
   "Calculate a vector embedding of STRING from PROVIDER.
@@ -134,6 +160,11 @@ error signal and a string message."
 
 (cl-defmethod llm-embedding-async ((_ (eql nil)) _ _ _)
   (error "LLM provider was nil.  Please set the provider in the application you are using."))
+
+(cl-defmethod llm-embedding-async :before (provider _ _ _)
+  "Issue a warning if the LLM is non-free."
+  (when-let (info (llm-nonfree-message-info provider))
+    (llm--warn-on-nonfree (car info) (cdr info))))
 
 (cl-defgeneric llm-count-tokens (provider string)
   "Return the number of tokens in STRING from PROVIDER.
