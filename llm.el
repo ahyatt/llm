@@ -116,7 +116,7 @@ PROMPT is a `llm-chat-prompt'. The response is a string."
 (cl-defmethod llm-chat ((_ (eql nil)) _)
   (error "LLM provider was nil.  Please set the provider in the application you are using."))
 
-(cl-defmethod llm-chat :before (provider _ _ _)
+(cl-defmethod llm-chat :before (provider _)
   "Issue a warning if the LLM is non-free."
   (when-let (info (llm-nonfree-message-info provider))
     (llm--warn-on-nonfree (car info) (cdr info))))
