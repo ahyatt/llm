@@ -26,6 +26,7 @@
 ;;; Code:
 
 (require 'cl-lib)
+(require 'llm)
 (require 'request)
 (require 'json)
 

@@ -25,6 +25,8 @@
 
 (require 'cl-lib)
 (require 'llm)
+(require 'request)
+(require 'json)
 
 (defgroup llm-vertex nil
   "LLM implementation for Google Cloud Vertex AI."
