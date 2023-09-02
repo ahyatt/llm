@@ -46,9 +46,9 @@ either a vector response for the chat, or a signal symbol and
 message cons. If nil, the response will be a simple vector."
  output-to-buffer chat-action-func embedding-action-func)
 
-(cl-defmethod llm-chat-response-async ((provider llm-fake) prompt response-callback error-callback)
+(cl-defmethod llm-chat-async ((provider llm-fake) prompt response-callback error-callback)
   (condition-case err
-      (funcall response-callback (llm-chat-response provider prompt))
+      (funcall response-callback (llm-chat provider prompt))
     (t (funcall error-callback (car err) (cdr err))))
   nil)
 
@@ -77,7 +77,7 @@ message cons. If nil, the response will be a simple vector."
         (pcase (type-of result)
                 ('vector result)
                 ('cons (signal (car result) (cdr result)))
-                (_ (error "Incorrect type found in `chat-embedding-func': %s" (type-of-result)))))
+                (_ (error "Incorrect type found in `chat-embedding-func': %s" (type-of result)))))
     [0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9]))
 
 (cl-defmethod llm-embedding-async ((provider llm-fake) string vector-callback error-callback)
