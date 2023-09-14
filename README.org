@@ -1,5 +1,6 @@
 #+TITLE: llm package for emacs
 
+* Introduction
 This is a library for interfacing with Large Language Models.  It allows elisp code to use LLMs, but allows gives the end-user an option to choose which LLM they would prefer.  This is especially useful for LLMs, since there are various high-quality ones that in which API access costs money, as well as  locally installed ones that are free, but of medium quality.  Applications using LLMs can use this library to make sure their application works regardless of whether the user has a local LLM or is paying for API access.
 
 The functionality supported by LLMs is not completely consistent, nor are their APIs.  In this library we attempt to abstract functionality to a higher level, because sometimes those higher level concepts are supported by an API, and othertimes they must be put in more low-level concepts.  One such higher-level concept is "examples" where the client can show example interactions to demonstrate a pattern for the LLM.  The GCloud Vertex API has an explicit API for examples, but for Open AI's API, examples must be specified by modifying the system prompt.  Open AI has the concept of a system prompt, whereas Vertex API does not.  These are the kinds of API differences we attempt to hide by having higher-level concepts in our API.
@@ -7,8 +8,31 @@ The functionality supported by LLMs is not completely consistent, nor are their 
 Some functionality may not be supported by LLMs.  Any unsupported functionality with throw a ='not-implemented= signal.
 
 This package is simple at the moment, but will grow as both LLMs and functionality is added.
+* Setting up providers
+Users who use an application that uses this package should not need to install it.  The llm module should be installed as a dependency when you install the package that uses it.  You do need to make sure to both require and set up the provider you will be using.  Typically, applications will have a variable you can set.  For example, let's say there's a package called "llm-refactoring", which has a variable ~llm-refactoring-provider~.  You would set it up like so:
 
-Clients should require the module, =llm=, and code against it.  Most functions are generic, and take a struct representing a provider as the first argument. The client code, or the user themselves can then require the specific module, such as =llm-openai=, and create a provider with a function such as ~(make-llm-openai :key user-api-key)~.  The client application will use this provider to call all the generic functions.
+#+begin_src emacs-lisp
+(use-package llm-refactoring
+  :init (setq llm-refactoring-provider (make-llm-openai :key my-openai-key))
+#+end_src
+
+Here ~my-openai-key~ would be a variable you set up before with your Open AI key.  Or, just substitute the key itself as a string.  It's important that you remember never to check your key into a public repository such as github, because your key must be kept private.  Anyone with your key can use the API, and you will be charged.
+** Open AI
+You can set up with ~make-llm-openai~, with the following parameters:
+- ~:key~, the Open AI key that you get when you sign up to use Open AI's APIs.  Remember to keep this private.  This is non-optional.
+- ~:chat-model~: A model name from the [[https://platform.openai.com/docs/models/gpt-4][list of Open AI's model names.]]  Keep in mind some of these are not available to everyone.  This is optional, and will default to a reasonable 3.5 model.
+- ~:embedding-model~: A model name from [[https://platform.openai.com/docs/guides/embeddings/embedding-models][list of Open AI's embedding model names.]]  This is optional, and will default to a reasonable model.
+** Vertex
+You can set up with ~make-llm-vertex~, with the following parameters:
+- ~:project~: Your project number from Google Cloud that has Vertex API enabled.
+- ~:chat-model~: A model name from the [[https://cloud.google.com/vertex-ai/docs/generative-ai/chat/chat-prompts#supported_model][list of Vertex's model names.]]  This is optional, and will default to a reasonable model.
+- ~:embedding-model~: A model name from the [[https://cloud.google.com/vertex-ai/docs/generative-ai/embeddings/get-text-embeddings#supported_models][list of Vertex's embedding model names.]]  This is optional, and will default to a reasonable model.
+
+In addition to the provider, which you may want multiple of (for example, to charge against different projects), there are customizable variables:
+- ~llm-vertex-gcloud-binary~: The binary to use for generating the API key.
+- ~llm-vertex-gcloud-region~: The gcloud region to use.  It's good to set this to a region near where you are for best latency.  Defaults to "us-central1".
+* Programmatic use
+Client applications should require the module, =llm=, and code against it.  Most functions are generic, and take a struct representing a provider as the first argument. The client code, or the user themselves can then require the specific module, such as =llm-openai=, and create a provider with a function such as ~(make-llm-openai :key user-api-key)~.  The client application will use this provider to call all the generic functions.
 
 A list of all the functions:
 
@@ -22,7 +46,5 @@ All of the providers currently implemented.
 - =llm-openai=.  This is the interface to Open AI's Chat GPT.  The user must set their key, and select their preferred chat and embedding model.
 - =llm-vertex=.  This is the interface to Google Cloud's Vertex API.  The user needs to set their project number.  In addition, to get authenticated, the user must have logged in initially, and have a valid path in ~llm-vertex-gcloud-binary~.  Users can also configure ~llm-vertex-gcloud-region~ for using a region closer to their location.  It defaults to ="us-central1"=  The provider can also contain the user's chosen embedding and chat model.
 - =llm-fake=.  This is a provider that is useful for developers using this library, to be able to understand what is being sent to the =llm= library without actually sending anything over the wire.
-
-If you are interested in creating a provider, please send a pull request, or open a bug.
-
-This library is not yet part of any package archive.
+* Contributions
+If you are interested in creating a provider, please send a pull request, or open a bug.  This library is part of GNU ELPA, so any major provider that we include in this module needs to be written by someone with FSF papers.  However, you can always write a module and put it on a different package archive, such as MELPA.
