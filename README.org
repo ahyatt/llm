@@ -13,7 +13,9 @@ Users who use an application that uses this package should not need to install i
 
 #+begin_src emacs-lisp
 (use-package llm-refactoring
-  :init (setq llm-refactoring-provider (make-llm-openai :key my-openai-key))
+  :init
+  (require 'llm-openai)
+  (setq llm-refactoring-provider (make-llm-openai :key my-openai-key))
 #+end_src
 
 Here ~my-openai-key~ would be a variable you set up before with your Open AI key.  Or, just substitute the key itself as a string.  It's important that you remember never to check your key into a public repository such as github, because your key must be kept private.  Anyone with your key can use the API, and you will be charged.
@@ -31,8 +33,24 @@ You can set up with ~make-llm-vertex~, with the following parameters:
 In addition to the provider, which you may want multiple of (for example, to charge against different projects), there are customizable variables:
 - ~llm-vertex-gcloud-binary~: The binary to use for generating the API key.
 - ~llm-vertex-gcloud-region~: The gcloud region to use.  It's good to set this to a region near where you are for best latency.  Defaults to "us-central1".
+** Fake
+This is a client that makes no call, but it just there for testing and debugging.  Mostly this is of use to programmatic clients of the llm package, but end users can also use it to understand what will be sent to the LLMs.  It has the following parameters:
+- ~:output-to-buffer~: if non-nil, the buffer or buffer name to append the request sent to the LLM to.
+- ~:chat-action-func~: a function that will be called to provide a string or symbol and message cons which are used to raise an error.
+- ~:embedding-action-func~: a function that will be called to provide a vector or symbol and message cons which are used to raise an error.
+* =llm= and the use of non-free LLMs
+The =llm= package is part of GNU Emacs by being part of GNU ELPA.  Unfortunately, the most popular LLMs in use are non-free, which is not what GNU software should be promoting by inclusion.  On the other hand, by use of the =llm= package, the user can make sure that any client that codes against it will work with free models that come along.  It's likely that sophisticated free LLMs will, emerge, although it's unclear right now what free software means with respsect to LLMs.  Because of this tradeoff, we have decided to warn the user when using non-free LLMs (which is every LLM supported right now except the fake one).  You can turn this off the same way you turn off any other warning, by clicking on the left arrow next to the warning when it comes up.  Alternatively, you can set ~llm-warn-on-nonfree~ to ~nil~.  This can be set via customization as well.
+
+To build upon the example from before:
+#+begin_src emacs-lisp
+(use-package llm-refactoring
+  :init
+  (require 'llm-openai)
+  (setq llm-refactoring-provider (make-llm-openai :key my-openai-key)
+        llm-warn-on-nonfree nil)
+#+end_src
 * Programmatic use
-Client applications should require the module, =llm=, and code against it.  Most functions are generic, and take a struct representing a provider as the first argument. The client code, or the user themselves can then require the specific module, such as =llm-openai=, and create a provider with a function such as ~(make-llm-openai :key user-api-key)~.  The client application will use this provider to call all the generic functions.
+Client applications should require the =llm= package, and code against it.  Most functions are generic, and take a struct representing a provider as the first argument. The client code, or the user themselves can then require the specific module, such as =llm-openai=, and create a provider with a function such as ~(make-llm-openai :key user-api-key)~.  The client application will use this provider to call all the generic functions.
 
 A list of all the functions:
 
@@ -40,11 +58,5 @@ A list of all the functions:
 - ~llm-chat-async provider prompt response-callback error-callback~: Same as ~llm-chat~, but executes in the background.  Takes a ~response-callback~ which will be called with the text response.  The ~error-callback~ will be called in case of error, with the error symbol and an error message.
 - ~llm-embedding provider string~: With the user-chosen ~provider~, send a string and get an embedding, which is a large vector of floating point values.  The embedding represents the semantic meaning of the string, and the vector can be compared against other vectors, where smaller distances between the vectors represent greater semantic similarity.
 - ~llm-embedding-async provider string vector-callback error-callback~: Same as ~llm-embedding~ but this is processed asynchronously. ~vector-callback~ is called with the vector embedding, and, in case of error, ~error-callback~ is called with the same arguments as in ~llm-chat-async~.
-
-All of the providers currently implemented.
-
-- =llm-openai=.  This is the interface to Open AI's Chat GPT.  The user must set their key, and select their preferred chat and embedding model.
-- =llm-vertex=.  This is the interface to Google Cloud's Vertex API.  The user needs to set their project number.  In addition, to get authenticated, the user must have logged in initially, and have a valid path in ~llm-vertex-gcloud-binary~.  Users can also configure ~llm-vertex-gcloud-region~ for using a region closer to their location.  It defaults to ="us-central1"=  The provider can also contain the user's chosen embedding and chat model.
-- =llm-fake=.  This is a provider that is useful for developers using this library, to be able to understand what is being sent to the =llm= library without actually sending anything over the wire.
 * Contributions
 If you are interested in creating a provider, please send a pull request, or open a bug.  This library is part of GNU ELPA, so any major provider that we include in this module needs to be written by someone with FSF papers.  However, you can always write a module and put it on a different package archive, such as MELPA.
