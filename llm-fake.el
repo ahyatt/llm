@@ -1,6 +1,6 @@
 ;;; llm-fake.el --- Use for developers looking at llm calls. -*- lexical-binding: t -*-
 
-;; Copyright (c) 2023  Andrew Hyatt <ahyatt@gmail.com>
+;; Copyright (c) 2023  Free Software Foundation, Inc.
 
 ;; Author: Andrew Hyatt <ahyatt@gmail.com>
 ;; Homepage: https://github.com/ahyatt/llm

@@ -1,6 +1,6 @@
 ;;; llm-tester.el --- Helpers for testing LLM implementation -*- lexical-binding: t -*-
 
-;; Copyright (c) 2023  Andrew Hyatt <ahyatt@gmail.com>
+;; Copyright (c) 2023  Free Software Foundation, Inc.
 
 ;; Author: Andrew Hyatt <ahyatt@gmail.com>
 ;; SPDX-License-Identifier: GPL-3.0-or-later

@@ -1,6 +1,6 @@
 ;;; llm-openai.el --- llm module for integrating with Open AI -*- lexical-binding: t -*-
 
-;; Copyright (c) 2023  Andrew Hyatt <ahyatt@gmail.com>
+;; Copyright (c) 2023  Free Software Foundation, Inc.
 
 ;; Author: Andrew Hyatt <ahyatt@gmail.com>
 ;; Homepage: https://github.com/ahyatt/llm

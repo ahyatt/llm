@@ -1,6 +1,6 @@
 ;;; llm-test.el --- Unit tests for the llm module -*- lexical-binding: t -*-
 
-;; Copyright (c) 2023  Andrew Hyatt <ahyatt@gmail.com>
+;; Copyright (c) 2023  Free Software Foundation, Inc.
 
 ;; Author: Andrew Hyatt <ahyatt@gmail.com>
 ;; SPDX-License-Identifier: GPL-3.0-or-later
