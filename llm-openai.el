@@ -139,7 +139,7 @@ SYNC is non-nil when the request should wait until the response is received."
                               ("parameters" . ,return-json-spec))))
             request-alist)
       (push '("function_call" . (("name" . "output"))) request-alist))
-    
+
     (request "https://api.openai.com/v1/chat/completions"
       :type "POST"
       :sync sync
@@ -150,7 +150,7 @@ SYNC is non-nil when the request should wait until the response is received."
       :success (cl-function
                 (lambda (&key data &allow-other-keys)
                   (let ((result (cdr (assoc 'content (cdr (assoc 'message (aref (cdr (assoc 'choices data)) 0))))))
-                        (func-result (cdr (assoc 'arguments (cdr (assoc 'function_call (cdr (assoc 'message (aref (cdr (assoc 'choices data)) 0)))))))))        
+                        (func-result (cdr (assoc 'arguments (cdr (assoc 'function_call (cdr (assoc 'message (aref (cdr (assoc 'choices data)) 0)))))))))
                     (funcall response-callback (or func-result result)))))
       :error (cl-function (lambda (&key error-thrown data &allow-other-keys)
                             (funcall error-callback
