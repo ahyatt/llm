@@ -23,9 +23,9 @@
 
 ;;; Commentary:
 ;; This file defines a generic interface for LLMs (large language models), and
-;; functionality they can provide. Not all LLMs will support all of these, but
+;; functionality they can provide.  Not all LLMs will support all of these, but
 ;; programs that want to integrate with LLMs can code against the interface, and
-;; users can then choose the LLMs they want to use. It's advisable to have the
+;; users can then choose the LLMs they want to use.  It's advisable to have the
 ;; possibility of using multiple LLMs when that make sense for different
 ;; functionality.
 ;;
@@ -50,7 +50,7 @@
 
 (defun llm--warn-on-nonfree (name tos)
   "Issue a warning if `llm-warn-on-nonfree' is non-nil.
-NAME is the human readable name of the LLM (e.g 'Open AI').
+NAME is the human readable name of the LLM (e.g \"Open AI\").
 
 TOS is the URL of the terms of service for the LLM.
 
@@ -72,7 +72,7 @@ EXAMPLES is a list of conses, where the car is an example
 inputs, and cdr is the corresponding example outputs.  This is optional.
 
 INTERACTIONS is a list message sent by either the llm or the
-user. It is a list of `llm-chat-prompt-interaction' objects. This
+user.  It is a list of `llm-chat-prompt-interaction' objects.  This
 is required.
 
 TEMPERATURE is a floating point number with a minimum of 0, and
@@ -80,8 +80,7 @@ maximum of 1, which controls how predictable the result is, with
 0 being the most predicatable, and 1 being the most creative.
 This is not required.
 
-MAX-TOKENS is the maximum number of tokens to generate.  This is optional.
-"
+MAX-TOKENS is the maximum number of tokens to generate.  This is optional."
   context examples interactions temperature max-tokens)
 
 (cl-defstruct llm-chat-prompt-interaction
@@ -102,19 +101,20 @@ This should be a cons of the name of the LLM, and the URL of the
 terms of service.
 
 If the LLM is free and has no restrictions on use, this should
-return nil. Since this function already returns nil, there is no
+return nil.  Since this function already returns nil, there is no
 need to override it."
   (ignore provider)
   nil)
 
 (cl-defgeneric llm-chat (provider prompt)
   "Return a response to PROMPT from PROVIDER.
-PROMPT is a `llm-chat-prompt'. The response is a string."
+PROMPT is a `llm-chat-prompt'.  The response is a string."
   (ignore provider prompt)
   (signal 'not-implemented nil))
 
 (cl-defmethod llm-chat ((_ (eql nil)) _)
-  (error "LLM provider was nil.  Please set the provider in the application you are using."))
+  "Catch trivial configuration mistake."
+  (error "LLM provider was nil.  Please set the provider in the application you are using"))
 
 (cl-defmethod llm-chat :before (provider _)
   "Issue a warning if the LLM is non-free."
@@ -130,7 +130,8 @@ ERROR-CALLBACK receives the error response."
   (signal 'not-implemented nil))
 
 (cl-defmethod llm-chat-async ((_ (eql nil)) _ _ _)
-  (error "LLM provider was nil.  Please set the provider in the application you are using."))
+  "Catch trivial configuration mistake."
+  (error "LLM provider was nil.  Please set the provider in the application you are using"))
 
 (cl-defmethod llm-chat-async :before (provider _ _ _)
   "Issue a warning if the LLM is non-free."
@@ -143,7 +144,8 @@ ERROR-CALLBACK receives the error response."
   (signal 'not-implemented nil))
 
 (cl-defmethod llm-embedding ((_ (eql nil)) _)
-  (error "LLM provider was nil.  Please set the provider in the application you are using."))
+  "Catch trivial configuration mistake."
+  (error "LLM provider was nil.  Please set the provider in the application you are using"))
 
 (cl-defmethod llm-embedding :before (provider _)
   "Issue a warning if the LLM is non-free."
@@ -159,7 +161,8 @@ error signal and a string message."
   (signal 'not-implemented nil))
 
 (cl-defmethod llm-embedding-async ((_ (eql nil)) _ _ _)
-  (error "LLM provider was nil.  Please set the provider in the application you are using."))
+  "Catch trivial configuration mistake."
+  (error "LLM provider was nil.  Please set the provider in the application you are using"))
 
 (cl-defmethod llm-embedding-async :before (provider _ _ _)
   "Issue a warning if the LLM is non-free."
@@ -169,7 +172,7 @@ error signal and a string message."
 (cl-defgeneric llm-count-tokens (provider string)
   "Return the number of tokens in STRING from PROVIDER.
 This may be an estimate if the LLM does not provide an exact
-count. Different providers might tokenize things in different
+count.  Different providers might tokenize things in different
 ways."
     (ignore provider)
     (with-temp-buffer
@@ -199,3 +202,4 @@ This should only be used for logging or debugging."
             "")))
 
 (provide 'llm)
+;;; llm.el ends here
