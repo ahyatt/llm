@@ -36,7 +36,8 @@
 (cl-defun llm-request-sync (url &key headers data timeout)
   "Make a request to URL.  The parsed response will be returned.
 
-AUTH will be sent in the Authorization header.  This is optional.
+HEADERS will be added in the Authorization header, in addition to
+standard json header. This is optional.
 
 DATA will be jsonified and sent as the request body.
 This is required.
@@ -56,7 +57,8 @@ TIMEOUT is the number of seconds to wait for a response."
   "Make a request to URL.
 Nothing will be returned.
 
-AUTH will be sent in the Authorization header.  This is optional.
+HEADERS will be added in the Authorization header, in addition to
+standard json header. This is optional.
 
 DATA will be jsonified and sent as the request body.
 This is required.
