@@ -129,6 +129,14 @@ ERROR-CALLBACK receives the error response."
   (ignore provider prompt response-callback error-callback)
   (signal 'not-implemented nil))
 
+(cl-defgeneric llm-chat-streaming (provider prompt response-callback error-callback)
+  "Stream a response to PROMPT from PROVIDER.
+PROMPT is a `llm-chat-prompt'.
+RESPONSE-CALLBACK receives the each piece of the string response.
+ERROR-CALLBACK receives the error response."
+  (ignore provider prompt response-callback error-callback)
+  (signal 'not-implemented nil))
+
 (cl-defmethod llm-chat-async ((_ (eql nil)) _ _ _)
   "Catch trivial configuration mistake."
   (error "LLM provider was nil.  Please set the provider in the application you are using"))

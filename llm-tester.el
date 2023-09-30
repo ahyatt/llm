@@ -108,6 +108,29 @@
           (message "ERROR: Provider %s returned an empty response" (type-of provider)))
       (message "ERROR: Provider %s did not return any response" (type-of provider)))))
 
+(defun llm-tester-chat-streaming (provider)
+  "Test that PROVIDER can stream back LLM chat responses."
+  (message "Testing provider %s for streaming chat" (type-of provider))
+  (let ((accum)
+        (counter 0))
+    (llm-chat-streaming
+     provider
+     (make-llm-chat-prompt
+      :interactions (list
+                     (make-llm-chat-prompt-interaction
+                      :role 'user
+                      :content "Write a poem in iambic pentameter about the pleasures of using Emacs.  The poem should make snide references to vi."))
+      :temperature 0.5
+      :max-tokens 200)
+     (lambda (text)
+       (if text (progn (message "Chunk retrieved")
+                       (cl-incf counter)
+                       (setq accum text))
+         (message "SUCCESS: Provider %s provided a response %s in %d parts"
+                  (type-of provider) accum counter)))
+     (lambda (type message)
+       (message "ERROR: Provider %s returned an error of type %s with message %s" (type-of provider) type message)))))
+
 (defun llm-tester-all (provider)
   "Test all llm functionality for PROVIDER."
   (llm-tester-embedding-sync provider)

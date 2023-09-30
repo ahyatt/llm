@@ -43,6 +43,12 @@ If the binary is not in the PATH, the full path must be specified."
   :type 'string
   :group 'llm-vertex)
 
+(defcustom llm-vertex-example-prelude "Examples of how you should respond follow."
+  "The prelude to use for examples in Vertex chat prompts.
+This is only used for streaming calls."
+  :type 'string
+  :group 'llm-vertex)
+
 (cl-defstruct llm-vertex
   "A struct representing a Vertex AI client.
 
@@ -81,7 +87,7 @@ PROVIDER, VECTOR-CALLBACK, ERROR-CALLBACK are all the same as
 `llm-embedding-async'. SYNC, when non-nil, will wait until the
 response is available to return."
   (llm-vertex-refresh-key provider)
-  (request (format "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:predict"
+  (request (format "https://%s-aiplatform.googleapis.com/%s/projects/%s/locations/%s/publishers/google/models/%s:predict"
                                llm-vertex-gcloud-region
                                (llm-vertex-project provider)
                                llm-vertex-gcloud-region
@@ -112,66 +118,199 @@ response is available to return."
                            (lambda (_ error-message) (error error-message)) t)
     response))
 
-(defun llm-vertex--chat (provider prompt response-callback error-callback sync)
-  "Get the chat response for PROMPT.
-PROVIDER, RESPONSE-CALLBACK, ERROR-CALLBACK are all the same as
-`llm-chat-async'. SYNC, when non-nil, will wait until
-the response is available to return."
-  (llm-vertex-refresh-key provider)
-  (let ((request-alist))
+(defun llm-vertex--parameters-ui (prompt)
+  "Return a alist setting parameters, appropriate for the ui API.
+If nothing needs to be set, return nil."
+  (let ((param-struct-alist))
+    (when (llm-chat-prompt-temperature prompt)
+      (push `("temperature" . (("float_val" . ,(llm-chat-prompt-temperature prompt)))) param-struct-alist))
+    (when (llm-chat-prompt-max-tokens prompt)
+      (push `("maxOutputTokens" . (("int_val" . ,(llm-chat-prompt-max-tokens prompt)))) param-struct-alist))
+      ;; Wrap in the "parameters" and "struct_val" keys
+    (if param-struct-alist
+        `(("parameters" . (("struct_val" . ,param-struct-alist)))))))
+
+(defun llm-vertex--parameters-v1 (prompt)
+  "Return an alist setting parameters, appropriate for the v1 API.
+If nothing needs to be set, return nil."
+  (let ((param-struct-alist))
+    (when (llm-chat-prompt-temperature prompt)
+      (push `("temperature" . ,(llm-chat-prompt-temperature prompt)) param-struct-alist))
+    (when (llm-chat-prompt-max-tokens prompt)
+      (push `("maxOutputTokens" . ,(llm-chat-prompt-max-tokens prompt)) param-struct-alist))
+      ;; Wrap in the "parameters" and "struct_val" keys
+    (if param-struct-alist
+        `(("parameters" . ,param-struct-alist)))))
+
+(defun llm-vertex--input-ui (prompt)
+  "Return an alist with chat input, appropriate for ui API.
+PROMPT contains the input to the call to the chat API."
+  (let ((system-prompt))
     (when (llm-chat-prompt-context prompt)
-      (push `("context" . ,(llm-chat-prompt-context prompt)) request-alist))
+      (push (llm-chat-prompt-context prompt) system-prompt))
     (when (llm-chat-prompt-examples prompt)
-      (push `("examples" . ,(apply #'vector
-                                   (mapcar (lambda (example)
+      (push (concat llm-vertex-example-prelude "\n"
+                    (mapconcat (lambda (example)
+                                 (concat "User:\n" (car example) "\nAssistant:\n" (cdr example)))
+                               (llm-chat-prompt-examples prompt) "\n"))
+            system-prompt))
+    `(("inputs" . ((("struct_val" .
+                   (("messages" .
+                     (("list_val" .
+                       ,(mapcar (lambda (interaction)
+                                  `(("struct_val" . (("content" .
+                                                      (("string_val" .
+                                                        (,(format "'\"%s\"'"
+                                                                  (llm-chat-prompt-interaction-content
+                                                                   interaction))))))
+                                                     ("author" .
+                                                      (("string_val" .
+                                                        ,(format "'\"%s\"'"
+                                                                 (pcase (llm-chat-prompt-interaction-role interaction)
+                                                                   ('user "user")
+                                                                   ('system "system")
+                                                                   ('assistant "assistant"))))))))))
+                                (if system-prompt
+                                    (cons (make-llm-chat-prompt-interaction
+                                           :role 'system
+                                           :content (mapconcat #'identity (nreverse system-prompt) "\n"))
+                                          (llm-chat-prompt-interactions prompt))
+                                  (llm-chat-prompt-interactions prompt))))))))))))))
+
+(defun llm-vertex--input-v1 (prompt)
+  "Return an alist with chat input, appropriate for v1 API.
+PROMPT contains the input to the call to the chat API."
+  (let ((param-alist))
+    (when (llm-chat-prompt-context prompt)
+      (push `("context" . ,(llm-chat-prompt-context prompt)) param-alist))
+    (when (llm-chat-prompt-examples prompt)
+      (push `("examples" . ,(mapcar (lambda (example)
                                       `(("input" . (("content" . ,(car example))))
                                         ("output" . (("content" . ,(cdr example))))))
-                                           (llm-chat-prompt-examples prompt))))
-            request-alist))
-    (push `("messages" . ,(apply #'vector
-                                 (mapcar (lambda (interaction)
-                                           `(("author" . (pcase (llm-chat-prompt-interaction-role interaction)
-                                                           ('user "user")
-                                                           ('system (error "System role not supported"))
-                                                           ('assistant "assistant")))
-                                             ("content" . ,(llm-chat-prompt-interaction-content interaction))))
-                                         (llm-chat-prompt-interactions prompt))))
-          request-alist)
-    (when (llm-chat-prompt-temperature prompt)
-      (push `("temperature" . ,(llm-chat-prompt-temperature prompt))
-            request-alist))
-    (when (llm-chat-prompt-max-tokens prompt)
-      (push `("max_tokens" . ,(llm-chat-prompt-max-tokens prompt)) request-alist))
-    (request (format "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:predict"
-                                   llm-vertex-gcloud-region
-                                   (llm-vertex-project provider)
-                                   llm-vertex-gcloud-region
-                                   (or (llm-vertex-chat-model provider) "chat-bison"))
-      :type "POST"
-      :sync sync
-      :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider)))
-                 ("Content-Type" . "application/json"))
-      :data (json-encode `(("instances" . [,request-alist])))
-      :parser 'json-read
-      :success (cl-function (lambda (&key data &allow-other-keys)
-                              (funcall response-callback
-                                       (cdr (assoc 'content (aref (cdr (assoc 'candidates (aref (cdr (assoc 'predictions data)) 0))) 0))))))
-      :error (cl-function (lambda (&key error-thrown data &allow-other-keys)
-                            (funcall error-callback 'error
-                                     (error (format "Problem calling GCloud AI: %s, status: %s message: %s (%s)"
-                                                    (cdr error-thrown)
-                                                    (assoc-default 'status (assoc-default 'error data))
-                                                    (assoc-default 'message (assoc-default 'error data))
-                                                    data))))))))
+                                           (llm-chat-prompt-examples prompt)))
+            param-alist))
+    (push `("messages" . ,(mapcar (lambda (interaction)
+                                     `(("author" . ,(pcase (llm-chat-prompt-interaction-role interaction)
+                                                      ('user "user")
+                                                      ('system (error "System role not supported"))
+                                                      ('assistant "assistant")))
+                                       ("content" . ,(llm-chat-prompt-interaction-content interaction))))
+                                   (llm-chat-prompt-interactions prompt)))
+          param-alist)
+    `(("instances" . (,param-alist)))))
+
+(defun llm-vertex--request-data-v1 (prompt)
+  "Return all request data to be passed to the v1 API.
+PROMPT contains the data that will be transformed into the result."
+  (append
+   (llm-vertex--input-v1 prompt)
+   (llm-vertex--parameters-v1 prompt)))
+
+(defun llm-vertex--request-data-ui (prompt)
+  "Return all request data to be passed to the ui API.
+PROMPT contains the data that will be transformed into the result."
+  (append
+   (llm-vertex--input-ui prompt)
+   (llm-vertex--parameters-ui prompt)))
+
+(defun llm-vertex--get-response-v1 (response)
+  "Return the actual response from the RESPONSE struct returned."
+  (cdr (assoc 'content (aref (cdr (assoc 'candidates (aref (cdr (assoc 'predictions response)) 0))) 0))))
+
+(defun llm-vertex--get-response-ui (response)
+  "Return the actual response from the RESPONSE struct returned."
+  (pcase (type-of response)
+    ('vector (mapconcat #'llm-vertex--get-response-ui
+                        response ""))
+    ('cons (let* ((outputs (cdr (assoc 'outputs response)))
+                  (structVal-list (cdr (assoc 'structVal (aref outputs 0))))
+                  (candidates (cdr (assoc 'candidates structVal-list)))
+                  (listVal (cdr (assoc 'listVal candidates)))
+                  (structVal (cdr (assoc 'structVal (aref listVal 0))))
+                  (content (cdr (assoc 'content structVal)))
+                  (stringVal (aref (cdr (assoc 'stringVal content)) 0)))
+             stringVal))))
+
+(defun llm-vertex--chat (provider prompt response-callback error-callback mode)
+  "Get the chat response for PROMPT.
+PROVIDER, RESPONSE-CALLBACK, ERROR-CALLBACK are all the same as
+`llm-chat-async'.
+
+MODE, is either the symbols sync, async, or streaming. If async or
+streaming, the value will not be returned with the response, but
+sent to RESPONSE-CALLBACK."
+  (llm-vertex-refresh-key provider)
+  (let ((r (request (format "https://%s-aiplatform.googleapis.com/%s/projects/%s/locations/%s/publishers/google/models/%s:%s"
+                            llm-vertex-gcloud-region
+                            (if (eq mode 'streaming) "ui" "v1")
+                            (llm-vertex-project provider)
+                            llm-vertex-gcloud-region
+                            (or (llm-vertex-chat-model provider) "chat-bison")
+                            (if (eq mode 'streaming) "serverStreamingPredict"
+                              "predict"))
+             :type "POST"
+             :sync (eq mode 'sync)
+             :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider)))
+                        ("Content-Type" . "application/json"))
+             :data (json-encode (if (eq mode 'streaming)
+                                    (llm-vertex--request-data-ui prompt)
+                                  (llm-vertex--request-data-v1 prompt)))
+             :parser 'json-read
+             :success (cl-function (lambda (&key data &allow-other-keys)
+                                     ;; If it's streaming, pass back nil, since we will have passed
+                                     ;; back everything else.
+                                     (funcall response-callback
+                                              (unless (eq mode 'streaming)
+                                                (llm-vertex--get-response-v1 data)))))
+             :error (cl-function (lambda (&key error-thrown data &allow-other-keys)
+                                   (funcall error-callback 'error
+                                            (error (format "Problem calling GCloud AI: %s, status: %s message: %s (%s)"
+                                                           (cdr error-thrown)
+                                                           (assoc-default 'status (assoc-default 'error data))
+                                                           (assoc-default 'message (assoc-default 'error data))
+                                                           data))))))))
+    (when (eq mode 'streaming)
+      (with-current-buffer (request-response--buffer r)
+        (add-hook 'after-change-functions
+                  (lambda (_ _ _)
+                    (let ((start (save-excursion
+                                   (goto-char (point-min))
+                                   (search-forward-regexp (rx (seq line-start "[")) nil t)
+                                   (beginning-of-line)
+                                   (point)))
+                          (end-of-valid-chunk
+                           (save-excursion
+                             (point-max)
+                             (search-backward-regexp (rx (seq line-start ",")) nil t)
+                             (point))))
+                      (when (and start end-of-valid-chunk)
+                        ;; It'd be nice if our little algorithm always worked, but doesn't, so let's
+                        ;; just ignore when it fails.  As long as it mostly succeeds, it should be fine.
+                        (condition-case nil
+                            (funcall response-callback
+                                     (llm-vertex--get-response-ui (json-read-from-string
+                                                                 (concat
+                                                                  (buffer-substring-no-properties
+                                                                   start end-of-valid-chunk)
+                                                                  ;; Close off the json
+                                                                  "]"))))
+                          (error (message "Unparseable buffer saved to *llm-vertex-unparseable*")
+                                 (let ((s (buffer-string)))
+                                   (with-current-buffer (get-buffer-create "*llm-vertex-unparseable*")
+                                     (erase-buffer)
+                                     (insert s)))))))) nil t)))))
 
 (cl-defmethod llm-chat-async ((provider llm-vertex) prompt response-callback error-callback)
-  (llm-vertex--chat provider prompt response-callback error-callback nil))
+  (llm-vertex--chat provider prompt response-callback error-callback 'async))
+
+(cl-defgeneric llm-chat-streaming (provider prompt response-callback error-callback)
+  (llm-vertex--chat provider prompt response-callback error-callback 'streaming))
 
 (cl-defmethod llm-chat ((provider llm-vertex) prompt)
   (let ((response))
     (llm-vertex--chat provider prompt
                                (lambda (result) (setq response result))
-                               (lambda (_ error-message) (error error-message)) t)
+                               (lambda (_ error-message) (error error-message)) 'sync)
     response))
 
 (provide 'llm-vertex)
