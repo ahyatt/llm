@@ -27,7 +27,7 @@
 
 (require 'cl-lib)
 (require 'llm)
-(require 'request)
+(require 'llm-request)
 (require 'json)
 
 (defgroup llm-openai nil
@@ -55,56 +55,54 @@ will use a reasonable default."
   (ignore provider)
   (cons "Open AI" "https://openai.com/policies/terms-of-use"))
 
-(defun llm-openai--embedding-make-request (provider string vector-callback error-callback sync)
-  "Make a request to Open AI to get an embedding for STRING.
-PROVIDER, VECTOR-CALLBACK and ERROR-CALLBACK are as in the
-`llm-embedding-async' call. SYNC is non-nil when the request
-should wait until the response is received."
-  (unless (llm-openai-key provider)
-    (error "To call Open AI API, add a key to the `llm-openai' provider."))
-  (request "https://api.openai.com/v1/embeddings"
-    :type "POST"
-    :sync sync
-    :timeout 5
-    :headers `(("Authorization" . ,(format "Bearer %s" (llm-openai-key provider)))
-               ("Content-Type" . "application/json"))
-    :data (json-encode `(("input" . ,string) ("model" . ,(or (llm-openai-embedding-model provider) "text-embedding-ada-002"))))
-    :parser 'json-read
-    :success (cl-function (lambda (&key data &allow-other-keys)
-                            (funcall vector-callback
-                                     (cdr (assoc 'embedding (aref (cdr (assoc 'data data)) 0))))))
-    :error (cl-function (lambda (&key error-thrown data &allow-other-keys)
-                          (funcall error-callback 'error
-                                   (format "Problem calling Open AI: %s, type: %s message: %s"
-                                           (cdr error-thrown)
-                                           (assoc-default 'type (cdar data))
-                                           (assoc-default 'message (cdar data))))))))
+(defun llm-openai--embedding-request (provider string)
+  "Return the request to the server for the embedding of STRING.
+PROVIDER is the llm-openai provider."
+  `(("input" . ,string)
+    ("model" . ,(or (llm-openai-embedding-model provider) "text-embedding-ada-002"))))
+
+(defun llm-openai--embedding-extract-response (response)
+  "Return the embedding from the server RESPONSE."
+  (cdr (assoc 'embedding (aref (cdr (assoc 'data response)) 0))))
+
+(defun llm-openai--error-message (err-response)
+  "Return a user-visible error message from ERR-RESPONSE."
+  (let ((errdata (cdr (assoc 'error err-response))))
+    (format "Problem calling Open AI: %s message: %s"
+            (cdr (assoc 'type errdata))
+            (cdr (assoc 'message errdata)))))
+
+(defun llm-openai--handle-response (response extractor)
+  "If RESPONSE is an error, throw it, else call EXTRACTOR."
+  (if (cdr (assoc 'error response))
+      (error (llm-openai--error-message response))
+    (funcall extractor response)))
 
 (cl-defmethod llm-embedding-async ((provider llm-openai) string vector-callback error-callback)
-  (llm-openai--embedding-make-request provider string vector-callback error-callback nil))
+  (unless (llm-openai-key provider)
+    (error "To call Open AI API, add a key to the `llm-openai' provider."))
+  (llm-request-async "https://api.openai.com/v1/embeddings"
+                     :headers `(("Authorization" . ,(format "Bearer %s" (llm-openai-key provider))))
+                     :data (llm-openai--embedding-request provider string)
+                     :on-success (lambda (data)
+                                   (funcall vector-callback (llm-openai--embedding-extract-response data)))
+                     :on-error (lambda (_ data) 
+                                 (funcall error-callback 'error
+                                            (llm-openai--error-message data)))))
 
 (cl-defmethod llm-embedding ((provider llm-openai) string)
-  (let ((response))
-    (llm-openai--embedding-make-request provider string
-                                        (lambda (vector) (setq response vector))
-                                        (lambda (_ error-message) (error error-message)) t)
-    response))
-
-(defun llm-openai--chat (provider prompt response-callback error-callback &optional return-json-spec sync)
-  "Main method to send a PROMPT as a chat prompt to Open AI.
-RETURN-JSON-SPEC, if specified, is a JSON spec to return from the
-Open AI API.
-
-PROVIDER is a `llm-openai' struct which holds the key and other options.
-
-RESPONSE-CALLBACK is a function to call with the LLM response.
-
-ERROR-CALLBACK is called if there is an error, with the error
-signal and message.
-
-SYNC is non-nil when the request should wait until the response is received."
   (unless (llm-openai-key provider)
-    (error "To call Open AI API, the key must have been set"))
+    (error "To call Open AI API, add a key to the `llm-openai' provider."))
+  (llm-openai--handle-response
+   (llm-request-sync "https://api.openai.com/v1/embeddings"
+               :headers `(("Authorization" . ,(format "Bearer %s" (llm-openai-key provider))))
+               :data (llm-openai--embedding-request provider string))
+   #'llm-openai--embedding-extract-response))
+
+(defun llm-openai--chat-request (provider prompt &optional return-json-spec)
+  "From PROMPT, create the chat request data to send.
+PROVIDER is the llm-openai provider to use.
+RETURN-JSON-SPEC is the optional specification for the JSON to return."
   (let (request-alist system-prompt)
     (when (llm-chat-prompt-context prompt)
       (setq system-prompt (llm-chat-prompt-context prompt)))
@@ -139,37 +137,36 @@ SYNC is non-nil when the request should wait until the response is received."
                               ("parameters" . ,return-json-spec))))
             request-alist)
       (push '("function_call" . (("name" . "output"))) request-alist))
+    request-alist))
 
-    (request "https://api.openai.com/v1/chat/completions"
-      :type "POST"
-      :sync sync
-      :headers `(("Authorization" . ,(format "Bearer %s" (llm-openai-key provider)))
-                 ("Content-Type" . "application/json"))
-      :data (json-encode request-alist)
-      :parser 'json-read
-      :success (cl-function
-                (lambda (&key data &allow-other-keys)
-                  (let ((result (cdr (assoc 'content (cdr (assoc 'message (aref (cdr (assoc 'choices data)) 0))))))
-                        (func-result (cdr (assoc 'arguments (cdr (assoc 'function_call (cdr (assoc 'message (aref (cdr (assoc 'choices data)) 0)))))))))
-                    (funcall response-callback (or func-result result)))))
-      :error (cl-function (lambda (&key error-thrown data &allow-other-keys)
-                            (funcall error-callback
-                                     'error
-                                     (format "Problem calling Open AI: %s, type: %s message: %s"
-                                             (cdr error-thrown)
-                                             (assoc-default 'type (cdar data))
-                                             (assoc-default 'message (cdar data)))))))))
+(defun llm-openai--extract-chat-response (response)
+  "Return chat response from server RESPONSE."
+  (let ((result (cdr (assoc 'content (cdr (assoc 'message (aref (cdr (assoc 'choices response)) 0))))))
+        (func-result (cdr (assoc 'arguments (cdr (assoc 'function_call (cdr (assoc 'message (aref (cdr (assoc 'choices response)) 0)))))))))
+    (or func-result result)))
 
 (cl-defmethod llm-chat-async ((provider llm-openai) prompt response-callback error-callback)
-  (llm-openai--chat provider prompt response-callback error-callback))
+  (unless (llm-openai-key provider)
+    (error "To call Open AI API, the key must have been set"))
+  (llm-request-async "https://api.openai.com/v1/chat/completions"
+      :headers `(("Authorization" . ,(format "Bearer %s" (llm-openai-key provider))))
+      :data (llm-openai--chat-request provider prompt)
+      :on-success (lambda (data) (funcall response-callback (llm-openai--extract-chat-response data)))
+      :on-error (lambda (_ data)
+                  (let ((errdata (cdr (assoc 'error data))))
+                    (funcall error-callback 'error
+                             (format "Problem calling Open AI: %s message: %s"
+                                     (cdr (assoc 'type errdata))
+                                     (cdr (assoc 'message errdata))))))))
 
 (cl-defmethod llm-chat ((provider llm-openai) prompt)
-  (let ((response))
-    (llm-openai--chat provider prompt
-                               (lambda (result) (setq response result))
-                               (lambda (_ msg) (error msg))
-                               nil t)
-    response))
+  (unless (llm-openai-key provider)
+    (error "To call Open AI API, the key must have been set"))
+  (llm-openai--handle-response
+   (llm-request-sync "https://api.openai.com/v1/chat/completions"
+                     :headers `(("Authorization" . ,(format "Bearer %s" (llm-openai-key provider))))
+                     :data (llm-openai--chat-request provider prompt) )
+   #'llm-openai--extract-chat-response))
 
 (provide 'llm-openai)
 

@@ -1,0 +1,2 @@
+* Version 0.2
+- Remove the dependency on non-GNU request library.
