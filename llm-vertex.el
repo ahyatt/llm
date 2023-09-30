@@ -25,7 +25,7 @@
 
 (require 'cl-lib)
 (require 'llm)
-(require 'request)
+(require 'llm-request)
 (require 'json)
 
 (defgroup llm-vertex nil
@@ -81,42 +81,42 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
   (ignore provider)
   (cons "Google Cloud Vertex" "https://policies.google.com/terms/generative-ai"))
 
-(defun llm-vertex--embedding (provider string vector-callback error-callback sync)
-  "Get the embedding for STRING.
-PROVIDER, VECTOR-CALLBACK, ERROR-CALLBACK are all the same as
-`llm-embedding-async'. SYNC, when non-nil, will wait until the
-response is available to return."
-  (llm-vertex-refresh-key provider)
-  (request (format "https://%s-aiplatform.googleapis.com/%s/projects/%s/locations/%s/publishers/google/models/%s:predict"
-                               llm-vertex-gcloud-region
-                               (llm-vertex-project provider)
-                               llm-vertex-gcloud-region
-                               (or (llm-vertex-embedding-model provider) "textembedding-gecko"))
-    :sync sync
-    :timeout 5
-    :type "POST"
-    :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider)))
-               ("Content-Type" . "application/json"))
-    :data (json-encode `(("instances" . [(("content" . ,string))])))
-    :parser 'json-read
-    :success (cl-function
-              (lambda (&key data &allow-other-keys)
-                (funcall vector-callback
-                         (cdr (assoc 'values (cdr (assoc 'embeddings (aref (cdr (assoc 'predictions data)) 0))))))))
-    :error (cl-function (lambda (&key error-thrown data &allow-other-keys)
-                          (funcall error-callback
-                                   (error (format "Problem calling GCloud AI: %s (%S)"
-                                                  (cdr error-thrown) data)))))))
+(defun llm-vertex--embedding-url (provider)
+  "From the PROVIDER, return the URL to use for embeddings"
+  (format "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:predict"
+                             llm-vertex-gcloud-region
+                             (llm-vertex-project provider)
+                             llm-vertex-gcloud-region
+                             (or (llm-vertex-embedding-model provider) "textembedding-gecko")))
+
+(defun llm-vertex--embedding-extract-response (response)
+  "Return the embedding contained in RESPONSE."
+  (cdr (assoc 'values (cdr (assoc 'embeddings (aref (cdr (assoc 'predictions response)) 0))))))
+
+(defun llm-vertex--error-message (err-response)
+  "Return a user-visible error message from ERR-RESPONSE."
+  (format "Problem calling GCloud Vertex AI: status: %s message: %s (%s)"
+          (assoc-default 'status (assoc-default 'error err-response))
+          (assoc-default 'message (assoc-default 'error err-response))
+          err-response))
+
+(defun llm-vertex--handle-response (response extractor)
+  "If RESPONSE is an error, throw it, else call EXTRACTOR."
+  (if (assoc 'error response)
+      (error (llm-vertex--error-message response))
+    (funcall extractor response)))
 
 (cl-defmethod llm-embedding-async ((provider llm-vertex) string vector-callback error-callback)
-  (llm-vertex--embedding provider string vector-callback error-callback nil))
-
-(cl-defmethod llm-embedding ((provider llm-vertex) string)
-  (let ((response))
-    (llm-vertex--embedding provider string
-                           (lambda (vector) (setq response vector))
-                           (lambda (_ error-message) (error error-message)) t)
-    response))
+  (llm-vertex-refresh-key provider)
+  (llm-request-async (llm-vertex--embedding-url provider)
+                     :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
+                     :data `(("instances" . [(("content" . ,string))]))
+                     :on-success (lambda (data)
+                                   (funcall vector-callback (llm-vertex--embedding-extract-response data)))
+                     :on-error (lambda (_ data)
+                                 (funcall error-callback
+                                          'error
+                                          (llm-vertex--error-message data)))))
 
 (defun llm-vertex--parameters-ui (prompt)
   "Return a alist setting parameters, appropriate for the ui API.
@@ -142,6 +142,14 @@ If nothing needs to be set, return nil."
     (if param-struct-alist
         `(("parameters" . ,param-struct-alist)))))
 
+(cl-defmethod llm-embedding ((provider llm-vertex) string)
+  (llm-vertex-refresh-key provider)
+  (llm-vertex--handle-response
+   (llm-request-sync (llm-vertex--embedding-url provider)
+                     :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
+                     :data `(("instances" . [(("content" . ,string))])))
+   #'llm-vertex--embedding-extract-response))
+
 (defun llm-vertex--input-ui (prompt)
   "Return an alist with chat input, appropriate for ui API.
 PROMPT contains the input to the call to the chat API."
@@ -153,7 +161,7 @@ PROMPT contains the input to the call to the chat API."
                     (mapconcat (lambda (example)
                                  (concat "User:\n" (car example) "\nAssistant:\n" (cdr example)))
                                (llm-chat-prompt-examples prompt) "\n"))
-            system-prompt))
+            system-prompt)))
     `(("inputs" . ((("struct_val" .
                    (("messages" .
                      (("list_val" .
@@ -187,131 +195,55 @@ PROMPT contains the input to the call to the chat API."
       (push `("examples" . ,(mapcar (lambda (example)
                                       `(("input" . (("content" . ,(car example))))
                                         ("output" . (("content" . ,(cdr example))))))
-                                           (llm-chat-prompt-examples prompt)))
-            param-alist))
-    (push `("messages" . ,(mapcar (lambda (interaction)
-                                     `(("author" . ,(pcase (llm-chat-prompt-interaction-role interaction)
-                                                      ('user "user")
-                                                      ('system (error "System role not supported"))
-                                                      ('assistant "assistant")))
-                                       ("content" . ,(llm-chat-prompt-interaction-content interaction))))
-                                   (llm-chat-prompt-interactions prompt)))
-          param-alist)
-    `(("instances" . (,param-alist)))))
+                                           (llm-chat-prompt-examples prompt))))
+            prompt-alist))
+    (push `("messages" . ,(apply #'vector
+                                 (mapcar (lambda (interaction)
+                                           `(("author" . (pcase (llm-chat-prompt-interaction-role interaction)
+                                                           ('user "user")
+                                                           ('system (error "System role not supported"))
+                                                           ('assistant "assistant")))
+                                             ("content" . ,(llm-chat-prompt-interaction-content interaction))))
+                                         (llm-chat-prompt-interactions prompt))))
+          prompt-alist)
+    (when (llm-chat-prompt-temperature prompt)
+      (push `("temperature" . ,(llm-chat-prompt-temperature prompt))
+            params-alist))
+    (when (llm-chat-prompt-max-tokens prompt)
+      (push `("max_tokens" . ,(llm-chat-prompt-max-tokens prompt)) params-alist))
+    `(("instances" . [,prompt-alist])
+      ("parameters" . ,params-alist))))
 
-(defun llm-vertex--request-data-v1 (prompt)
-  "Return all request data to be passed to the v1 API.
-PROMPT contains the data that will be transformed into the result."
-  (append
-   (llm-vertex--input-v1 prompt)
-   (llm-vertex--parameters-v1 prompt)))
+(defun llm-vertex--chat-url (provider)
+  "Return the correct url to use for PROVIDER."
+  (format "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:predict"
+                                   llm-vertex-gcloud-region
+                                   (llm-vertex-project provider)
+                                   llm-vertex-gcloud-region
+                                   (or (llm-vertex-chat-model provider) "chat-bison")))
 
-(defun llm-vertex--request-data-ui (prompt)
-  "Return all request data to be passed to the ui API.
-PROMPT contains the data that will be transformed into the result."
-  (append
-   (llm-vertex--input-ui prompt)
-   (llm-vertex--parameters-ui prompt)))
-
-(defun llm-vertex--get-response-v1 (response)
-  "Return the actual response from the RESPONSE struct returned."
+(defun llm-vertex--chat-extract-response (response)
+  "Return the chat response contained in the server RESPONSE."
   (cdr (assoc 'content (aref (cdr (assoc 'candidates (aref (cdr (assoc 'predictions response)) 0))) 0))))
 
-(defun llm-vertex--get-response-ui (response)
-  "Return the actual response from the RESPONSE struct returned."
-  (pcase (type-of response)
-    ('vector (mapconcat #'llm-vertex--get-response-ui
-                        response ""))
-    ('cons (let* ((outputs (cdr (assoc 'outputs response)))
-                  (structVal-list (cdr (assoc 'structVal (aref outputs 0))))
-                  (candidates (cdr (assoc 'candidates structVal-list)))
-                  (listVal (cdr (assoc 'listVal candidates)))
-                  (structVal (cdr (assoc 'structVal (aref listVal 0))))
-                  (content (cdr (assoc 'content structVal)))
-                  (stringVal (aref (cdr (assoc 'stringVal content)) 0)))
-             stringVal))))
-
-(defun llm-vertex--chat (provider prompt response-callback error-callback mode)
-  "Get the chat response for PROMPT.
-PROVIDER, RESPONSE-CALLBACK, ERROR-CALLBACK are all the same as
-`llm-chat-async'.
-
-MODE, is either the symbols sync, async, or streaming. If async or
-streaming, the value will not be returned with the response, but
-sent to RESPONSE-CALLBACK."
-  (llm-vertex-refresh-key provider)
-  (let ((r (request (format "https://%s-aiplatform.googleapis.com/%s/projects/%s/locations/%s/publishers/google/models/%s:%s"
-                            llm-vertex-gcloud-region
-                            (if (eq mode 'streaming) "ui" "v1")
-                            (llm-vertex-project provider)
-                            llm-vertex-gcloud-region
-                            (or (llm-vertex-chat-model provider) "chat-bison")
-                            (if (eq mode 'streaming) "serverStreamingPredict"
-                              "predict"))
-             :type "POST"
-             :sync (eq mode 'sync)
-             :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider)))
-                        ("Content-Type" . "application/json"))
-             :data (json-encode (if (eq mode 'streaming)
-                                    (llm-vertex--request-data-ui prompt)
-                                  (llm-vertex--request-data-v1 prompt)))
-             :parser 'json-read
-             :success (cl-function (lambda (&key data &allow-other-keys)
-                                     ;; If it's streaming, pass back nil, since we will have passed
-                                     ;; back everything else.
-                                     (funcall response-callback
-                                              (unless (eq mode 'streaming)
-                                                (llm-vertex--get-response-v1 data)))))
-             :error (cl-function (lambda (&key error-thrown data &allow-other-keys)
-                                   (funcall error-callback 'error
-                                            (error (format "Problem calling GCloud AI: %s, status: %s message: %s (%s)"
-                                                           (cdr error-thrown)
-                                                           (assoc-default 'status (assoc-default 'error data))
-                                                           (assoc-default 'message (assoc-default 'error data))
-                                                           data))))))))
-    (when (eq mode 'streaming)
-      (with-current-buffer (request-response--buffer r)
-        (add-hook 'after-change-functions
-                  (lambda (_ _ _)
-                    (let ((start (save-excursion
-                                   (goto-char (point-min))
-                                   (search-forward-regexp (rx (seq line-start "[")) nil t)
-                                   (beginning-of-line)
-                                   (point)))
-                          (end-of-valid-chunk
-                           (save-excursion
-                             (point-max)
-                             (search-backward-regexp (rx (seq line-start ",")) nil t)
-                             (point))))
-                      (when (and start end-of-valid-chunk)
-                        ;; It'd be nice if our little algorithm always worked, but doesn't, so let's
-                        ;; just ignore when it fails.  As long as it mostly succeeds, it should be fine.
-                        (condition-case nil
-                            (funcall response-callback
-                                     (llm-vertex--get-response-ui (json-read-from-string
-                                                                 (concat
-                                                                  (buffer-substring-no-properties
-                                                                   start end-of-valid-chunk)
-                                                                  ;; Close off the json
-                                                                  "]"))))
-                          (error (message "Unparseable buffer saved to *llm-vertex-unparseable*")
-                                 (let ((s (buffer-string)))
-                                   (with-current-buffer (get-buffer-create "*llm-vertex-unparseable*")
-                                     (erase-buffer)
-                                     (insert s)))))))) nil t)))))
-
 (cl-defmethod llm-chat-async ((provider llm-vertex) prompt response-callback error-callback)
-  (llm-vertex--chat provider prompt response-callback error-callback 'async))
-
-(cl-defgeneric llm-chat-streaming (provider prompt response-callback error-callback)
-  (llm-vertex--chat provider prompt response-callback error-callback 'streaming))
+  (llm-vertex-refresh-key provider)
+  (llm-request-async (llm-vertex--chat-url provider)
+                     :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
+                     :data (llm-vertex--chat-request prompt)
+                     :on-success (lambda (data)
+                                   (funcall response-callback (llm-vertex--chat-extract-response data)))
+                     :on-error (lambda (_ data)
+                                 (funcall error-callback 'error
+                                          (llm-vertex--error-message data)))))
 
 (cl-defmethod llm-chat ((provider llm-vertex) prompt)
-  (let ((response))
-    (llm-vertex--chat provider prompt
-                               (lambda (result) (setq response result))
-                               (lambda (_ error-message) (error error-message)) 'sync)
-    response))
+  (llm-vertex-refresh-key provider)
+  (llm-vertex--handle-response
+   (llm-request-sync (llm-vertex--chat-url provider)
+                     :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
+                     :data (llm-vertex--chat-request prompt))
+   #'llm-vertex--chat-extract-response))
 
 (provide 'llm-vertex)
 
