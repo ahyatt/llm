@@ -1,2 +1,4 @@
+* Version 0.2.1
+- Changes in how we make and listen to requests, in preparation for streaming functionality.
 * Version 0.2
 - Remove the dependency on non-GNU request library.
