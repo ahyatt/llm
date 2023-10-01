@@ -137,7 +137,8 @@
   (llm-tester-embedding-sync provider)
   (llm-tester-chat-sync provider)
   (llm-tester-embedding-async provider)
-  (llm-tester-chat-async provider))
+  (llm-tester-chat-async provider)
+  (llm-tester-chat-streaming provider))
 
 (provide 'llm-tester)
 
