@@ -99,10 +99,11 @@ PROVIDER is the llm-openai provider."
                :data (llm-openai--embedding-request provider string))
    #'llm-openai--embedding-extract-response))
 
-(defun llm-openai--chat-request (provider prompt &optional return-json-spec)
+(defun llm-openai--chat-request (provider prompt &optional return-json-spec streaming)
   "From PROMPT, create the chat request data to send.
 PROVIDER is the llm-openai provider to use.
-RETURN-JSON-SPEC is the optional specification for the JSON to return."
+RETURN-JSON-SPEC is the optional specification for the JSON to return.
+STREAMING if non-nil, turn on response streaming."
   (let (request-alist system-prompt)
     (when (llm-chat-prompt-context prompt)
       (setq system-prompt (llm-chat-prompt-context prompt)))
@@ -119,6 +120,7 @@ RETURN-JSON-SPEC is the optional specification for the JSON to return."
     (when system-prompt
       (push (make-llm-chat-prompt-interaction :role 'system :content system-prompt)
             (llm-chat-prompt-interactions prompt)))
+    (when streaming (push `("stream" . ,t) request-alist))
     (push `("messages" . ,(mapcar (lambda (p)
                                     `(("role" . ,(pcase (llm-chat-prompt-interaction-role p)
                                                    ('user "user")
@@ -165,8 +167,50 @@ RETURN-JSON-SPEC is the optional specification for the JSON to return."
   (llm-openai--handle-response
    (llm-request-sync "https://api.openai.com/v1/chat/completions"
                      :headers `(("Authorization" . ,(format "Bearer %s" (llm-openai-key provider))))
-                     :data (llm-openai--chat-request provider prompt) )
+                     :data (llm-openai--chat-request provider prompt))
    #'llm-openai--extract-chat-response))
+
+(defvar-local llm-openai-current-response ""
+  "The response so far from the server.")
+
+(defvar-local llm-openai-last-position 1
+  "The last position in the streamed response we read until.")
+
+(defun llm-openai--get-partial-chat-response (response)
+  "Return the text in the partial chat response from RESPONSE."
+  ;; To begin with, we should still be in the buffer with the actual response.
+  (let ((current-response llm-openai-current-response)
+        (last-position llm-openai-last-position))
+    (with-temp-buffer
+      (insert response)
+      (goto-char last-position)
+      (when (search-forward "\ndata: {" nil t)
+        (backward-char 2)
+        (ignore-errors
+          (setq current-response
+                (concat current-response (assoc-default 'content (assoc-default 'delta (aref (assoc-default 'choices (json-read)) 0))))))
+        (setq last-position (point))))
+    (setq-local llm-openai-current-response current-response)
+    (setq-local llm-openai-last-position last-position)
+    current-response))
+
+(cl-defmethod llm-chat-streaming ((provider llm-openai) prompt partial-callback response-callback error-callback)
+  (unless (llm-openai-key provider)
+    (error "To call Open AI API, the key must have been set"))
+  (llm-request-async "https://api.openai.com/v1/chat/completions"
+                     :headers `(("Authorization" . ,(format "Bearer %s" (llm-openai-key provider))))
+                     :data (llm-openai--chat-request provider prompt nil t)
+                     :on-error (lambda (_ data)
+                                 (let ((errdata (cdr (assoc 'error data))))
+                                   (funcall error-callback 'error
+                                            (format "Problem calling Open AI: %s message: %s"
+                                                    (cdr (assoc 'type errdata))
+                                                    (cdr (assoc 'message errdata))))))
+                     :on-partial (lambda (data)
+                                   (when-let ((response (llm-openai--get-partial-chat-response data)))
+                                     (funcall partial-callback response)))
+                     :on-success-raw (lambda (data)
+                                       (funcall response-callback (llm-openai--get-partial-chat-response data)))))
 
 (provide 'llm-openai)
 

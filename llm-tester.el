@@ -119,7 +119,7 @@
       :interactions (list
                      (make-llm-chat-prompt-interaction
                       :role 'user
-                      :content "Write a poem in iambic pentameter about the pleasures of using Emacs.  The poem should make snide references to vi."))
+                      :content "Write a short poem in iambic pentameter about the pleasures of using Emacs.  The poem should make snide references to vi."))
       :temperature 0.5
       :max-tokens 200)
      (lambda (text)

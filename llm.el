@@ -135,9 +135,13 @@ PROMPT is a `llm-chat-prompt'.
 
 PARTIAL-CALLBACK is called with the output of the string response
 as it is built up. The callback is called with the entire
-response that has been received, as it is streamed back.
+response that has been received, as it is streamed back. It is
+not guaranteed to be called with the complete response before
+RESPONSE-CALLBACK is called.
 
 RESPONSE-CALLBACK receives the each piece of the string response.
+It is called once after the response has been completed, with the
+final text.
 
 ERROR-CALLBACK receives the error response."
   (ignore provider prompt partial-callback response-callback error-callback)

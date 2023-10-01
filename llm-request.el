@@ -21,12 +21,12 @@
 
 ;;; Code:
 (require 'json)
+(require 'cl-macs)
 (require 'url-http)
 (require 'rx)
 
 (defun llm-request--content ()
   "From the current buffer, return the content of the response."
-  (message "llm-request--content for buffer %s" (current-buffer))
   (buffer-substring-no-properties
    (or (and (boundp 'url-http-end-of-headers) url-http-end-of-headers)
       (save-match-data
@@ -68,7 +68,7 @@ TIMEOUT is the number of seconds to wait for a response."
         (when llm-request--partial-callback
           (funcall llm-request--partial-callback (llm-request--content)))))))
 
-(cl-defun llm-request-async (url &key headers data on-success on-error on-partial)
+(cl-defun llm-request-async (url &key headers data on-success on-success-raw on-error on-partial)
   "Make a request to URL.
 Nothing will be returned.
 
@@ -78,14 +78,20 @@ standard json header. This is optional.
 DATA will be jsonified and sent as the request body.
 This is required.
 
-ON-SUCCESS will be called with the response body as a json object.
-This is required.
+ON-SUCCESS will be called with the response body as a json
+object. This is optional in the case that ON-SUCCESS-DATA is set,
+and required otherwise.
 
 ON-ERROR will be called with the error code and a response-body.
 This is required.
 
 ON-PARTIAL will be called with the potentially incomplete response
-body as a string.  This is an optional argument."
+body as a string.  This is an optional argument.
+
+ON-SUCCESS-RAW, if set, will be called in the buffer with the
+response body, and expect the response content. This is an
+optional argument, and mostly useful for streaming.  If not set,
+the buffer is turned into JSON and passed to ON-SUCCESS."
   (let ((url-request-method "POST")
         ;; This is necessary for streaming, otherwise we get gzip'd data that is
         ;; unparseable until the end. The responses should be small enough that
@@ -103,7 +109,9 @@ body as a string.  This is an optional argument."
               (remove-hook 'after-change-functions #'llm-request--handle-new-content t)
               (let ((code (url-http-parse-response)))
                 (if (eq code 200)
-                    (funcall on-success (json-read-from-string (llm-request--content)))
+                    (if on-success-raw
+                        (funcall on-success-raw (llm-request--content))
+                      (funcall on-success (json-read-from-string (llm-request--content))))
                   (funcall on-error code (ignore-errors
                                            (json-read-from-string (llm-request--content)))))))
             (list on-success on-error)
