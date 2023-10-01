@@ -129,13 +129,28 @@ ERROR-CALLBACK receives the error response."
   (ignore provider prompt response-callback error-callback)
   (signal 'not-implemented nil))
 
-(cl-defgeneric llm-chat-streaming (provider prompt response-callback error-callback)
+(cl-defgeneric llm-chat-streaming (provider prompt partial-callback response-callback error-callback)
   "Stream a response to PROMPT from PROVIDER.
 PROMPT is a `llm-chat-prompt'.
+
+PARTIAL-CALLBACK is called with the output of the string response
+as it is built up. The callback is called with the entire
+response that has been received, as it is streamed back.
+
 RESPONSE-CALLBACK receives the each piece of the string response.
+
 ERROR-CALLBACK receives the error response."
-  (ignore provider prompt response-callback error-callback)
+  (ignore provider prompt partial-callback response-callback error-callback)
   (signal 'not-implemented nil))
+
+(cl-defmethod llm-chat-streaming ((_ (eql nil)) _ _ _ _)
+  "Catch trivial configuration mistake."
+  (error "LLM provider was nil.  Please set the provider in the application you are using"))
+
+(cl-defmethod llm-chat-streaming :before (provider _ _ _ _)
+  "Issue a warning if the LLM is non-free."
+  (when-let (info (llm-nonfree-message-info provider))
+    (llm--warn-on-nonfree (car info) (cdr info))))
 
 (cl-defmethod llm-chat-async ((_ (eql nil)) _ _ _)
   "Catch trivial configuration mistake."

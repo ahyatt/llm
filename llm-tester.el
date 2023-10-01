@@ -111,7 +111,7 @@
 (defun llm-tester-chat-streaming (provider)
   "Test that PROVIDER can stream back LLM chat responses."
   (message "Testing provider %s for streaming chat" (type-of provider))
-  (let ((accum)
+  (let ((streamed)
         (counter 0))
     (llm-chat-streaming
      provider
@@ -123,11 +123,12 @@
       :temperature 0.5
       :max-tokens 200)
      (lambda (text)
-       (if text (progn (message "Chunk retrieved")
-                       (cl-incf counter)
-                       (setq accum text))
-         (message "SUCCESS: Provider %s provided a response %s in %d parts"
-                  (type-of provider) accum counter)))
+       (cl-incf counter)
+       (setq streamed text))
+     (lambda (text)
+       (message "SUCCESS: Provider %s provided a streamed response %s in %d parts, complete text is: %s" (type-of provider) streamed counter text)
+       (if (= 0 counter)
+           (message "ERROR: Provider %s streaming request never happened!" (type-of provider))))
      (lambda (type message)
        (message "ERROR: Provider %s returned an error of type %s with message %s" (type-of provider) type message)))))
 
