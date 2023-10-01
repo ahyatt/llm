@@ -56,6 +56,7 @@ A list of all the functions:
 
 - ~llm-chat provider prompt~:  With user-chosen ~provider~ , and a ~llm-chat-prompt~ structure (containing context, examples, interactions, and parameters such as temperature and max tokens), send that prompt to the LLM and wait for the string output.
 - ~llm-chat-async provider prompt response-callback error-callback~: Same as ~llm-chat~, but executes in the background.  Takes a ~response-callback~ which will be called with the text response.  The ~error-callback~ will be called in case of error, with the error symbol and an error message.
+- ~llm-chat-streaming provider prompt partial-callback response-callback error-callback~:  Similar to ~llm-chat-async~, but request a streaming response.  As the response is built up, ~partial-callback~ is called with the all the text retrieved up to the current point.  Finally, ~reponse-callback~ is called with the complete text.
 - ~llm-embedding provider string~: With the user-chosen ~provider~, send a string and get an embedding, which is a large vector of floating point values.  The embedding represents the semantic meaning of the string, and the vector can be compared against other vectors, where smaller distances between the vectors represent greater semantic similarity.
 - ~llm-embedding-async provider string vector-callback error-callback~: Same as ~llm-embedding~ but this is processed asynchronously. ~vector-callback~ is called with the vector embedding, and, in case of error, ~error-callback~ is called with the same arguments as in ~llm-chat-async~.
 * Contributions
