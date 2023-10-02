@@ -1,5 +1,6 @@
 * Version 0.3
 - Streaming support in the API, and for the Open AI and Vertex models.
+- Properly encode and decode in utf-8 so double-width or other character sizes don't cause problems.
 * Version 0.2.1
 - Changes in how we make and listen to requests, in preparation for streaming functionality.
 - Fix overzealous change hook creation when using async llm requests.

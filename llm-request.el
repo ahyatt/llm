@@ -27,15 +27,16 @@
 
 (defun llm-request--content ()
   "From the current buffer, return the content of the response."
-  (buffer-substring-no-properties
-   (or (and (boundp 'url-http-end-of-headers) url-http-end-of-headers)
-      (save-match-data
-        (save-excursion
-          (goto-char (point-min))
-          (search-forward "\n\n" nil t)
-          (forward-line)
-          (point))))
-    (point-max)))
+  (decode-coding-string
+   (buffer-substring-no-properties
+    (or (and (boundp 'url-http-end-of-headers) url-http-end-of-headers)
+        (save-match-data
+          (save-excursion
+            (goto-char (point-min))
+            (search-forward "\n\n" nil t)
+            (forward-line)
+            (point))))
+    (point-max)) 'utf-8))
 
 (defvar-local llm-request--partial-callback nil
   "The callback to call when a partial response is received.")
@@ -53,7 +54,7 @@ TIMEOUT is the number of seconds to wait for a response."
   (let ((url-request-method "POST")
         (url-request-extra-headers
          (append headers '(("Content-Type" . "application/json"))))
-        (url-request-data (json-encode data)))
+        (url-request-data (encode-coding-string (json-encode data) 'utf-8)))
     (let ((buf (url-retrieve-synchronously url t nil (or timeout 5))))
       (if buf
           (with-current-buffer buf
@@ -99,7 +100,7 @@ the buffer is turned into JSON and passed to ON-SUCCESS."
         (url-mime-encoding-string "identity")
         (url-request-extra-headers
          (append headers '(("Content-Type" . "application/json"))))
-        (url-request-data (json-encode data)))
+        (url-request-data (encode-coding-string (json-encode data) 'utf-8)))
     (let ((buffer
            (url-retrieve
             url
