@@ -82,7 +82,8 @@ message cons. If nil, the response will be a simple vector."
     (let ((accum ""))
       (mapc (lambda (word)
               (setq accum (concat accum word " "))
-              (funcall partial-callback accum))
+              (funcall partial-callback accum)
+              (sleep-for 0 100))
             (string-split text))
       (funcall response-callback text))))
 
