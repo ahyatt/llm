@@ -156,6 +156,31 @@ ERROR-CALLBACK receives the error response."
   (when-let (info (llm-nonfree-message-info provider))
     (llm--warn-on-nonfree (car info) (cdr info))))
 
+(defun llm-chat-streaming-to-point (provider prompt buffer point finish-callback)
+  "Stream the llm output of PROMPT to POINT in BUFFER.
+PROVIDER is the backend provider of the LLM functionality.
+FINISH-CALLBACK is called with no arguments when the output has finished."
+  (with-current-buffer buffer
+    (save-excursion
+      (let ((start (make-marker))
+            (end (make-marker)))
+        (set-marker start point)
+        (set-marker end point)
+        (set-marker-insertion-type start nil)
+        (set-marker-insertion-type end t)
+        (cl-flet ((insert-text (text)
+                    ;; Erase and insert the new text between the marker cons.
+                    (with-current-buffer (marker-buffer start)
+                      (save-excursion
+                        (goto-char start)
+                        (delete-region start end)
+                        (insert text)))))
+          (llm-chat-streaming provider prompt
+                              (lambda (text) (insert-text text))
+                              (lambda (text) (insert-text text)
+                                (funcall finish-callback))
+                              (lambda (_ msg) (error "Error calling the LLM: %s" msg))))))))
+
 (cl-defmethod llm-chat-async ((_ (eql nil)) _ _ _)
   "Catch trivial configuration mistake."
   (error "LLM provider was nil.  Please set the provider in the application you are using"))
