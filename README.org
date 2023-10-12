@@ -57,12 +57,19 @@ To build upon the example from before:
 * Programmatic use
 Client applications should require the =llm= package, and code against it.  Most functions are generic, and take a struct representing a provider as the first argument. The client code, or the user themselves can then require the specific module, such as =llm-openai=, and create a provider with a function such as ~(make-llm-openai :key user-api-key)~.  The client application will use this provider to call all the generic functions.
 
-A list of all the functions:
+A list of all the main functions:
 
 - ~llm-chat provider prompt~:  With user-chosen ~provider~ , and a ~llm-chat-prompt~ structure (containing context, examples, interactions, and parameters such as temperature and max tokens), send that prompt to the LLM and wait for the string output.
 - ~llm-chat-async provider prompt response-callback error-callback~: Same as ~llm-chat~, but executes in the background.  Takes a ~response-callback~ which will be called with the text response.  The ~error-callback~ will be called in case of error, with the error symbol and an error message.
 - ~llm-chat-streaming provider prompt partial-callback response-callback error-callback~:  Similar to ~llm-chat-async~, but request a streaming response.  As the response is built up, ~partial-callback~ is called with the all the text retrieved up to the current point.  Finally, ~reponse-callback~ is called with the complete text.
 - ~llm-embedding provider string~: With the user-chosen ~provider~, send a string and get an embedding, which is a large vector of floating point values.  The embedding represents the semantic meaning of the string, and the vector can be compared against other vectors, where smaller distances between the vectors represent greater semantic similarity.
 - ~llm-embedding-async provider string vector-callback error-callback~: Same as ~llm-embedding~ but this is processed asynchronously. ~vector-callback~ is called with the vector embedding, and, in case of error, ~error-callback~ is called with the same arguments as in ~llm-chat-async~.
+- ~llm-count-tokens provider string~: Count how many tokens are in ~string~.  This may theoretically vary by ~provider~ but typically is always about the same.  This gives an estimate only.
+
+  And the following helper functions:
+  - ~llm-make-simple-chat-prompt text~: For the common case of just wanting a simple text prompt without the richness that ~llm-chat-prompt~ struct provides, use this to turn a string into a ~llm-chat-prompt~ that can be passed to the main functions above.
+  - ~llm-chat-prompt-to-text prompt~: Somewhat opposite of the above, from a prompt, return a string representation.  This is not usually suitable for passing to LLMs, but for debugging purposes.
+  - ~llm-chat-streaming-to-point provider prompt buffer point finish-callback~: Same basic arguments as ~llm-chat-streaming~, but will stream to ~point~ in ~buffer~.
+
 * Contributions
 If you are interested in creating a provider, please send a pull request, or open a bug.  This library is part of GNU ELPA, so any major provider that we include in this module needs to be written by someone with FSF papers.  However, you can always write a module and put it on a different package archive, such as MELPA.
