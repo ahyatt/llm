@@ -1,5 +1,6 @@
 * Version 0.4
 - Add helper function ~llm-chat-streaming-to-point~.
+- Add provider =llm-ollama=.
 * Version 0.3
 - Streaming support in the API, and for the Open AI and Vertex models.
 - Properly encode and decode in utf-8 so double-width or other character sizes don't cause problems.

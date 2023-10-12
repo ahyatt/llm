@@ -33,6 +33,11 @@ You can set up with ~make-llm-vertex~, with the following parameters:
 In addition to the provider, which you may want multiple of (for example, to charge against different projects), there are customizable variables:
 - ~llm-vertex-gcloud-binary~: The binary to use for generating the API key.
 - ~llm-vertex-gcloud-region~: The gcloud region to use.  It's good to set this to a region near where you are for best latency.  Defaults to "us-central1".
+** Ollama
+[[https://ollama.ai/][Ollama]] is a way to run large language models locally. There are [[https://ollama.ai/library][many different models]] you can use with it. You set it up with the following parameters:
+- ~:port~: The localhost port that ollama is run on.  This is optional and will default to the default ollama port.
+- ~:chat-mode~: The model name to use for chat.  This is not optional for chat use, since there is no default.
+- ~:embedding-model~: The model name to use for embeddings.  This is not optional for embedding use, since there is no default.
 ** Fake
 This is a client that makes no call, but it just there for testing and debugging.  Mostly this is of use to programmatic clients of the llm package, but end users can also use it to understand what will be sent to the LLMs.  It has the following parameters:
 - ~:output-to-buffer~: if non-nil, the buffer or buffer name to append the request sent to the LLM to.
