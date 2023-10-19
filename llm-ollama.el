@@ -47,12 +47,15 @@
 (cl-defstruct llm-ollama
   "A structure for holding information needed by Ollama's API.
 
+HOST is the host that Ollama is running on. It is optional and
+default to localhost.
+
 PORT is the localhost port that Ollama is running on.  It is optional.
 
 CHAT-MODEL is the model to use for chat queries. It is required.
 
 EMBEDDING-MODEL is the model to use for embeddings.  It is required."
-  port chat-model embedding-model)
+  host port chat-model embedding-model)
 
 ;; Ollama's models may or may not be free, we have no way of knowing. There's no
 ;; way to tell, and no ToS to point out here.
@@ -62,7 +65,8 @@ EMBEDDING-MODEL is the model to use for embeddings.  It is required."
 
 (defun llm-ollama--url (provider method)
   "With ollama PROVIDER, return url for METHOD."
-  (format "http://localhost:%d/api/%s" (or (llm-ollama-port provider) 11434) method))
+  (format "http://%s:%d/api/%s" (or (llm-ollama-host provider) "localhost")
+          (or (llm-ollama-port provider) 11434) method))
 
 (defun llm-ollama--embedding-request (provider string)
   "Return the request to the server for the embedding of STRING.
