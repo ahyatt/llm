@@ -269,18 +269,27 @@ If STREAMING is non-nil, use the URL for the streaming API."
                      :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
                      :data (llm-vertex--chat-request-v1 prompt)
                      :on-success (lambda (data)
-                                   (funcall response-callback (llm-vertex--chat-extract-response data)))
+                                   (let ((response (llm-vertex--chat-extract-response data)))
+                                     (setf (llm-chat-prompt-interactions prompt)
+                                           (append (llm-chat-prompt-interactions prompt)
+                                                   (list (make-llm-chat-prompt-interaction :role 'assistant :content response))))
+                                     (funcall response-callback response)))
                      :on-error (lambda (_ data)
                                  (funcall error-callback 'error
                                           (llm-vertex--error-message data)))))
 
 (cl-defmethod llm-chat ((provider llm-vertex) prompt)
   (llm-vertex-refresh-key provider)
-  (llm-vertex--handle-response
-   (llm-request-sync (llm-vertex--chat-url provider nil)
-                     :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
-                     :data (llm-vertex--chat-request-v1 prompt))
-   #'llm-vertex--chat-extract-response))
+  (let ((response (llm-vertex--handle-response
+                 (llm-request-sync
+                  (llm-vertex--chat-url provider nil)
+                  :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
+                  :data (llm-vertex--chat-request-v1 prompt))
+                 #'llm-vertex--chat-extract-response)))
+    (setf (llm-chat-prompt-interactions prompt)
+          (append (llm-chat-prompt-interactions prompt)
+                  (list (make-llm-chat-prompt-interaction :role 'assistant :content response))))
+    response))
 
 (cl-defmethod llm-chat-streaming ((provider llm-vertex) prompt partial-callback response-callback error-callback)
   (llm-vertex-refresh-key provider)
@@ -291,7 +300,11 @@ If STREAMING is non-nil, use the URL for the streaming API."
                                    (when-let ((response (llm--vertex--get-partial-chat-ui-repsonse partial)))
                                      (funcall partial-callback response)))
                      :on-success (lambda (data)
-                                   (funcall response-callback (llm-vertex--get-chat-response-ui data)))
+                                   (let ((response (llm-vertex--get-chat-response-ui data)))
+                                     (setf (llm-chat-prompt-interactions prompt)
+                                           (append (llm-chat-prompt-interactions prompt)
+                                                   (list (make-llm-chat-prompt-interaction :role 'assistant :content response))))
+                                     (funcall response-callback response)))
                      :on-error (lambda (_ data)
                                  (funcall error-callback 'error
                                           (llm-vertex--error-message data)))))

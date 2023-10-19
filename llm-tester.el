@@ -132,6 +132,83 @@
      (lambda (type message)
        (message "ERROR: Provider %s returned an error of type %s with message %s" (type-of provider) type message)))))
 
+(defun llm-tester-chat-conversation (provider chat-func)
+  "Test that PROVIDER can handle a conversation via CHAT-FUNC.
+CHAT-FUNC should insert the chat response to the buffer."
+  (message "Testing provider %s for conversation" (type-of provider))
+  (with-temp-buffer
+    (let ((prompt (llm-make-simple-chat-prompt
+                   "I'm currently testing conversational abilities.  Please respond to each message with the ordinal number of your response, so just '1' for the first response, '2' for the second, and so on.  It's important that I can verify that you are working with the full conversation history, so please let me know if you seem to be missing anything.")))
+      (push (llm-chat provider prompt) outputs)
+      (llm-chat-prompt-append-response prompt "This is the second message.")
+      (push (llm-chat provider prompt) outputs)
+      (llm-chat-prompt-append-response prompt "This is the third message.")
+      (push (llm-chat provider prompt) outputs)
+      (message "SUCCESS: Provider %s provided a conversation with responses %s" (type-of provider)
+               (nreverse outputs)))))
+
+(defun llm-tester-chat-conversation-sync (provider)
+  "Test that PROVIDER can handle a conversation."
+  (message "Testing provider %s for conversation" (type-of provider))
+  (let ((prompt (llm-make-simple-chat-prompt
+                 "I'm currently testing conversational abilities.  Please respond to each message with the ordinal number of your response, so just '1' for the first response, '2' for the second, and so on.  It's important that I can verify that you are working with the full conversation history, so please let me know if you seem to be missing anything."))
+        (outputs nil))
+    (push (llm-chat provider prompt) outputs)
+    (llm-chat-prompt-append-response prompt "This is the second message.")
+    (push (llm-chat provider prompt) outputs)
+    (llm-chat-prompt-append-response prompt "This is the third message.")
+    (push (llm-chat provider prompt) outputs)
+    (message "SUCCESS: Provider %s provided a conversation with responses %s" (type-of provider)
+             (nreverse outputs))))
+
+(defun llm-tester-chat-conversation-async (provider)
+  "Test that PROVIDER can handle a conversation."
+  (message "Testing provider %s for conversation" (type-of provider))
+  (let ((prompt (llm-make-simple-chat-prompt
+                 "I'm currently testing conversational abilities.  Please respond to each message with the ordinal number of your response, so just '1' for the first response, '2' for the second, and so on.  It's important that I can verify that you are working with the full conversation history, so please let me know if you seem to be missing anything."))
+        (outputs nil))
+    (llm-chat-async provider prompt
+                    (lambda (response)
+                      (push response outputs)
+                      (llm-chat-prompt-append-response prompt "This is the second message.")
+                      (llm-chat-async provider prompt
+                                      (lambda (response)
+                                        (push response outputs)
+                                        (llm-chat-prompt-append-response prompt "This is the third message.")
+                                        (llm-chat-async provider prompt
+                                                        (lambda (response)
+                                                          (push response outputs)
+                                                          (message "SUCCESS: Provider %s provided a conversation with responses %s" (type-of provider) (nreverse outputs)))
+                                                        (lambda (type message)
+                                                          (message "ERROR: Provider %s returned an error of type %s with message %s" (type-of provider) type message))))
+                                      (lambda (type message)
+                                        (message "ERROR: Provider %s returned an error of type %s with message %s" (type-of provider) type message))))
+                    (lambda (type message)
+                      (message "ERROR: Provider %s returned an error of type %s with message %s" (type-of provider) type message)))))
+
+(defun llm-tester-chat-conversation-streaming (provider)
+  "Test that PROVIDER can handle a conversation."
+  (message "Testing provider %s for conversation" (type-of provider))
+  (let ((prompt (llm-make-simple-chat-prompt
+                 "I'm currently testing conversational abilities.  Please respond to each message with the ordinal number of your response, so just '1' for the first response, '2' for the second, and so on.  It's important that I can verify that you are working with the full conversation history, so please let me know if you seem to be missing anything.")))
+    (let ((buf (get-buffer-create "*llm-streaming-conversation-tester*")))
+      (llm-chat-streaming-to-point
+       provider prompt buf (with-current-buffer buf (point-max))
+       (lambda ()
+         (with-current-buffer buf (goto-char (point-max)) (insert "\n"))
+         (llm-chat-prompt-append-response prompt "This is the second message.")
+         (llm-chat-streaming-to-point
+          provider prompt
+          buf (with-current-buffer buf (point-max))
+          (lambda ()
+            (with-current-buffer buf (goto-char (point-max)) (insert "\n"))
+            (llm-chat-prompt-append-response prompt "This is the third message.")
+            (llm-chat-streaming-to-point
+             provider prompt buf (with-current-buffer buf (point-max))
+             (lambda ()
+               (message "SUCCESS: Provider %s provided a conversation with responses %s" (type-of provider) (with-current-buffer buf (buffer-string)))
+               (kill-buffer buf))))))))))
+
 (defun llm-tester-all (provider)
   "Test all llm functionality for PROVIDER."
   (llm-tester-embedding-sync provider)

@@ -153,7 +153,12 @@ STREAMING if non-nil, turn on response streaming."
   (llm-request-async "https://api.openai.com/v1/chat/completions"
       :headers `(("Authorization" . ,(format "Bearer %s" (llm-openai-key provider))))
       :data (llm-openai--chat-request provider prompt)
-      :on-success (lambda (data) (funcall response-callback (llm-openai--extract-chat-response data)))
+      :on-success (lambda (data)
+                    (let ((response (llm-openai--extract-chat-response data)))
+                      (setf (llm-chat-prompt-interactions prompt)
+                            (append (llm-chat-prompt-interactions prompt)
+                                    (list (make-llm-chat-prompt-interaction :role 'assistant :content response))))
+                      (funcall response-callback response)))
       :on-error (lambda (_ data)
                   (let ((errdata (cdr (assoc 'error data))))
                     (funcall error-callback 'error
@@ -164,11 +169,15 @@ STREAMING if non-nil, turn on response streaming."
 (cl-defmethod llm-chat ((provider llm-openai) prompt)
   (unless (llm-openai-key provider)
     (error "To call Open AI API, the key must have been set"))
-  (llm-openai--handle-response
-   (llm-request-sync "https://api.openai.com/v1/chat/completions"
-                     :headers `(("Authorization" . ,(format "Bearer %s" (llm-openai-key provider))))
-                     :data (llm-openai--chat-request provider prompt))
-   #'llm-openai--extract-chat-response))
+  (let ((response (llm-openai--handle-response
+                   (llm-request-sync "https://api.openai.com/v1/chat/completions"
+                                     :headers `(("Authorization" . ,(format "Bearer %s" (llm-openai-key provider))))
+                                     :data (llm-openai--chat-request provider prompt))
+                   #'llm-openai--extract-chat-response)))
+    (setf (llm-chat-prompt-interactions prompt)
+          (append (llm-chat-prompt-interactions prompt)
+                  (list (make-llm-chat-prompt-interaction :role 'assistant :content response))))
+    response))
 
 (defvar-local llm-openai-current-response ""
   "The response so far from the server.")
@@ -210,7 +219,11 @@ STREAMING if non-nil, turn on response streaming."
                                    (when-let ((response (llm-openai--get-partial-chat-response data)))
                                      (funcall partial-callback response)))
                      :on-success-raw (lambda (data)
-                                       (funcall response-callback (llm-openai--get-partial-chat-response data)))))
+                                       (let ((response (llm-openai--get-partial-chat-response data)))
+                                         (setf (llm-chat-prompt-interactions prompt)
+                                               (append (llm-chat-prompt-interactions prompt)
+                                                       (list (make-llm-chat-prompt-interaction :role 'assistant :content response))))
+                                         (funcall response-callback response)))))
 
 (provide 'llm-openai)
 
