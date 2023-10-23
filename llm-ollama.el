@@ -113,8 +113,13 @@ STREAMING if non-nil, turn on response streaming."
                                             (car (last (llm-chat-prompt-interactions prompt)))))))
     ;; If the first item isn't an interaction, then it's a conversation which
     ;; we'll set as the chat context.
-    (when (not (type-of (car (llm-chat-prompt-interactions prompt))))
-      (push `("context" . ,(car (llm-chat-prompt-interactions prompt))) request-alist))
+    (when (not (eq (type-of (car (llm-chat-prompt-interactions prompt)))
+		   'llm-chat-prompt-interaction))
+      (push `("context" . ,(cl-remove-if
+			    (lambda (el)
+			      (eq (type-of el) 'llm-chat-prompt-interaction))
+			    (llm-chat-prompt-interactions prompt)))
+	    request-alist))
     (push `("prompt" . ,(string-trim text-prompt)) request-alist)
     (push `("model" . ,(llm-ollama-chat-model provider)) request-alist)
     (when (llm-chat-prompt-temperature prompt)
