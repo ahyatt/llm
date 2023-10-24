@@ -178,19 +178,22 @@ STREAMING if non-nil, turn on response streaming."
   (llm-chat-streaming provider prompt (lambda (_)) response-callback error-callback))
 
 (cl-defmethod llm-chat-streaming ((provider llm-ollama) prompt partial-callback response-callback error-callback)
-  (llm-request-async (llm-ollama--url provider "generate")
+  (let ((buf (current-buffer)))
+    (llm-request-async (llm-ollama--url provider "generate")
       :data (llm-ollama--chat-request provider prompt)
       :on-success-raw (lambda (response)
                         (setf (llm-chat-prompt-interactions prompt)
                               (list (assoc-default 'context (llm-ollama--get-final-response response))))
-                        (funcall response-callback (llm-ollama--get-partial-chat-response response)))
+                        (llm-request-callback-in-buffer
+                         buf response-callback
+                         (llm-ollama--get-partial-chat-response response)))
       :on-partial (lambda (data)
                     (when-let ((response (llm-ollama--get-partial-chat-response data)))
-                      (funcall partial-callback response)))
+                      (llm-request-callback-in-buffer buf partial-callback response)))
       :on-error (lambda (_ _)
                   ;; The problem with ollama is that it doesn't
                   ;; seem to have an error response.
-                  (funcall error-callback 'error "Unknown error calling ollama"))))
+                  (llm-request-callback-in-buffer buf error-callback "Unknown error calling ollama")))))
 
 (provide 'llm-ollama)
 
