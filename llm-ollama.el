@@ -113,7 +113,8 @@ STREAMING if non-nil, turn on response streaming."
                                             (car (last (llm-chat-prompt-interactions prompt)))))))
     ;; If the first item isn't an interaction, then it's a conversation which
     ;; we'll set as the chat context.
-    (when (not (type-of (car (llm-chat-prompt-interactions prompt))))
+    (when (not (eq (type-of (car (llm-chat-prompt-interactions prompt)))
+                   'llm-chat-prompt-interaction))
       (push `("context" . ,(car (llm-chat-prompt-interactions prompt))) request-alist))
     (push `("prompt" . ,(string-trim text-prompt)) request-alist)
     (push `("model" . ,(llm-ollama-chat-model provider)) request-alist)
@@ -170,7 +171,7 @@ STREAMING if non-nil, turn on response streaming."
                    ;; ollama is run on a user's machine, and it can take a while.
                    :timeout llm-ollama-chat-timeout)))
       (setf (llm-chat-prompt-interactions prompt)
-            (assoc-default 'context (llm-ollama--get-final-response output)))
+	        (list (assoc-default 'context (llm-ollama--get-final-response output))))
       (llm-ollama--get-partial-chat-response output))))
 
 (cl-defmethod llm-chat-async ((provider llm-ollama) prompt response-callback error-callback)
@@ -181,7 +182,7 @@ STREAMING if non-nil, turn on response streaming."
       :data (llm-ollama--chat-request provider prompt)
       :on-success-raw (lambda (response)
                         (setf (llm-chat-prompt-interactions prompt)
-                              (assoc-default 'context (llm-ollama--get-final-response response)))
+                              (list (assoc-default 'context (llm-ollama--get-final-response response))))
                         (funcall response-callback (llm-ollama--get-partial-chat-response response)))
       :on-partial (lambda (data)
                     (when-let ((response (llm-ollama--get-partial-chat-response data)))
