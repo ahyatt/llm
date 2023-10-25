@@ -152,7 +152,7 @@ If nothing needs to be set, return nil."
                   (stringVal (aref (cdr (assoc 'stringVal content)) 0)))
              stringVal))))
 
-(defun llm--vertex--get-partial-chat-ui-repsonse (response)
+(defun llm-vertex--get-partial-chat-ui-repsonse (response)
   "Return the partial response from as much of RESPONSE as we can parse.
 If the response is not parseable, return nil."
   (with-temp-buffer
@@ -288,7 +288,7 @@ If STREAMING is non-nil, use the URL for the streaming API."
                      :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
                      :data (llm-vertex--chat-request-ui prompt)
                      :on-partial (lambda (partial)
-                                   (when-let ((response (llm--vertex--get-partial-chat-ui-repsonse partial)))
+                                   (when-let ((response (llm-vertex--get-partial-chat-ui-repsonse partial)))
                                      (funcall partial-callback response)))
                      :on-success (lambda (data)
                                    (funcall response-callback (llm-vertex--get-chat-response-ui data)))
