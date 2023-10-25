@@ -79,9 +79,8 @@ TIMEOUT is the number of seconds to wait for a response."
   "Handle new content in the current buffer."
   (save-match-data
     (save-excursion
-      (with-auto-compression-mode
-        (when llm-request--partial-callback
-          (funcall llm-request--partial-callback (llm-request--content)))))))
+      (when llm-request--partial-callback
+          (funcall llm-request--partial-callback (llm-request--content))))))
 
 (cl-defun llm-request-async (url &key headers data on-success on-success-raw on-error on-partial)
   "Make a request to URL.
