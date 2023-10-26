@@ -56,6 +56,8 @@ To build upon the example from before:
 #+end_src
 * Programmatic use
 Client applications should require the =llm= package, and code against it.  Most functions are generic, and take a struct representing a provider as the first argument. The client code, or the user themselves can then require the specific module, such as =llm-openai=, and create a provider with a function such as ~(make-llm-openai :key user-api-key)~.  The client application will use this provider to call all the generic functions.
+
+For all callbacks, the callback will be executed in the buffer the function was first called from.  If the buffer has been killed, it will be executed in a temporary buffer instead.
 ** Main functions
 - ~llm-chat provider prompt~:  With user-chosen ~provider~ , and a ~llm-chat-prompt~ structure (containing context, examples, interactions, and parameters such as temperature and max tokens), send that prompt to the LLM and wait for the string output.
 - ~llm-chat-async provider prompt response-callback error-callback~: Same as ~llm-chat~, but executes in the background.  Takes a ~response-callback~ which will be called with the text response.  The ~error-callback~ will be called in case of error, with the error symbol and an error message.
@@ -79,7 +81,7 @@ Conversations can take place by repeatedly calling ~llm-chat~ and its variants. 
   (if llm-chat-streaming-prompt
       (llm-chat-prompt-append-response llm-chat-streaming-prompt text)
     (setq llm-chat-streaming-prompt (llm-make-simple-chat-prompt text))
-    (llm-chat-streaming-to-point provider prompt (current-buffer) (point-max) (lambda ()))))
+    (llm-chat-streaming-to-point provider llm-chat-streaming-prompt (current-buffer) (point-max) (lambda ()))))
 #+end_src
 
 * Contributions
