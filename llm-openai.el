@@ -55,11 +55,11 @@ will use a reasonable default."
   (ignore provider)
   (cons "Open AI" "https://openai.com/policies/terms-of-use"))
 
-(defun llm-openai--embedding-request (provider string)
+(defun llm-openai--embedding-request (model string)
   "Return the request to the server for the embedding of STRING.
-PROVIDER is the llm-openai provider."
+MODEL is the embedding model to use, or nil to use the default.."
   `(("input" . ,string)
-    ("model" . ,(or (llm-openai-embedding-model provider) "text-embedding-ada-002"))))
+    ("model" . ,(or model "text-embedding-ada-002"))))
 
 (defun llm-openai--embedding-extract-response (response)
   "Return the embedding from the server RESPONSE."
@@ -84,7 +84,7 @@ PROVIDER is the llm-openai provider."
   (let ((buf (current-buffer)))
     (llm-request-async "https://api.openai.com/v1/embeddings"
                      :headers `(("Authorization" . ,(format "Bearer %s" (llm-openai-key provider))))
-                     :data (llm-openai--embedding-request provider string)
+                     :data (llm-openai--embedding-request (llm-openai-embedding-model provider) string)
                      :on-success (lambda (data)
                                    (llm-request-callback-in-buffer
                                     buf vector-callback (llm-openai--embedding-extract-response data)))
@@ -99,12 +99,12 @@ PROVIDER is the llm-openai provider."
   (llm-openai--handle-response
    (llm-request-sync "https://api.openai.com/v1/embeddings"
                :headers `(("Authorization" . ,(format "Bearer %s" (llm-openai-key provider))))
-               :data (llm-openai--embedding-request provider string))
+               :data (llm-openai--embedding-request (llm-openai-embedding-model provider) string))
    #'llm-openai--embedding-extract-response))
 
-(defun llm-openai--chat-request (provider prompt &optional return-json-spec streaming)
+(defun llm-openai--chat-request (model prompt &optional return-json-spec streaming)
   "From PROMPT, create the chat request data to send.
-PROVIDER is the llm-openai provider to use.
+MODEL is the model name to use.
 RETURN-JSON-SPEC is the optional specification for the JSON to return.
 STREAMING if non-nil, turn on response streaming."
   (let (request-alist system-prompt)
@@ -136,7 +136,7 @@ STREAMING if non-nil, turn on response streaming."
                                       ("content" . ,(string-trim (llm-chat-prompt-interaction-content p)))))
                                   (llm-chat-prompt-interactions prompt)))
           request-alist)
-    (push `("model" . ,(or (llm-openai-chat-model provider) "gpt-3.5-turbo-0613")) request-alist)
+    (push `("model" . ,(or model "gpt-3.5-turbo-0613")) request-alist)
     (when (llm-chat-prompt-temperature prompt)
       (push `("temperature" . ,(/ (llm-chat-prompt-temperature prompt) 2.0)) request-alist))
     (when (llm-chat-prompt-max-tokens prompt)
@@ -160,7 +160,7 @@ STREAMING if non-nil, turn on response streaming."
   (let ((buf (current-buffer)))
     (llm-request-async "https://api.openai.com/v1/chat/completions"
       :headers `(("Authorization" . ,(format "Bearer %s" (llm-openai-key provider))))
-      :data (llm-openai--chat-request provider prompt)
+      :data (llm-openai--chat-request (llm-openai-chat-model provider) prompt)
       :on-success (lambda (data)
                     (let ((response (llm-openai--extract-chat-response data)))
                       (setf (llm-chat-prompt-interactions prompt)
@@ -180,7 +180,8 @@ STREAMING if non-nil, turn on response streaming."
   (let ((response (llm-openai--handle-response
                    (llm-request-sync "https://api.openai.com/v1/chat/completions"
                                      :headers `(("Authorization" . ,(format "Bearer %s" (llm-openai-key provider))))
-                                     :data (llm-openai--chat-request provider prompt))
+                                     :data (llm-openai--chat-request (llm-openai-chat-model provider)
+                                                                     prompt))
                    #'llm-openai--extract-chat-response)))
     (setf (llm-chat-prompt-interactions prompt)
           (append (llm-chat-prompt-interactions prompt)
@@ -217,7 +218,7 @@ STREAMING if non-nil, turn on response streaming."
   (let ((buf (current-buffer)))
     (llm-request-async "https://api.openai.com/v1/chat/completions"
                        :headers `(("Authorization" . ,(format "Bearer %s" (llm-openai-key provider))))
-                       :data (llm-openai--chat-request provider prompt nil t)
+                       :data (llm-openai--chat-request (llm-openai-chat-model provider) prompt nil t)
                        :on-error (lambda (_ data)
                                    (let ((errdata (cdr (assoc 'error data))))
                                      (llm-request-callback-in-buffer buf error-callback 'error

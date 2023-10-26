@@ -1,7 +1,9 @@
 * Version 0.5
 - Fixes for conversation context storage, requiring clients to handle ongoing conversations slightly differently.
+- Fixes for proper sync request http error code handling.
 - =llm-ollama= can now be configured with a different hostname.
 - Callbacks now always attempts to be in the client's original buffer.
+- Add provider =llm-gpt4all=.
 * Version 0.4
 - Add helper function ~llm-chat-streaming-to-point~.
 - Add provider =llm-ollama=.

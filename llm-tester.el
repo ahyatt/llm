@@ -136,7 +136,7 @@
          (message "ERROR: Provider %s returned a response not in the original buffer" (type-of provider)))
        (message "SUCCESS: Provider %s provided a streamed response %s in %d parts, complete text is: %s" (type-of provider) streamed counter text)
        (if (= 0 counter)
-           (message "ERROR: Provider %s streaming request never happened!" (type-of provider))))
+           (message "WARNING: Provider %s returned no partial updates!" (type-of provider))))
      (lambda (type message)
        (unless (eq buf (current-buffer))
          (message "ERROR: Provider %s returned a response not in the original buffer" (type-of provider)))
