@@ -81,14 +81,17 @@ PROVIDER is the llm-openai provider."
 (cl-defmethod llm-embedding-async ((provider llm-openai) string vector-callback error-callback)
   (unless (llm-openai-key provider)
     (error "To call Open AI API, add a key to the `llm-openai' provider."))
-  (llm-request-async "https://api.openai.com/v1/embeddings"
+  (let ((buf (current-buffer)))
+    (llm-request-async "https://api.openai.com/v1/embeddings"
                      :headers `(("Authorization" . ,(format "Bearer %s" (llm-openai-key provider))))
                      :data (llm-openai--embedding-request provider string)
                      :on-success (lambda (data)
-                                   (funcall vector-callback (llm-openai--embedding-extract-response data)))
+                                   (llm-request-callback-in-buffer
+                                    buf vector-callback (llm-openai--embedding-extract-response data)))
                      :on-error (lambda (_ data) 
-                                 (funcall error-callback 'error
-                                            (llm-openai--error-message data)))))
+                                 (llm-request-callback-in-buffer
+                                  buf error-callback 'error
+                                  (llm-openai--error-message data))))))
 
 (cl-defmethod llm-embedding ((provider llm-openai) string)
   (unless (llm-openai-key provider)
@@ -117,7 +120,11 @@ STREAMING if non-nil, turn on response streaming."
                                          (car example)
                                          (cdr example)))
                                (llm-chat-prompt-examples prompt) "\n"))))
-    (when system-prompt
+    ;; Add the system prompt only if there is no existing one.
+    (when (and system-prompt
+               (not (cl-some (lambda (p)
+                               (eq (llm-chat-prompt-interaction-role p) 'system))
+                             (llm-chat-prompt-interactions prompt))))
       (push (make-llm-chat-prompt-interaction :role 'system :content system-prompt)
             (llm-chat-prompt-interactions prompt)))
     (when streaming (push `("stream" . ,t) request-alist))

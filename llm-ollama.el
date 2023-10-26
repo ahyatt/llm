@@ -79,14 +79,17 @@ PROVIDER is the llm-ollama provider."
   (assoc-default 'embedding response))
 
 (cl-defmethod llm-embedding-async ((provider llm-ollama) string vector-callback error-callback)
-  (llm-request-async (llm-ollama--url provider "embeddings")
+  (let ((buf (current-buffer)))
+    (llm-request-async (llm-ollama--url provider "embeddings")
                      :data (llm-ollama--embedding-request provider string)
                      :on-success (lambda (data)
-                                   (funcall vector-callback (llm-ollama--embedding-extract-response data)))
+                                   (llm-request-callback-in-buffer
+                                    buf vector-callback (llm-ollama--embedding-extract-response data)))
                      :on-error (lambda (_ _)
                                  ;; The problem with ollama is that it doesn't
                                  ;; seem to have an error response.
-                                 (funcall error-callback 'error "Unknown error calling ollama"))))
+                                 (llm-request-callback-in-buffer
+                                  buf error-callback 'error "Unknown error calling ollama")))))
 
 (cl-defmethod llm-embedding ((provider llm-ollama) string)
   (llm-ollama--embedding-extract-response
