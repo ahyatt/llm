@@ -72,8 +72,18 @@ EXAMPLES is a list of conses, where the car is an example
 inputs, and cdr is the corresponding example outputs.  This is optional.
 
 INTERACTIONS is a list message sent by either the llm or the
-user.  It is a list of `llm-chat-prompt-interaction' objects.  This
-is required.
+user. It is a either list of `llm-chat-prompt-interaction'
+objects or list of an opaque converation ID (anything not a
+`llm-chat-prompt-interaction') and the latest
+`llm-chat-prompt-interaction' in the conversation to submit. When
+building up a chat, the chat methods update this to a new value,
+and the client is expected to append a new interaction to the
+end, without introspecting the value otherwise. The function
+`llm-chat-prompt-append-response' accomplishes that operation, and
+should be used. 'Because this value updated by the called
+function, for continuing chats, the whole prompt MUST be a
+variable passed in to the chat function. INTERACTIONS is
+required.
 
 TEMPERATURE is a floating point number with a minimum of 0, and
 maximum of 1, which controls how predictable the result is, with
@@ -95,6 +105,14 @@ an LLM, and don't need the more advanced features that the
 `llm-chat-prompt' struct makes available."
   (make-llm-chat-prompt :interactions (list (make-llm-chat-prompt-interaction :role 'user :content text))))
 
+(defun llm-chat-prompt-append-response (prompt response &optional role)
+  "Append a new RESPONSE to PROMPT, to continue a conversation.
+ROLE default to `user', which should almost always be what is needed."
+  (setf (llm-chat-prompt-interactions prompt)
+        (append (llm-chat-prompt-interactions prompt)
+                (list (make-llm-chat-prompt-interaction :role (or role 'user)
+                                                        :content response)))))
+
 (cl-defgeneric llm-nonfree-message-info (provider)
   "If PROVIDER is non-free, return info for a warning.
 This should be a cons of the name of the LLM, and the URL of the
@@ -108,7 +126,10 @@ need to override it."
 
 (cl-defgeneric llm-chat (provider prompt)
   "Return a response to PROMPT from PROVIDER.
-PROMPT is a `llm-chat-prompt'.  The response is a string."
+PROMPT is a `llm-chat-prompt'. The response is a string response by the LLM.
+
+The prompt's interactions list will be updated to encode the
+conversation so far."
   (ignore provider prompt)
   (signal 'not-implemented nil))
 
@@ -124,8 +145,13 @@ PROMPT is a `llm-chat-prompt'.  The response is a string."
 (cl-defgeneric llm-chat-async (provider prompt response-callback error-callback)
   "Return a response to PROMPT from PROVIDER.
 PROMPT is a `llm-chat-prompt'.
-RESPONSE-CALLBACK receives the string response.
-ERROR-CALLBACK receives the error response."
+
+RESPONSE-CALLBACK receives the final text.
+
+ERROR-CALLBACK receives the error response.
+
+The prompt's interactions list will be updated to encode the
+conversation so far."
   (ignore provider prompt response-callback error-callback)
   (signal 'not-implemented nil))
 
@@ -143,7 +169,10 @@ RESPONSE-CALLBACK receives the each piece of the string response.
 It is called once after the response has been completed, with the
 final text.
 
-ERROR-CALLBACK receives the error response."
+ERROR-CALLBACK receives the error response.
+
+The prompt's interactions list will be updated to encode the
+conversation so far."
   (ignore provider prompt partial-callback response-callback error-callback)
   (signal 'not-implemented nil))
 

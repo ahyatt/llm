@@ -56,9 +56,7 @@ To build upon the example from before:
 #+end_src
 * Programmatic use
 Client applications should require the =llm= package, and code against it.  Most functions are generic, and take a struct representing a provider as the first argument. The client code, or the user themselves can then require the specific module, such as =llm-openai=, and create a provider with a function such as ~(make-llm-openai :key user-api-key)~.  The client application will use this provider to call all the generic functions.
-
-A list of all the main functions:
-
+** Main functions
 - ~llm-chat provider prompt~:  With user-chosen ~provider~ , and a ~llm-chat-prompt~ structure (containing context, examples, interactions, and parameters such as temperature and max tokens), send that prompt to the LLM and wait for the string output.
 - ~llm-chat-async provider prompt response-callback error-callback~: Same as ~llm-chat~, but executes in the background.  Takes a ~response-callback~ which will be called with the text response.  The ~error-callback~ will be called in case of error, with the error symbol and an error message.
 - ~llm-chat-streaming provider prompt partial-callback response-callback error-callback~:  Similar to ~llm-chat-async~, but request a streaming response.  As the response is built up, ~partial-callback~ is called with the all the text retrieved up to the current point.  Finally, ~reponse-callback~ is called with the complete text.
@@ -70,6 +68,19 @@ A list of all the main functions:
   - ~llm-make-simple-chat-prompt text~: For the common case of just wanting a simple text prompt without the richness that ~llm-chat-prompt~ struct provides, use this to turn a string into a ~llm-chat-prompt~ that can be passed to the main functions above.
   - ~llm-chat-prompt-to-text prompt~: Somewhat opposite of the above, from a prompt, return a string representation.  This is not usually suitable for passing to LLMs, but for debugging purposes.
   - ~llm-chat-streaming-to-point provider prompt buffer point finish-callback~: Same basic arguments as ~llm-chat-streaming~, but will stream to ~point~ in ~buffer~.
+  - ~llm-chat-prompt-append-response prompt response role~: Append a new response (from the user, usually) to the prompt.  The ~role~ is optional, and defaults to ~'user~.
+** How to handle conversations
+Conversations can take place by repeatedly calling ~llm-chat~ and its variants.  For a conversation, the entire prompt must be a variable, because the ~llm-chat-prompt-interactions~ slot will be getting changed by the chat functions to store the conversation.  For some providers, this will store the history directly in ~llm-chat-prompt-interactions~, but for others (such as ollama), the conversation history is opaque.  For that reason, the correct way to handle a conversation is to repeatedly call ~llm-chat~ or variants, and after each time, add the new user text with ~llm-chat-prompt-append-response~.  The following is an example:
+
+#+begin_src emacs-lisp
+(defvar-local llm-chat-streaming-prompt nil)
+(defun start-or-continue-conversation (text)
+  "Called when the user has input TEXT as the next input."
+  (if llm-chat-streaming-prompt
+      (llm-chat-prompt-append-response llm-chat-streaming-prompt text)
+    (setq llm-chat-streaming-prompt (llm-make-simple-chat-prompt text))
+    (llm-chat-streaming-to-point provider prompt (current-buffer) (point-max) (lambda ()))))
+#+end_src
 
 * Contributions
 If you are interested in creating a provider, please send a pull request, or open a bug.  This library is part of GNU ELPA, so any major provider that we include in this module needs to be written by someone with FSF papers.  However, you can always write a module and put it on a different package archive, such as MELPA.

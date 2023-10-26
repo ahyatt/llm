@@ -110,20 +110,16 @@ STREAMING if non-nil, turn on response streaming."
                                          (car example)
                                          (cdr example)))
                                (llm-chat-prompt-examples prompt) "\n"))))
-    (setq text-prompt (concat text-prompt "\n"
-                              (let ((conversationp (> (length (llm-chat-prompt-interactions prompt)) 1)))
-                                (if conversationp
-                                    (concat
-                                     "The following interactions have already happened: "
-                                     (mapcar (lambda (p)
-                                               (format "%s: %s\n"
-                                                       (pcase (llm-chat-prompt-interaction-role p)
-                                                         ('user "User")
-                                                         ('assistant "Assistant"))
-                                                       (string-trim (llm-chat-prompt-interaction-content p))))
-                                             (llm-chat-prompt-interactions prompt)))
-                                  (string-trim
-                                   (llm-chat-prompt-interaction-content (car (llm-chat-prompt-interactions prompt))))))))
+    ;; The last item always should be the latest interaction, which is the prompt.
+    (setq text-prompt (concat text-prompt
+                              "\n"
+                              (string-trim (llm-chat-prompt-interaction-content
+                                            (car (last (llm-chat-prompt-interactions prompt)))))))
+    ;; If the first item isn't an interaction, then it's a conversation which
+    ;; we'll set as the chat context.
+    (when (not (eq (type-of (car (llm-chat-prompt-interactions prompt)))
+                   'llm-chat-prompt-interaction))
+      (push `("context" . ,(car (llm-chat-prompt-interactions prompt))) request-alist))
     (push `("prompt" . ,(string-trim text-prompt)) request-alist)
     (push `("model" . ,(llm-ollama-chat-model provider)) request-alist)
     (when (llm-chat-prompt-temperature prompt)
@@ -159,32 +155,49 @@ STREAMING if non-nil, turn on response streaming."
     (setq-local llm-ollama-last-position last-position)
     current-response))
 
+(defun llm-ollama--get-final-response (response)
+  "Return the final post-streaming json output from RESPONSE."
+  (with-temp-buffer
+    (insert response)
+    ;; Find the last json object in the buffer.
+    (goto-char (point-max))
+    (search-backward "{" nil t)
+    (json-read)))
+
 (cl-defmethod llm-chat ((provider llm-ollama) prompt)
   ;; We expect to be in a new buffer with the response, which we use to store
   ;; local variables. The temp buffer won't have the response, but that's fine,
   ;; we really just need it for the local variables.
   (with-temp-buffer
-    (llm-ollama--get-partial-chat-response
-     (llm-request-sync-raw-output (llm-ollama--url provider "generate")
-                                  :data (llm-ollama--chat-request provider prompt)
-                                  ;; ollama is run on a user's machine, and it can take a while.
-                                  :timeout llm-ollama-chat-timeout))))
+    (let ((output (llm-request-sync-raw-output 
+                   (llm-ollama--url provider "generate")
+                   :data (llm-ollama--chat-request provider prompt)
+                   ;; ollama is run on a user's machine, and it can take a while.
+                   :timeout llm-ollama-chat-timeout)))
+      (setf (llm-chat-prompt-interactions prompt)
+	        (list (assoc-default 'context (llm-ollama--get-final-response output))))
+      (llm-ollama--get-partial-chat-response output))))
 
 (cl-defmethod llm-chat-async ((provider llm-ollama) prompt response-callback error-callback)
   (llm-chat-streaming provider prompt (lambda (_)) response-callback error-callback))
 
 (cl-defmethod llm-chat-streaming ((provider llm-ollama) prompt partial-callback response-callback error-callback)
-  (llm-request-async (llm-ollama--url provider "generate")
+  (let ((buf (current-buffer)))
+    (llm-request-async (llm-ollama--url provider "generate")
       :data (llm-ollama--chat-request provider prompt)
-      :on-success-raw (lambda (data)
-                        (funcall response-callback (llm-ollama--get-partial-chat-response data)))
+      :on-success-raw (lambda (response)
+                        (setf (llm-chat-prompt-interactions prompt)
+                              (list (assoc-default 'context (llm-ollama--get-final-response response))))
+                        (llm-request-callback-in-buffer
+                         buf response-callback
+                         (llm-ollama--get-partial-chat-response response)))
       :on-partial (lambda (data)
                     (when-let ((response (llm-ollama--get-partial-chat-response data)))
-                      (funcall partial-callback response)))
+                      (llm-request-callback-in-buffer buf partial-callback response)))
       :on-error (lambda (_ _)
                   ;; The problem with ollama is that it doesn't
                   ;; seem to have an error response.
-                  (funcall error-callback 'error "Unknown error calling ollama"))))
+                  (llm-request-callback-in-buffer buf error-callback "Unknown error calling ollama")))))
 
 (provide 'llm-ollama)
 
