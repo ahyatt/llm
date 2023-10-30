@@ -313,6 +313,9 @@ If STREAMING is non-nil, use the URL for the streaming API."
                                  (llm-request-callback-in-buffer buf error-callback 'error
                                                                  (llm-vertex--error-message data))))))
 
+;; Token counts
+;; https://cloud.google.com/vertex-ai/docs/generative-ai/get-token-count
+
 (defun llm-vertex--count-token-url (provider)
   "Return the URL to use for the Vertex API.
 PROVIDER is the llm provider.
@@ -321,14 +324,11 @@ MODEL "
           llm-vertex-gcloud-region
           (llm-vertex-project provider)
           llm-vertex-gcloud-region
-          (or (llm-vertex-embedding-model provider) "chat-bison")))
+          (or (llm-vertex-chat-model provider) "chat-bison")))
 
-;; Token counts
-;; https://cloud.google.com/vertex-ai/docs/generative-ai/get-token-count
-
-(defun llm-vertex--count-token-request (string)
-  "Create the data payload to count tokens in STRING."
-  `((instances . [((prompt . ,string))])))
+(defun llm-vertex--to-count-token-request (request)
+  "Return a version of REQUEST that is suitable for counting tokens."
+  (seq-filter (lambda (c) (not (equal (car c) "parameters"))) request))
 
 (defun llm-vertex--count-tokens-extract-response (response)
   "Extract the token count from the response."
@@ -339,7 +339,8 @@ MODEL "
   (llm-vertex--handle-response
    (llm-request-sync (llm-vertex--count-token-url provider)
                      :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
-                     :data (llm-vertex--count-token-request string))
+                     :data (llm-vertex--to-count-token-request
+                            (llm-vertex--chat-request-v1 (llm-make-simple-chat-prompt string))))
    #'llm-vertex--count-tokens-extract-response))
 
 (provide 'llm-vertex)
