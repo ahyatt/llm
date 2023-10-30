@@ -1,3 +1,5 @@
+* Version 0.6
+- Implement token counting for Google Cloud Vertex via their API.
 * Version 0.5
 - Fixes for conversation context storage, requiring clients to handle ongoing conversations slightly differently.
 - Fixes for proper sync request http error code handling.
