@@ -255,10 +255,10 @@ error signal and a string message."
 This may be an estimate if the LLM does not provide an exact
 count.  Different providers might tokenize things in different
 ways."
-    (ignore provider)
-    (with-temp-buffer
-      (insert string)
-      (/ (* (count-words (point-min) (point-max)) 4) 3)))
+  (ignore provider)
+  (with-temp-buffer
+    (insert string)
+    (/ (* (count-words (point-min) (point-max)) 4) 3)))
 
 (defun llm-chat-prompt-to-text (prompt)
   "Convert PROMPT `llm-chat-prompt' to a simple text.
