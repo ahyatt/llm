@@ -85,12 +85,18 @@ TIMEOUT is the number of seconds to wait for a response."
                                                       :data data
                                                       :timeout timeout)))
 
-(defun llm-request--handle-new-content (&rest _)
-  "Handle new content in the current buffer."
-  (save-match-data
-    (save-excursion
-      (when llm-request--partial-callback
-          (funcall llm-request--partial-callback (llm-request--content))))))
+(defun llm-request--handle-new-content (_ _ pre-change)
+  "Handle new content in the current buffer.
+PRE-CHANGE is the length of text replaced, which for insertions
+is zero."
+  (when (= 0 pre-change)
+    (save-match-data
+      (save-excursion
+        ;; Make sure we actually have any content before invoking a callback.
+        (when (and llm-request--partial-callback
+                   (boundp 'url-http-end-of-headers)
+                   url-http-end-of-headers)
+          (funcall llm-request--partial-callback (llm-request--content)))))))
 
 (cl-defun llm-request-async (url &key headers data on-success on-success-raw on-error on-partial)
   "Make a request to URL.

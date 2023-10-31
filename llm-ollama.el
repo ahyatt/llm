@@ -145,17 +145,28 @@ STREAMING if non-nil, turn on response streaming."
         (last-position llm-ollama-last-position))
     (with-temp-buffer
       (insert response)
-      (goto-char last-position)
-      (while (search-forward "{" nil t)
-        (backward-char 1)
-        (ignore-errors
-          (let ((obj (json-read)))
-            (unless (eq (assoc-default 'done obj) :json-true)
-              (setq current-response
-                    (concat current-response (assoc-default 'response obj))))))
-        (setq last-position (point))))
-    (setq-local llm-ollama-current-response current-response)
-    (setq-local llm-ollama-last-position last-position)
+      ;; Responses in ollama are always one per line.
+      (let* ((start-pos (save-excursion (goto-char (1- last-position))
+                                        (when (search-forward-regexp (rx (seq line-start ?{)) nil t)
+                                          (1- (point)))))
+             (end-pos (save-excursion (goto-char (point-max))
+                                      (when (search-backward-regexp (rx (seq "done\":false}" line-end))
+                                                                    start-pos t)
+                                        (pos-eol)))))
+        (when (and start-pos end-pos)
+          (setq
+           current-response
+           (concat current-response
+                   (mapconcat
+                    ;; Skip any lines that aren't json objects.
+                    (lambda (line) (when (string-match-p (rx (seq string-start ?{)) line)
+                                     (assoc-default 'response (json-read-from-string line))))
+                    (split-string (buffer-substring-no-properties start-pos end-pos) "\n" t))))
+          (setq last-position (1+ end-pos)))))
+    ;; If there is no new content, don't manipulate anything.
+    (when (> (length current-response) (length llm-ollama-current-response))
+      (setq-local llm-ollama-last-position last-position)
+      (setq-local llm-ollama-current-response current-response))
     current-response))
 
 (defun llm-ollama--get-final-response (response)
