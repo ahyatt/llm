@@ -135,38 +135,40 @@ STREAMING if non-nil, turn on response streaming."
 (defvar-local llm-ollama-current-response ""
   "The response so far from the server.")
 
-(defvar-local llm-ollama-last-position 1
-  "The last position in the streamed response we read until.")
+(defvar-local llm-ollama-last-response 0
+  "The last response number we've read.")
 
 (defun llm-ollama--get-partial-chat-response (response)
   "Return the text in the partial chat response from RESPONSE."
   ;; To begin with, we should still be in the buffer with the actual response.
   (let ((current-response llm-ollama-current-response)
-        (last-position llm-ollama-last-position))
+        (last-response llm-ollama-last-response))
     (with-temp-buffer
       (insert response)
       ;; Responses in ollama are always one per line.
-      (let* ((start-pos (save-excursion (goto-char (1- last-position))
-                                        (when (search-forward-regexp (rx (seq line-start ?{)) nil t)
-                                          (1- (point)))))
-             (end-pos (save-excursion (goto-char (point-max))
-                                      (when (search-backward-regexp (rx (seq "done\":false}" line-end))
-                                                                    start-pos t)
+      (let* ((end-pos (save-excursion (goto-char (point-max))
+                                      (when (search-backward-regexp
+                                             (rx (seq "done\":false}" line-end))
+                                             nil t)
                                         (pos-eol)))))
-        (when (and start-pos end-pos)
-          (setq
-           current-response
-           (concat current-response
-                   (mapconcat
-                    ;; Skip any lines that aren't json objects.
-                    (lambda (line) (when (string-match-p (rx (seq string-start ?{)) line)
-                                     (assoc-default 'response (json-read-from-string line))))
-                    (split-string (buffer-substring-no-properties start-pos end-pos) "\n" t))))
-          (setq last-position (1+ end-pos)))))
+        (when end-pos
+          (let ((all-lines (seq-filter
+                            (lambda (line) (string-match-p (rx (seq string-start ?{)) line))
+                            (split-string (buffer-substring-no-properties 1 end-pos) "\n" t))))
+            (setq
+             current-response
+             (concat current-response
+                     (mapconcat
+                      (lambda (line) (assoc-default 'response (json-read-from-string line)))
+                      ;; Take from response output last-response to the end. This
+                      ;; counts only valid responses, so we need to throw out all
+                      ;; other lines that aren't valid JSON.
+                      (seq-subseq all-lines last-response))))
+            (setq last-response (length all-lines))))))
     ;; If there is no new content, don't manipulate anything.
     (when (> (length current-response) (length llm-ollama-current-response))
-      (setq-local llm-ollama-last-position last-position)
-      (setq-local llm-ollama-current-response current-response))
+      (setq llm-ollama-last-response last-response)
+      (setq llm-ollama-current-response current-response))
     current-response))
 
 (defun llm-ollama--get-final-response (response)

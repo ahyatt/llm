@@ -1,6 +1,7 @@
 * Version 0.5.1
 - Implement token counting for Google Cloud Vertex via their API.
 - Fix issue with Google Cloud Vertex erroring on multibyte strings.
+- Fix issue with small bits of missing text in Open AI and Ollama streaming chat.
 * Version 0.5
 - Fixes for conversation context storage, requiring clients to handle ongoing conversations slightly differently.
 - Fixes for proper sync request http error code handling.

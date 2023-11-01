@@ -191,25 +191,44 @@ STREAMING if non-nil, turn on response streaming."
 (defvar-local llm-openai-current-response ""
   "The response so far from the server.")
 
-(defvar-local llm-openai-last-position 1
-  "The last position in the streamed response we read until.")
+(defvar-local llm-openai-last-response 0
+  "The number of the last streaming response we read.
+The responses from OpenAI are not numbered, but we just number
+them from 1 to however many are sent.")
 
 (defun llm-openai--get-partial-chat-response (response)
   "Return the text in the partial chat response from RESPONSE."
   ;; To begin with, we should still be in the buffer with the actual response.
   (let ((current-response llm-openai-current-response)
-        (last-position llm-openai-last-position))
+        (last-response llm-openai-last-response))
     (with-temp-buffer
       (insert response)
-      (goto-char last-position)
-      (when (search-forward "\ndata: {" nil t)
-        (backward-char 2)
-        (ignore-errors
-          (setq current-response
-                (concat current-response (assoc-default 'content (assoc-default 'delta (aref (assoc-default 'choices (json-read)) 0))))))
-        (setq last-position (point))))
-    (setq-local llm-openai-current-response current-response)
-    (setq-local llm-openai-last-position last-position)
+      (let* ((complete-rx (rx (seq "finish_reason\":" (1+ (or ?\[ ?\] alpha)) "}]}" line-end)))
+             (end-pos (save-excursion (goto-char (point-max))
+                                      (when (search-backward-regexp
+                                             complete-rx
+                                             nil t)
+                                        (pos-eol)))))
+        (when end-pos
+          (let ((all-lines (seq-filter
+                            (lambda (line) (string-match-p complete-rx line))
+                            (split-string (buffer-substring-no-properties 1 end-pos) "\n"))))
+            (setq current-response
+                  (concat current-response
+                          (mapconcat (lambda (line)
+                                       (assoc-default 'content
+                                                      (assoc-default
+                                                       'delta
+                                                       (aref (assoc-default
+                                                              'choices
+                                                              (json-read-from-string
+                                                               (replace-regexp-in-string "data: " "" line)))
+                                                             0))))
+                                     (seq-subseq all-lines last-response))))
+            (setq last-response (length all-lines))))))
+    (when (> (length current-response) (length llm-openai-current-response))
+        (setq llm-openai-current-response current-response)
+        (setq llm-openai-last-response last-response))
     current-response))
 
 (cl-defmethod llm-chat-streaming ((provider llm-openai) prompt partial-callback response-callback error-callback)
