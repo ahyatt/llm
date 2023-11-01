@@ -74,7 +74,9 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
     (let ((result (string-trim (shell-command-to-string (concat llm-vertex-gcloud-binary " auth print-access-token")))))
       (when (string-match-p "ERROR" result)
         (error "Could not refresh gcloud access token, received the following error: %s" result))
-      (setf (llm-vertex-key provider) result))
+      ;; We need to make this unibyte, or else it doesn't causes problems when
+      ;; the user is using multibyte strings.
+      (setf (llm-vertex-key provider) (encode-coding-string result 'utf-8)))
     (setf (llm-vertex-key-gentime provider) (current-time))))
 
 (cl-defmethod llm-nonfree-message-info ((provider llm-vertex))
@@ -124,7 +126,7 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
   (llm-vertex-refresh-key provider)
   (llm-vertex--handle-response
    (llm-request-sync (llm-vertex--embedding-url provider)
-                     :headers `(("Authorization" . ,(encode-coding-string (format "Bearer %s" (llm-vertex-key provider)) 'utf-8)))
+                     :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
                      :data `(("instances" . [(("content" . ,string))])))
    #'llm-vertex--embedding-extract-response))
 
