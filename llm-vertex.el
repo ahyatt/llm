@@ -124,7 +124,7 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
   (llm-vertex-refresh-key provider)
   (llm-vertex--handle-response
    (llm-request-sync (llm-vertex--embedding-url provider)
-                     :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
+                     :headers `(("Authorization" . ,(encode-coding-string (format "Bearer %s" (llm-vertex-key provider)) 'utf-8)))
                      :data `(("instances" . [(("content" . ,string))])))
    #'llm-vertex--embedding-extract-response))
 
