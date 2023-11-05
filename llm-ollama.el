@@ -163,7 +163,7 @@ STREAMING if non-nil, turn on response streaming."
                       ;; Take from response output last-response to the end. This
                       ;; counts only valid responses, so we need to throw out all
                       ;; other lines that aren't valid JSON.
-                      (seq-subseq all-lines last-response))))
+                      (seq-subseq all-lines last-response) "")))
             (setq last-response (length all-lines))))))
     ;; If there is no new content, don't manipulate anything.
     (when (> (length current-response) (length llm-ollama-current-response))

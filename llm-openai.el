@@ -224,7 +224,7 @@ them from 1 to however many are sent.")
                                                               (json-read-from-string
                                                                (replace-regexp-in-string "data: " "" line)))
                                                              0))))
-                                     (seq-subseq all-lines last-response))))
+                                     (seq-subseq all-lines last-response) "")))
             (setq last-response (length all-lines))))))
     (when (> (length current-response) (length llm-openai-current-response))
         (setq llm-openai-current-response current-response)

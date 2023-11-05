@@ -1,3 +1,5 @@
+* Version 0.5.2
+- Fix incompatibility with older Emacs introduced in Version 0.5.1.
 * Version 0.5.1
 - Implement token counting for Google Cloud Vertex via their API.
 - Fix issue with Google Cloud Vertex erroring on multibyte strings.
