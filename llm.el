@@ -5,7 +5,7 @@
 ;; Author: Andrew Hyatt <ahyatt@gmail.com>
 ;; Homepage: https://github.com/ahyatt/llm
 ;; Package-Requires: ((emacs "28.1"))
-;; Package-Version: 0.5.1
+;; Package-Version: 0.5.2
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;
 ;; This program is free software; you can redistribute it and/or
