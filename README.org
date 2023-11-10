@@ -35,6 +35,7 @@ In addition to the provider, which you may want multiple of (for example, to cha
 - ~llm-vertex-gcloud-region~: The gcloud region to use.  It's good to set this to a region near where you are for best latency.  Defaults to "us-central1".
 ** Ollama
 [[https://ollama.ai/][Ollama]] is a way to run large language models locally. There are [[https://ollama.ai/library][many different models]] you can use with it. You set it up with the following parameters:
+- ~:scheme~: The scheme (http/https) for the connection to ollama.  This default to "http".
 - ~:host~: The host that ollama is run on.  This is optional and will default to localhost.
 - ~:port~: The port that ollama is run on.  This is optional and will default to the default ollama port.
 - ~:chat-model~: The model name to use for chat.  This is not optional for chat use, since there is no default.
@@ -44,6 +45,15 @@ In addition to the provider, which you may want multiple of (for example, to cha
 - ~:host~: The host that GPT4All is run on.  This is optional and will default to localhost.
 - ~:port~: The port that GPT4All is run on.  This is optional and will default to the default ollama port.
 - ~:chat-model~: The model name to use for chat.  This is not optional for chat use, since there is no default.
+** llama.cpp
+[[https://github.com/ggerganov/llama.cpp][llama.cpp]] is a way to run large language models locally.  To use it with the =llm= package, you need to start the server (with the "--embedding" flag if you plan on using embeddings).  The server must be started with a model, so it is not possible to switch models until the server is restarted to use the new model.  As such, model is not a parameter to the provider, since the model choice is already set once the server starts.
+
+Llama.cpp does not have native chat interfaces, so is not as good at multi-round conversations as other solutions such as Ollama.  It will perform better at single-responses.
+
+The parameters default to optional values, so mostly users should just be creating a model with ~(make-llm-llamacpp)~.  The parameters are:
+- ~:scheme~: The scheme (http/https) for the connection to ollama.  This default to "http".
+- ~:host~: The host that llama.cpp server is run on.  This is optional and will default to localhost.
+- ~:port~: The port that llama.cpp server is run on.  This is optional and will default to 8080, the default llama.cpp port.
 ** Fake
 This is a client that makes no call, but it just there for testing and debugging.  Mostly this is of use to programmatic clients of the llm package, but end users can also use it to understand what will be sent to the LLMs.  It has the following parameters:
 - ~:output-to-buffer~: if non-nil, the buffer or buffer name to append the request sent to the LLM to.

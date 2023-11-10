@@ -1,3 +1,5 @@
+* Version 0.6
+- Add provider =llm-llamacpp=.
 * Version 0.5.2
 - Fix incompatibility with older Emacs introduced in Version 0.5.1.
 - Add support for Google Cloud Vertex model =text-bison= and variants.
