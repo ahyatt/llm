@@ -248,11 +248,13 @@ contains the model to use, which can change the request."
                                                                           ('user "user")
                                                                           ('system "system")
                                                                           ('assistant "assistant"))))))))))
-                                       (if system-prompt
+                                       ;; Only append the system prompt if this is the first message of the conversation.
+                                       (if (and system-prompt (= (length (llm-chat-prompt-interactions prompt)) 1))
                                            (cons (make-llm-chat-prompt-interaction
-                                                  :role 'system
-                                                  :content system-prompt)
-                                                 (llm-chat-prompt-interactions prompt))
+                                                  :role 'user
+                                                  :content (concat system-prompt (llm-chat-prompt-interaction-content
+                                                                                   (car (llm-chat-prompt-interactions prompt)))))
+                                                 (cdr (llm-chat-prompt-interactions prompt)))
                                          (llm-chat-prompt-interactions prompt)))))))))))))
      (llm-vertex--parameters-ui prompt))))
 
