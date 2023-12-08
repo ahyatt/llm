@@ -157,7 +157,7 @@ them from 1 to however many are sent.")
                                       (when (search-backward-regexp
                                              end-of-chunk-rx
                                              nil t)
-                                        (pos-eol)))))
+                                        (line-end-position)))))
         (when end-pos
           (let ((all-lines (seq-filter
                             (lambda (line) (string-match-p end-of-chunk-rx line))

@@ -153,7 +153,7 @@ STREAMING if non-nil, turn on response streaming."
                                       (when (search-backward-regexp
                                              (rx (seq "done\":false}" line-end))
                                              nil t)
-                                        (pos-eol)))))
+                                        (line-end-position)))))
         (when end-pos
           (let ((all-lines (seq-filter
                             (lambda (line) (string-match-p (rx (seq string-start ?{)) line))
