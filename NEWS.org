@@ -1,8 +1,7 @@
-* Version 0.6.1
-- Fix issue with Google Cloud Vertex not responding to messages with a system interaction.
-- Fix use of ~(pos-eol)~ which is not compatible with Emacs 28.1.
 * Version 0.6
 - Add provider =llm-llamacpp=.
+- Fix issue with Google Cloud Vertex not responding to messages with a system interaction.
+- Fix use of ~(pos-eol)~ which is not compatible with Emacs 28.1.
 * Version 0.5.2
 - Fix incompatibility with older Emacs introduced in Version 0.5.1.
 - Add support for Google Cloud Vertex model =text-bison= and variants.
