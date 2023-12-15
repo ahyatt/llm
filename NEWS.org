@@ -1,5 +1,6 @@
 * Version 0.7
 - Upgrade Google Cloud Vertex to Gemini - previous models are no longer available.
+- Added =gemini= provider, which is an alternate endpoint with alternate (and easier) authentication and setup compared to Cloud Vertex.
 - Provide default for ~llm-chat-async~ to fall back to streaming if not defined for a provider.
 * Version 0.6
 - Add provider =llm-llamacpp=.

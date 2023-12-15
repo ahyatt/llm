@@ -214,8 +214,8 @@ PROMPT contains the input to the call to the chat API."
         .
         ,(mapcar (lambda (interaction)
                     `((role . ,(pcase (llm-chat-prompt-interaction-role interaction)
-                                 ('user "USER")
-                                 ('assistant "ASSISTANT")))
+                                 ('user "user")
+                                 ('assistant "model")))
                       (parts .
                               ((text . ,(llm-chat-prompt-interaction-content
                                          interaction))))))
