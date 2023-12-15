@@ -152,8 +152,14 @@ ERROR-CALLBACK receives the error response.
 
 The prompt's interactions list will be updated to encode the
 conversation so far."
-  (ignore provider prompt response-callback error-callback)
-  (signal 'not-implemented nil))
+  ;; By default, you can turn a streaming call into an async call, so we can
+  ;; fall back to streaming if async is not populated.
+  (llm-chat-streaming provider prompt
+                      ;; Do nothing on partial callback
+                      (lambda (_))
+                      (lambda (text)
+                        (funcall response-callback text))
+                      (lambda (err msg) (funcall error-callback err msg))))
 
 (cl-defgeneric llm-chat-streaming (provider prompt partial-callback response-callback error-callback)
   "Stream a response to PROMPT from PROVIDER.

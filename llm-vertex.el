@@ -56,7 +56,7 @@ and there is no default. The maximum value possible here is 2049."
   :type 'integer
   :group 'llm-vertex)
 
-(defcustom llm-vertex-default-chat-model "chat-bison"
+(defcustom llm-vertex-default-chat-model "gemini-pro"
   "The default model to ask for.
 This should almost certainly be a chat model, other models are
 for more specialized uses."
@@ -111,10 +111,10 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
 
 (defun llm-vertex--error-message (err-response)
   "Return a user-visible error message from ERR-RESPONSE."
-  (format "Problem calling GCloud Vertex AI: status: %s message: %s (%s)"
-          (assoc-default 'status (assoc-default 'error err-response))
-          (assoc-default 'message (assoc-default 'error err-response))
-          err-response))
+  (let ((err (assoc-default 'error (aref err-response 0))))
+    (format "Problem calling GCloud Vertex AI: status: %s message: %s"
+            (assoc-default 'code err)
+            (assoc-default 'message err))))
 
 (defun llm-vertex--handle-response (response extractor)
   "If RESPONSE is an error, throw it, else call EXTRACTOR."
@@ -144,34 +144,18 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
                      :data `(("instances" . [(("content" . ,string))])))
    #'llm-vertex--embedding-extract-response))
 
-(defun llm-vertex--parameters-ui (prompt)
-  "Return a alist setting parameters, appropriate for the ui API.
-If nothing needs to be set, return nil."
-  (let ((param-struct-alist))
-    (when (llm-chat-prompt-temperature prompt)
-      (push `("temperature" . (("float_val" . ,(llm-chat-prompt-temperature prompt)))) param-struct-alist))
-    (when (llm-chat-prompt-max-tokens prompt)
-      (push `("maxOutputTokens" . (("int_val" . ,(llm-chat-prompt-max-tokens prompt)))) param-struct-alist))
-    ;; Wrap in the "parameters" and "struct_val" keys
-    (if param-struct-alist
-        `(("parameters" . (("struct_val" . ,param-struct-alist)))))))
-
 (defun llm-vertex--get-chat-response-streaming (response)
   "Return the actual response from the RESPONSE struct returned.
 This handles different kinds of models."
   (pcase (type-of response)
     ('vector (mapconcat #'llm-vertex--get-chat-response-streaming
                         response ""))
-    ('cons (let* ((outputs (assoc-default 'outputs response))
-                  (structVal-list (assoc-default 'structVal (aref outputs 0)))
-                  (candidates (assoc-default 'candidates structVal-list)))
-             (if candidates
-                 (let* ((listVal (assoc-default 'listVal candidates))
-                        (structVal (assoc-default 'structVal (aref listVal 0)))
-                        (content (assoc-default 'content structVal))
-                        (stringVal (aref (assoc-default 'stringVal content) 0)))
-                   stringVal)
-               (aref (assoc-default 'stringVal (assoc-default 'content structVal-list)) 0))))))
+    ('cons (let ((parts (assoc-default 'parts
+                                       (assoc-default 'content 
+                                                      (aref (assoc-default 'candidates response) 0)))))
+             (if parts
+                 (assoc-default 'text (aref parts 0))
+               "")))))
 
 (defun llm-vertex--get-partial-chat-ui-repsonse (response)
   "Return the partial response from as much of RESPONSE as we can parse.
@@ -217,46 +201,26 @@ If there are no non-interaction parts, return nil."
     (when system-prompt
       (mapconcat #'identity (nreverse system-prompt) "\n"))))
 
-(defun llm-vertex--chat-request-streaming (prompt model)
+(defun llm-vertex--chat-request-streaming (prompt)
   "Return an alist with chat input for the streaming API.
-PROMPT contains the input to the call to the chat API. MODEL
-contains the model to use, which can change the request."
-  (let ((system-prompt (llm-vertex--collapsed-system-prompt prompt)))    
+PROMPT contains the input to the call to the chat API."
+  (let ((system-prompt (llm-vertex--collapsed-system-prompt prompt)))
+    (when (and (= 1 (length (llm-chat-prompt-interactions prompt))) system-prompt)
+      (setf (llm-chat-prompt-interaction-content (car (llm-chat-prompt-interactions prompt)))
+              (concat system-prompt "\n" (llm-chat-prompt-interaction-content
+                                          (car (llm-chat-prompt-interactions prompt))))))
     (append
-     `(("inputs" . ((("struct_val" .
-                      ,(if (string-match-p "text-bison" model)
-                          (progn
-                            (unless (= 1 (length (llm-chat-prompt-interactions prompt)))
-                              (error "Vertex model 'text-bison' must contain only one interaction"))
-                            `(("prompt" . (("string_val" .
-                                           [,(format "'\"%s\"'"
-                                                     (concat system-prompt (when system-prompt "\n")
-                                                             (llm-chat-prompt-interaction-content
-                                                              (car (llm-chat-prompt-interactions prompt )))))])))))
-                         `(("messages" .
-                            (("list_val" .
-                              ,(mapcar (lambda (interaction)
-                                         `(("struct_val" . (("content" .
-                                                             (("string_val" .
-                                                               (,(format "'\"%s\"'"
-                                                                         (llm-chat-prompt-interaction-content
-                                                                          interaction))))))
-                                                            ("author" .
-                                                             (("string_val" .
-                                                               ,(format "'\"%s\"'"
-                                                                        (pcase (llm-chat-prompt-interaction-role interaction)
-                                                                          ('user "user")
-                                                                          ('system "system")
-                                                                          ('assistant "assistant"))))))))))
-                                       ;; Only append the system prompt if this is the first message of the conversation.
-                                       (if (and system-prompt (= (length (llm-chat-prompt-interactions prompt)) 1))
-                                           (cons (make-llm-chat-prompt-interaction
-                                                  :role 'user
-                                                  :content (concat system-prompt (llm-chat-prompt-interaction-content
-                                                                                   (car (llm-chat-prompt-interactions prompt)))))
-                                                 (cdr (llm-chat-prompt-interactions prompt)))
-                                         (llm-chat-prompt-interactions prompt)))))))))))))
-     (llm-vertex--parameters-ui prompt))))
+     `((contents
+        .
+        ,(mapcar (lambda (interaction)
+                    `((role . ,(pcase (llm-chat-prompt-interaction-role interaction)
+                                 ('user "USER")
+                                 ('assistant "ASSISTANT")))
+                      (parts .
+                              ((text . ,(llm-chat-prompt-interaction-content
+                                         interaction))))))
+                  (llm-chat-prompt-interactions prompt))))
+     (llm-vertex--chat-parameters prompt))))
 
 (defun llm-vertex--chat-parameters (prompt)
   "From PROMPT, create the parameters section.
@@ -269,110 +233,37 @@ nothing to add, in which case it is nil."
     (when (llm-chat-prompt-max-tokens prompt)
       (push `(maxOutputTokens . ,(llm-chat-prompt-max-tokens prompt)) params-alist))
     (when params-alist
-      `(parameters . ,params-alist))))
+      `((generation_config . ,params-alist)))))
 
-(defun llm-vertex--text-request (prompt)
-  "From PROMPT, create the data for the vertex text reequest.
-The text request can only have one interaction."
-  (unless (= 1 (length (llm-chat-prompt-interactions prompt)))
-    (error "Model text-bison can only have 1 prompt interaction"))
-  (let ((system-prompt (llm-vertex--collapsed-system-prompt prompt)))
-    (append
-     `((instances . [((prompt . ,(concat system-prompt
-                                        (when system-prompt "\n")
-                                        (llm-chat-prompt-interaction-content
-                                              (car (llm-chat-prompt-interactions prompt))))))]))
-     (let ((params (llm-vertex--chat-parameters (let ((p (copy-llm-chat-prompt prompt)))
-                                                  ;; For some reason vertex requires max-tokens
-                                                  (setf (llm-chat-prompt-max-tokens p)
-                                                        llm-vertex-default-max-output-tokens)
-                                                  p))))
-       (when params (list params))))))
-
-(defun llm-vertex--chat-request-v1 (prompt model)
-  "From PROMPT, create the data for the vertex chat request."
-  (if (string-match-p "text-bison" model)
-      (llm-vertex--text-request prompt)
-    (let ((prompt-alist))
-      (when (llm-chat-prompt-context prompt)
-        (push `("context" . ,(llm-chat-prompt-context prompt)) prompt-alist))
-      (when (llm-chat-prompt-examples prompt)
-        (push `("examples" . ,(apply #'vector
-                                     (mapcar (lambda (example)
-                                        `(("input" . (("content" . ,(car example))))
-                                          ("output" . (("content" . ,(cdr example))))))
-                                             (llm-chat-prompt-examples prompt))))
-              prompt-alist))
-      (push `("messages" . ,(apply #'vector
-                                   (mapcar (lambda (interaction)
-                                             `(("author" . (pcase (llm-chat-prompt-interaction-role interaction)
-                                                             ('user "user")
-                                                             ('system (error "System role not supported"))
-                                                             ('assistant "assistant")))
-                                               ("content" . ,(llm-chat-prompt-interaction-content interaction))))
-                                           (llm-chat-prompt-interactions prompt))))
-            prompt-alist)      
-      (append
-        `(("instances" . [,prompt-alist]))
-        (let ((params (llm-vertex--chat-parameters prompt)))
-          (when params (list params)))))))
-
-(defun llm-vertex--chat-url (provider streaming)
+(defun llm-vertex--chat-url (provider)
 "Return the correct url to use for PROVIDER.
 If STREAMING is non-nil, use the URL for the streaming API."
-  (format "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:%s"
+  (format "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:streamGenerateContent"
           llm-vertex-gcloud-region
           (llm-vertex-project provider)
           llm-vertex-gcloud-region
-          (llm-vertex-chat-model provider)
-          (if streaming "serverStreamingPredict" "predict")))
+          (llm-vertex-chat-model provider)))
 
-(defun llm-vertex--chat-extract-response (response)
-  "Return the chat response contained in the server RESPONSE.
-This should handle the various kinds of responses that the
-different models can return."
-  (let* ((predictions (aref (assoc-default 'predictions response) 0))
-         (candidates (assoc-default 'candidates predictions)))
-    (if candidates
-        (assoc-default 'content (aref candidates 0))
-      (assoc-default 'content predictions))))
-
-(cl-defmethod llm-chat-async ((provider llm-vertex) prompt response-callback error-callback)
-  (llm-vertex-refresh-key provider)
-  (let ((buf (current-buffer)))
-    (llm-request-async (llm-vertex--chat-url provider nil)
-                     :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
-                     :data (llm-vertex--chat-request-v1 prompt (llm-vertex-chat-model provider))
-                     :on-success (lambda (data)
-                                   (let ((response (llm-vertex--chat-extract-response data)))
-                                     (setf (llm-chat-prompt-interactions prompt)
-                                           (append (llm-chat-prompt-interactions prompt)
-                                                   (list (make-llm-chat-prompt-interaction :role 'assistant :content response))))
-                                     (llm-request-callback-in-buffer buf response-callback response)))
-                     :on-error (lambda (_ data)
-                                 (llm-request-callback-in-buffer buf error-callback 'error
-                                          (llm-vertex--error-message data))))))
+;; API reference: https://cloud.google.com/vertex-ai/docs/generative-ai/multimodal/send-chat-prompts-gemini#gemini-chat-samples-drest
 
 (cl-defmethod llm-chat ((provider llm-vertex) prompt)
+  ;; Gemini just has a streaming response, but we can just call it synchronously.
   (llm-vertex-refresh-key provider)
-  (let ((response (llm-vertex--handle-response
-                 (llm-request-sync
-                  (llm-vertex--chat-url provider nil)
-                  :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
-                  :data (llm-vertex--chat-request-v1 prompt (llm-vertex-chat-model provider)))
-                 #'llm-vertex--chat-extract-response)))
+  (let ((response (llm-vertex--get-chat-response-streaming
+                   (llm-request-sync (llm-vertex--chat-url provider)
+                                     :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
+                                     :data (llm-vertex--chat-request-streaming prompt)))))
     (setf (llm-chat-prompt-interactions prompt)
           (append (llm-chat-prompt-interactions prompt)
                   (list (make-llm-chat-prompt-interaction :role 'assistant :content response))))
     response))
 
-;; API reference: https://cloud.google.com/vertex-ai/docs/generative-ai/learn/streaming
 (cl-defmethod llm-chat-streaming ((provider llm-vertex) prompt partial-callback response-callback error-callback)
   (llm-vertex-refresh-key provider)
   (let ((buf (current-buffer)))
-    (llm-request-async (llm-vertex--chat-url provider t)
+    (llm-request-async (llm-vertex--chat-url provider)
                      :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
-                     :data (llm-vertex--chat-request-streaming prompt (llm-vertex-chat-model provider))
+                     :data (llm-vertex--chat-request-streaming prompt)
                      :on-partial (lambda (partial)
                                    (when-let ((response (llm-vertex--get-partial-chat-ui-repsonse partial)))
                                      (llm-request-callback-in-buffer buf partial-callback response)))
@@ -414,8 +305,8 @@ MODEL "
    (llm-request-sync (llm-vertex--count-token-url provider)
                      :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
                      :data (llm-vertex--to-count-token-request
-                            (llm-vertex--chat-request-v1
-                             (llm-make-simple-chat-prompt string) (llm-vertex-chat-model provider))))
+                            (llm-vertex--chat-request-streaming
+                             (llm-make-simple-chat-prompt string))))
    #'llm-vertex--count-tokens-extract-response))
 
 (provide 'llm-vertex)

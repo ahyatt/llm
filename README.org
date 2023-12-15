@@ -24,7 +24,7 @@ You can set up with ~make-llm-openai~, with the following parameters:
 - ~:key~, the Open AI key that you get when you sign up to use Open AI's APIs.  Remember to keep this private.  This is non-optional.
 - ~:chat-model~: A model name from the [[https://platform.openai.com/docs/models/gpt-4][list of Open AI's model names.]]  Keep in mind some of these are not available to everyone.  This is optional, and will default to a reasonable 3.5 model.
 - ~:embedding-model~: A model name from [[https://platform.openai.com/docs/guides/embeddings/embedding-models][list of Open AI's embedding model names.]]  This is optional, and will default to a reasonable model.
-** Vertex
+** Vertex (Gemini via Google Cloud)
 You can set up with ~make-llm-vertex~, with the following parameters:
 - ~:project~: Your project number from Google Cloud that has Vertex API enabled.
 - ~:chat-model~: A model name from the [[https://cloud.google.com/vertex-ai/docs/generative-ai/chat/chat-prompts#supported_model][list of Vertex's model names.]]  This is optional, and will default to a reasonable model.
@@ -33,6 +33,11 @@ You can set up with ~make-llm-vertex~, with the following parameters:
 In addition to the provider, which you may want multiple of (for example, to charge against different projects), there are customizable variables:
 - ~llm-vertex-gcloud-binary~: The binary to use for generating the API key.
 - ~llm-vertex-gcloud-region~: The gcloud region to use.  It's good to set this to a region near where you are for best latency.  Defaults to "us-central1".
+
+  If you haven't already, you must run the following command before using this:
+  #+begin_src sh
+  gcloud beta services identity create --service=aiplatform.googleapis.com --project=PROJECT_ID
+  #+end_src
 ** Ollama
 [[https://ollama.ai/][Ollama]] is a way to run large language models locally. There are [[https://ollama.ai/library][many different models]] you can use with it. You set it up with the following parameters:
 - ~:scheme~: The scheme (http/https) for the connection to ollama.  This default to "http".
