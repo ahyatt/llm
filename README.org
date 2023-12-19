@@ -24,6 +24,9 @@ You can set up with ~make-llm-openai~, with the following parameters:
 - ~:key~, the Open AI key that you get when you sign up to use Open AI's APIs.  Remember to keep this private.  This is non-optional.
 - ~:chat-model~: A model name from the [[https://platform.openai.com/docs/models/gpt-4][list of Open AI's model names.]]  Keep in mind some of these are not available to everyone.  This is optional, and will default to a reasonable 3.5 model.
 - ~:embedding-model~: A model name from [[https://platform.openai.com/docs/guides/embeddings/embedding-models][list of Open AI's embedding model names.]]  This is optional, and will default to a reasonable model.
+** Open AI Compatible
+There are many Open AI compatible APIs and proxies of Open AI.  You can set up one with ~make-llm-openai-compatible~, with the following parameter:
+- ~:url~, the URL of leading up to the command ("embeddings" or "chat/completions").  So, for example, "https://api.openai.com/v1/" is the URL to use Open AI (although if you wanted to do that, just use ~make-llm-openai~ instead.
 ** Gemini (not via Google Cloud)
 This is Google's AI model.  You can get an API key via their [[https://makersuite.google.com/app/apikey][page on Google AI Studio]].
 Set this up with ~make-llm-gemini~, with the following parameters:

@@ -1,3 +1,5 @@
+* Version 0.8
+- Allow users to change the Open AI URL, to allow for proxies and other services that re-use the API.
 * Version 0.7
 - Upgrade Google Cloud Vertex to Gemini - previous models are no longer available.
 - Added =gemini= provider, which is an alternate endpoint with alternate (and easier) authentication and setup compared to Cloud Vertex.

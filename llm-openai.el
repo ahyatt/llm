@@ -51,6 +51,15 @@ EMBEDDING-MODEL is the model to use for embeddings.  If unset, it
 will use a reasonable default."
   key chat-model embedding-model)
 
+(cl-defstruct (llm-openai-compatible (:include llm-openai))
+  "A structure for other APIs that use the Open AI's API.
+
+URL is the URL to use for the API, up to the command. So, for
+example, if the API for chat is at
+https://api.example.com/v1/chat, then URL should be
+\"https://api.example.com/v1/\"."
+  url)
+
 (cl-defmethod llm-nonfree-message-info ((provider llm-openai))
   (ignore provider)
   (cons "Open AI" "https://openai.com/policies/terms-of-use"))
@@ -78,27 +87,49 @@ MODEL is the embedding model to use, or nil to use the default.."
       (error (llm-openai--error-message response))
     (funcall extractor response)))
 
-(cl-defmethod llm-embedding-async ((provider llm-openai) string vector-callback error-callback)
+(cl-defmethod llm-openai--check-key ((provider llm-openai))
   (unless (llm-openai-key provider)
-    (error "To call Open AI API, add a key to the `llm-openai' provider."))
+    (error "To call Open AI API, add a key to the `llm-openai' provider.")))
+
+(cl-defmethod llm-openai--check-key ((_ llm-openai-compatible))
+  ;; It isn't always the case that a key is needed for Open AI compatible APIs.
+  )
+
+(defun llm-openai--headers (provider)
+  "From PROVIDER, return the headers to use for a request.
+This is just the key, if it exists."
+  (when (llm-openai-key provider)
+    `(("Authorization" . ,(format "Bearer %s" (llm-openai-key provider))))))
+
+(cl-defmethod llm-openai--url ((_ llm-openai) command)
+  "Return the URL for COMMAND for PROVIDER."
+  (concat "https://api.openai.com/v1/" command))
+
+(cl-defmethod llm-openai--url ((provider llm-openai-compatible) command)
+  "Return the URL for COMMAND for PROVIDER."
+  (concat (llm-openai-compatible-url provider)
+          (unless (string-suffix-p "/" (llm-openai-compatible-url provider))
+            "/") command))
+
+(cl-defmethod llm-embedding-async ((provider llm-openai) string vector-callback error-callback)
+  (llm-openai--check-key provider)
   (let ((buf (current-buffer)))
-    (llm-request-async "https://api.openai.com/v1/embeddings"
-                     :headers `(("Authorization" . ,(format "Bearer %s" (llm-openai-key provider))))
-                     :data (llm-openai--embedding-request (llm-openai-embedding-model provider) string)
-                     :on-success (lambda (data)
+    (llm-request-async (llm-openai--url provider "embeddings")
+                       :headers (llm-openai--headers provider)
+                       :data (llm-openai--embedding-request (llm-openai-embedding-model provider) string)
+                       :on-success (lambda (data)
+                                     (llm-request-callback-in-buffer
+                                      buf vector-callback (llm-openai--embedding-extract-response data)))
+                       :on-error (lambda (_ data) 
                                    (llm-request-callback-in-buffer
-                                    buf vector-callback (llm-openai--embedding-extract-response data)))
-                     :on-error (lambda (_ data) 
-                                 (llm-request-callback-in-buffer
-                                  buf error-callback 'error
-                                  (llm-openai--error-message data))))))
+                                    buf error-callback 'error
+                                    (llm-openai--error-message data))))))
 
 (cl-defmethod llm-embedding ((provider llm-openai) string)
-  (unless (llm-openai-key provider)
-    (error "To call Open AI API, add a key to the `llm-openai' provider."))
+  (llm-openai--check-key provider)
   (llm-openai--handle-response
-   (llm-request-sync "https://api.openai.com/v1/embeddings"
-               :headers `(("Authorization" . ,(format "Bearer %s" (llm-openai-key provider))))
+   (llm-request-sync (llm-openai--url provider "embeddings")
+               :headers (llm-openai--headers provider)
                :data (llm-openai--embedding-request (llm-openai-embedding-model provider) string))
    #'llm-openai--embedding-extract-response))
 
@@ -155,11 +186,10 @@ STREAMING if non-nil, turn on response streaming."
     (or func-result result)))
 
 (cl-defmethod llm-chat-async ((provider llm-openai) prompt response-callback error-callback)
-  (unless (llm-openai-key provider)
-    (error "To call Open AI API, the key must have been set"))
+  (llm-openai--check-key provider)
   (let ((buf (current-buffer)))
-    (llm-request-async "https://api.openai.com/v1/chat/completions"
-      :headers `(("Authorization" . ,(format "Bearer %s" (llm-openai-key provider))))
+    (llm-request-async (llm-openai--url provider "chat/completions")
+      :headers (llm-openai--headers provider)
       :data (llm-openai--chat-request (llm-openai-chat-model provider) prompt)
       :on-success (lambda (data)
                     (let ((response (llm-openai--extract-chat-response data)))
@@ -175,11 +205,10 @@ STREAMING if non-nil, turn on response streaming."
                                      (cdr (assoc 'message errdata)))))))))
 
 (cl-defmethod llm-chat ((provider llm-openai) prompt)
-  (unless (llm-openai-key provider)
-    (error "To call Open AI API, the key must have been set"))
+  (llm-openai--check-key provider)
   (let ((response (llm-openai--handle-response
-                   (llm-request-sync "https://api.openai.com/v1/chat/completions"
-                                     :headers `(("Authorization" . ,(format "Bearer %s" (llm-openai-key provider))))
+                   (llm-request-sync (llm-openai--url provider "chat/completions")
+                                     :headers (llm-openai--headers provider)
                                      :data (llm-openai--chat-request (llm-openai-chat-model provider)
                                                                      prompt))
                    #'llm-openai--extract-chat-response)))
@@ -232,11 +261,10 @@ them from 1 to however many are sent.")
     current-response))
 
 (cl-defmethod llm-chat-streaming ((provider llm-openai) prompt partial-callback response-callback error-callback)
-  (unless (llm-openai-key provider)
-    (error "To call Open AI API, the key must have been set"))
+  (llm-openai--check-key provider)
   (let ((buf (current-buffer)))
-    (llm-request-async "https://api.openai.com/v1/chat/completions"
-                       :headers `(("Authorization" . ,(format "Bearer %s" (llm-openai-key provider))))
+    (llm-request-async (llm-openai--url provider "chat/completions")
+                       :headers (llm-openai--headers provider)
                        :data (llm-openai--chat-request (llm-openai-chat-model provider) prompt nil t)
                        :on-error (lambda (_ data)
                                    (let ((errdata (cdr (assoc 'error data))))
