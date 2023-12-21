@@ -151,7 +151,8 @@ the buffer is turned into JSON and passed to ON-SUCCESS."
           (setq llm-request--partial-callback on-partial)
           (add-hook 'after-change-functions
                     #'llm-request--handle-new-content
-                    nil t))))))
+                    nil t)))
+      buffer)))
 
 ;; This is a useful method for getting out of the request buffer when it's time
 ;; to make callbacks.
