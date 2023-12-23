@@ -211,6 +211,26 @@
                (message "SUCCESS: Provider %s provided a conversation with responses %s" (type-of provider) (buffer-string))
                (kill-buffer buf))))))))))
 
+(defun llm-tester-cancel (provider)
+  "Test that PROVIDER can do async calls which can be cancelled."
+  (message "Testing provider %s for cancellation" (type-of provider))
+  (let ((embedding-request (llm-embedding-async
+                            provider "This is a test."
+                            (lambda (_)
+                              (message "ERROR: Provider %s returned an embedding when it should have been cancelled" (type-of provider)))
+                            (lambda (type message)
+                              (message "ERROR: Provider %s returned an error of type %s with message %s" (type-of provider) type message))))
+        (chat-async-request (llm-chat-async
+                             provider
+                             (llm-make-simple-chat-prompt "Please count up to 200.")
+                             (lambda (_)
+                               (message "ERROR: Provider %s returned a response when it should have been cancelled" (type-of provider)))
+                             (lambda (type message)
+                               (message "ERROR: Provider %s returned an error of type %s with message %s" (type-of provider) type message)))))
+    (llm-cancel-request embedding-request)
+    (message "SUCCESS: Provider %s cancelled an async request" (type-of provider))
+    (llm-cancel-request chat-async-request)))
+
 (defun llm-tester-all (provider)
   "Test all llm functionality for PROVIDER."
   (llm-tester-embedding-sync provider)
@@ -220,7 +240,8 @@
   (llm-tester-chat-streaming provider)
   (llm-tester-chat-conversation-sync provider)
   (llm-tester-chat-conversation-async provider)
-  (llm-tester-chat-conversation-streaming provider))
+  (llm-tester-chat-conversation-streaming provider)
+  (llm-tester-cancel provider))
 
 (provide 'llm-tester)
 

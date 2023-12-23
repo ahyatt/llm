@@ -151,7 +151,10 @@ RESPONSE-CALLBACK receives the final text.
 ERROR-CALLBACK receives the error response.
 
 The prompt's interactions list will be updated to encode the
-conversation so far."
+conversation so far.
+
+This returns an object representing the async request, which can
+be passed to `llm-cancel-request'."
   ;; By default, you can turn a streaming call into an async call, so we can
   ;; fall back to streaming if async is not populated.
   (llm-chat-streaming provider prompt
@@ -178,7 +181,10 @@ final text.
 ERROR-CALLBACK receives the error response.
 
 The prompt's interactions list will be updated to encode the
-conversation so far."
+conversation so far.
+
+This returns an object representing the async request, which can
+be passed to `llm-cancel-request'."
   (ignore provider prompt partial-callback response-callback error-callback)
   (signal 'not-implemented nil))
 
@@ -194,7 +200,9 @@ conversation so far."
 (defun llm-chat-streaming-to-point (provider prompt buffer point finish-callback)
   "Stream the llm output of PROMPT to POINT in BUFFER.
 PROVIDER is the backend provider of the LLM functionality.
-FINISH-CALLBACK is called with no arguments when the output has finished."
+FINISH-CALLBACK is called with no arguments when the output has finished.
+This returns an object representing the async request, which can
+be passed to `llm-cancel-request'."
   (with-current-buffer buffer
     (save-excursion
       (let ((start (make-marker))
@@ -243,7 +251,10 @@ FINISH-CALLBACK is called with no arguments when the output has finished."
   "Calculate a vector embedding of STRING from PROVIDER.
 VECTOR-CALLBACK will be called with the vector embedding.
 ERROR-CALLBACK will be called in the event of an error, with an
-error signal and a string message."
+error signal and a string message.
+
+This returns an object representing the asymc request, which can
+be passed to `llm-cancel-request'."
   (ignore provider string vector-callback error-callback)
   (signal 'not-implemented nil))
 
@@ -265,6 +276,17 @@ ways."
   (with-temp-buffer
     (insert string)
     (/ (* (count-words (point-min) (point-max)) 4) 3)))
+
+(cl-defgeneric llm-cancel-request (request)
+  "Cancel REQUEST, stopping any further communication.
+REQUEST is the same object return by the async or streaming
+methods."
+  (ignore request)
+  (lwarn 'llm :warning  "Canceling a request is not supported for this LLM."))
+
+(cl-defmethod llm-cancel-request ((buf buffer))
+  (cl-letf (((symbol-function 'url-http-async-sentinel) (lambda (_ _))))
+    (kill-buffer buf)))
 
 (defun llm-chat-prompt-to-text (prompt)
   "Convert PROMPT `llm-chat-prompt' to a simple text.
