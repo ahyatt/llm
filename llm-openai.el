@@ -282,6 +282,9 @@ them from 1 to however many are sent.")
                                                          (list (make-llm-chat-prompt-interaction :role 'assistant :content response))))
                                            (llm-request-callback-in-buffer buf response-callback response))))))
 
+(cl-defmethod llm-name ((_ llm-openai))
+  "Open AI")
+
 (provide 'llm-openai)
 
 ;;; llm-openai.el ends here

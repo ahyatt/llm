@@ -218,6 +218,9 @@ STREAMING if non-nil, turn on response streaming."
                   ;; seem to have an error response.
                   (llm-request-callback-in-buffer buf error-callback "Unknown error calling ollama")))))
 
+(cl-defmethod llm-name ((provider llm-ollama))
+  (llm-ollama-chat-model provider))
+
 (provide 'llm-ollama)
 
 ;;; llm-ollama.el ends here

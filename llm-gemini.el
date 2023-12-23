@@ -121,6 +121,10 @@ You can get this at https://makersuite.google.com/app/apikey."
                      :data (llm-vertex--to-count-token-request (llm-vertex--chat-request-streaming (llm-make-simple-chat-prompt string))))
    #'llm-vertex--count-tokens-extract-response))
 
+(cl-defmethod llm-name ((_ llm-gemini))
+  "Return the name of PROVIDER."
+  "Gemini")
+
 (provide 'llm-gemini)
 
 ;;; llm-gemini.el ends here

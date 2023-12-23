@@ -289,6 +289,20 @@ methods."
             (kill-buffer-query-functions nil))
     (kill-buffer buf)))
 
+(cl-defgeneric llm-name (_)
+  "Return the name of the model in PROVIDER.
+This is expected to be suitable for short labels. For example, if
+the client wants to have a conversation with prefixes of `user> '
+and a similar label for LLM (for example `Mistral> '), this
+string should be short enough to fit that role.
+
+Names are expected to be one word where possible, and
+capitalized when appropriate.
+
+This should be the name of the model, not the provider, where it
+makes sense. This is not expected to be unique per provider."
+  "LLM")
+
 (defun llm-chat-prompt-to-text (prompt)
   "Convert PROMPT `llm-chat-prompt' to a simple text.
 This should only be used for logging or debugging."

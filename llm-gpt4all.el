@@ -81,6 +81,10 @@ default the default GPT4all port."
   ;; GPT4All does not implement streaming, so instead we just use the async method.
   (llm-chat-async provider prompt response-callback error-callback))
 
+(cl-defmethod llm-name ((provider llm-gpt4all))
+  "Return the name of the provider."
+  (llm-gpt4all-chat-model provider))
+
 (provide 'llm-gpt4all)
 
 ;;; llm-gpt4all.el ends here

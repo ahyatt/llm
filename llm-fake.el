@@ -115,4 +115,7 @@ message cons. If nil, the response will be a simple vector."
     (t (funcall error-callback (car err) (cdr err))))
   nil)
 
+(cl-defmethod llm-name ((_ llm-fake))
+  "Fake")
+
 (provide 'llm-fake)

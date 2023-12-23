@@ -196,5 +196,10 @@ them from 1 to however many are sent.")
                                    (llm-request-callback-in-buffer
                                     buf error-callback 'error "Unknown error calling llm-llamacpp")))))
 
+(cl-defmethod llm-name ((_ llm-llamacpp))
+  ;; We don't actually know the name of the model, so we have to just name Llama
+  ;; CPP itself.
+  "Llama CPP")
+
 (provide 'llm-llamacpp)
 ;;; llm-llamacpp.el ends here

@@ -309,6 +309,9 @@ MODEL "
                              (llm-make-simple-chat-prompt string))))
    #'llm-vertex--count-tokens-extract-response))
 
+(cl-defmethod llm-name ((_ llm-vertex))
+  "Gemini")
+
 (provide 'llm-vertex)
 
 ;;; llm-vertex.el ends here
