@@ -253,7 +253,7 @@ VECTOR-CALLBACK will be called with the vector embedding.
 ERROR-CALLBACK will be called in the event of an error, with an
 error signal and a string message.
 
-This returns an object representing the asymc request, which can
+This returns an object representing the async request, which can
 be passed to `llm-cancel-request'."
   (ignore provider string vector-callback error-callback)
   (signal 'not-implemented nil))
@@ -285,7 +285,8 @@ methods."
   (lwarn 'llm :warning  "Canceling a request is not supported for this LLM."))
 
 (cl-defmethod llm-cancel-request ((buf buffer))
-  (cl-letf (((symbol-function 'url-http-async-sentinel) (lambda (_ _))))
+  (cl-letf (((symbol-function 'url-http-async-sentinel) (lambda (_ _)))
+            (kill-buffer-query-functions nil))
     (kill-buffer buf)))
 
 (defun llm-chat-prompt-to-text (prompt)
