@@ -26,6 +26,7 @@
 (require 'cl-lib)
 (require 'llm)
 (require 'llm-request)
+(require 'llm-provider-utils)
 (require 'json)
 
 (defgroup llm-vertex nil
@@ -186,30 +187,11 @@ If the response is not parseable, return nil."
                      (erase-buffer)
                      (insert response))))))))
 
-(defun llm-vertex--collapsed-system-prompt (prompt)
-  "Return the text of the non-interaction parts of PROMPT.
-If there are no non-interaction parts, return nil."
-  (let ((system-prompt))
-    (when (llm-chat-prompt-context prompt)
-      (push (llm-chat-prompt-context prompt) system-prompt))
-    (when (llm-chat-prompt-examples prompt)
-      (push (concat llm-vertex-example-prelude "\n"
-                    (mapconcat (lambda (example)
-                                 (concat "User:\n" (car example) "\nAssistant:\n" (cdr example)))
-                               (llm-chat-prompt-examples prompt) "\n"))
-            system-prompt))
-    (when system-prompt
-      (mapconcat #'identity (nreverse system-prompt) "\n"))))
-
 (defun llm-vertex--chat-request-streaming (prompt)
   "Return an alist with chat input for the streaming API.
 PROMPT contains the input to the call to the chat API."
-  (let ((system-prompt (llm-vertex--collapsed-system-prompt prompt)))
-    (when (and (= 1 (length (llm-chat-prompt-interactions prompt))) system-prompt)
-      (setf (llm-chat-prompt-interaction-content (car (llm-chat-prompt-interactions prompt)))
-              (concat system-prompt "\n" (llm-chat-prompt-interaction-content
-                                          (car (llm-chat-prompt-interactions prompt))))))
-    (append
+  (llm-provider-utils-combine-to-user-prompt prompt llm-vertex-example-prelude)
+  (append
      `((contents
         .
         ,(mapcar (lambda (interaction)
@@ -220,7 +202,7 @@ PROMPT contains the input to the call to the chat API."
                               ((text . ,(llm-chat-prompt-interaction-content
                                          interaction))))))
                   (llm-chat-prompt-interactions prompt))))
-     (llm-vertex--chat-parameters prompt))))
+     (llm-vertex--chat-parameters prompt)))
 
 (defun llm-vertex--chat-parameters (prompt)
   "From PROMPT, create the parameters section.

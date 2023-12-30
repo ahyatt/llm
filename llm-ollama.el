@@ -28,6 +28,7 @@
 (require 'cl-lib)
 (require 'llm)
 (require 'llm-request)
+(require 'llm-provider-utils)
 (require 'json)
 
 (defgroup llm-ollama nil
@@ -103,30 +104,18 @@ PROVIDER is the llm-ollama provider."
   "From PROMPT, create the chat request data to send.
 PROVIDER is the llm-ollama provider to use.
 RETURN-JSON-SPEC is the optional specification for the JSON to return.
-STREAMING if non-nil, turn on response streaming."
-  (let (request-alist text-prompt options)
+STREAMING if non-nil, turn on response streaming." 
+  (let (request-alist options)
     (when (llm-chat-prompt-context prompt)
-      (push `("system" . ,(llm-chat-prompt-context prompt)) request-alist))
-    (when (llm-chat-prompt-examples prompt)
-      (setq text-prompt
-            (concat llm-ollama-example-prelude
-                    "\n"
-                    (mapconcat (lambda (example)
-                                 (format "User: %s\nAssistant: %s"
-                                         (car example)
-                                         (cdr example)))
-                               (llm-chat-prompt-examples prompt) "\n"))))
-    ;; The last item always should be the latest interaction, which is the prompt.
-    (setq text-prompt (concat text-prompt
-                              "\n"
-                              (string-trim (llm-chat-prompt-interaction-content
-                                            (car (last (llm-chat-prompt-interactions prompt)))))))
+      (push `("system" . ,(llm-provider-utils-get-system-prompt prompt llm-ollama-example-prelude)) request-alist))
     ;; If the first item isn't an interaction, then it's a conversation which
     ;; we'll set as the chat context.
     (when (not (eq (type-of (car (llm-chat-prompt-interactions prompt)))
                    'llm-chat-prompt-interaction))
       (push `("context" . ,(car (llm-chat-prompt-interactions prompt))) request-alist))
-    (push `("prompt" . ,(string-trim text-prompt)) request-alist)
+    (push `("prompt" . ,(string-trim (llm-chat-prompt-interaction-content
+                                      (car (last (llm-chat-prompt-interactions prompt))))))
+          request-alist)
     (push `("model" . ,(llm-ollama-chat-model provider)) request-alist)
     (when (llm-chat-prompt-temperature prompt)
       (push `("temperature" . ,(llm-chat-prompt-temperature prompt)) options))

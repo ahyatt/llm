@@ -64,7 +64,7 @@ In addition to the provider, which you may want multiple of (for example, to cha
 ** llama.cpp
 [[https://github.com/ggerganov/llama.cpp][llama.cpp]] is a way to run large language models locally.  To use it with the =llm= package, you need to start the server (with the "--embedding" flag if you plan on using embeddings).  The server must be started with a model, so it is not possible to switch models until the server is restarted to use the new model.  As such, model is not a parameter to the provider, since the model choice is already set once the server starts.
 
-Llama.cpp does not have native chat interfaces, so is not as good at multi-round conversations as other solutions such as Ollama.  It will perform better at single-responses.
+Llama.cpp does not have native chat interfaces, so is not as good at multi-round conversations as other solutions such as Ollama.  It will perform better at single-responses.  However, it does support Open AI's request format for models that are good at conversation.  If you are using one of those models, you should probably use the Open AI Compatible provider instead to connect to Llama CPP.
 
 The parameters default to optional values, so mostly users should just be creating a model with ~(make-llm-llamacpp)~.  The parameters are:
 - ~:scheme~: The scheme (http/https) for the connection to ollama.  This default to "http".
@@ -117,6 +117,7 @@ Conversations can take place by repeatedly calling ~llm-chat~ and its variants. 
     (setq llm-chat-streaming-prompt (llm-make-simple-chat-prompt text))
     (llm-chat-streaming-to-point provider llm-chat-streaming-prompt (current-buffer) (point-max) (lambda ()))))
 #+end_src
-
+** Caution about ~llm-chat-prompt-interactions~
+The interactions in a prompt may be modified by conversation or by the conversion of the context and examples to what the LLM understands.  Different providers require different things from the interactions.  Some can handle system prompts, some cannot.  Some may have richer APIs for examples and context, some not.  Do not attempt to read or manipulate ~llm-chat-prompt-interactions~ after initially setting it up for the first time, because you are likely to make changes that only work for some providers.
 * Contributions
 If you are interested in creating a provider, please send a pull request, or open a bug.  This library is part of GNU ELPA, so any major provider that we include in this module needs to be written by someone with FSF papers.  However, you can always write a module and put it on a different package archive, such as MELPA.

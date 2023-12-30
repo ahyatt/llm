@@ -28,6 +28,7 @@
 (require 'cl-lib)
 (require 'llm)
 (require 'llm-request)
+(require 'llm-provider-utils)
 (require 'json)
 
 (defgroup llm-openai nil
@@ -138,26 +139,8 @@ This is just the key, if it exists."
 MODEL is the model name to use.
 RETURN-JSON-SPEC is the optional specification for the JSON to return.
 STREAMING if non-nil, turn on response streaming."
-  (let (request-alist system-prompt)
-    (when (llm-chat-prompt-context prompt)
-      (setq system-prompt (llm-chat-prompt-context prompt)))
-    (when (llm-chat-prompt-examples prompt)
-      (setq system-prompt
-            (concat (if system-prompt (format "\n%s\n" system-prompt) "")
-                    llm-openai-example-prelude
-                    "\n"
-                    (mapconcat (lambda (example)
-                                 (format "User: %s\nAssistant: %s"
-                                         (car example)
-                                         (cdr example)))
-                               (llm-chat-prompt-examples prompt) "\n"))))
-    ;; Add the system prompt only if there is no existing one.
-    (when (and system-prompt
-               (not (cl-some (lambda (p)
-                               (eq (llm-chat-prompt-interaction-role p) 'system))
-                             (llm-chat-prompt-interactions prompt))))
-      (push (make-llm-chat-prompt-interaction :role 'system :content system-prompt)
-            (llm-chat-prompt-interactions prompt)))
+  (let (request-alist)
+    (llm-provider-utils-combine-to-system-prompt prompt llm-openai-example-prelude)
     (when streaming (push `("stream" . ,t) request-alist))
     (push `("messages" . ,(mapcar (lambda (p)
                                     `(("role" . ,(pcase (llm-chat-prompt-interaction-role p)

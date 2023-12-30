@@ -1,6 +1,7 @@
 * Version 0.8
 - Allow users to change the Open AI URL, to allow for proxies and other services that re-use the API.
 - Add =llm-name= and =llm-cancel-request= to the API.
+- Standardize handling of how context, examples and history are folded into =llm-chat-prompt-interactions=.
 * Version 0.7
 - Upgrade Google Cloud Vertex to Gemini - previous models are no longer available.
 - Added =gemini= provider, which is an alternate endpoint with alternate (and easier) authentication and setup compared to Cloud Vertex.

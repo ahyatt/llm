@@ -28,6 +28,7 @@
 (require 'llm)
 (require 'cl-lib)
 (require 'llm-request)
+(require 'llm-provider-utils)
 (require 'json)
 
 (defgroup llm-llamacpp nil
@@ -81,24 +82,9 @@ PATH is the path to append to the URL, not prefixed with a slash."
 
 (defun llm-llamacpp--prompt-to-text (prompt)
   "From PROMPT, return the text to send to llama.cpp."
-  (concat
-   (when (llm-chat-prompt-context prompt)
-     (concat (llm-chat-prompt-context prompt) "\n"))
-   (when (llm-chat-prompt-examples prompt)
-     (concat llm-llamacpp-example-prelude "\n\n"
-             (mapconcat (lambda (example)
-                          (format "User: %s\nAssistant: %s" (car example) (cdr example)))
-                        (llm-chat-prompt-examples prompt) "\n") "\n\n"))
-   (when (> (length (llm-chat-prompt-interactions prompt)) 1)
-     (concat llm-llamacpp-history-prelude "\n\n"
-             (mapconcat (lambda (interaction)
-                          (format "%s: %s" (pcase (llm-chat-prompt-interaction-role interaction)
-                                             ('user "User")
-                                             ('assistant "Assistant"))
-                                  (llm-chat-prompt-interaction-content interaction)))
-                        (butlast (llm-chat-prompt-interactions prompt)) "\n")
-             "\n\nThe current conversation follows:\n\n"))
-   (llm-chat-prompt-interaction-content (car (last (llm-chat-prompt-interactions prompt))))))
+  (llm-provider-utils-combine-to-user-prompt prompt llm-llamacpp-example-prelude)
+  (llm-provider-utils-collapse-history prompt llm-llamacpp-history-prelude)
+  (llm-chat-prompt-interaction-content (car (last (llm-chat-prompt-interactions prompt)))))
 
 (defun llm-llamacpp--chat-request (prompt)
   "From PROMPT, create the chat request data to send."
