@@ -139,9 +139,9 @@ Returns REQUEST-ALIST with prompt request data."
   "From PROMPT, create the chat request data to send.
 PROVIDER is the llm-ollama provider to use.
 
-Function will create the appropriate request data for either a
-`chat' or `generate' request depending on the endpoint specified
-in the provider."
+Calls the appropriate helper function to initialize
+`request-alist' depending on whether a `chat' or `generate'
+endpoint is specified in the provider."
   (let* ((request-alist 
           (if (string= (llm-ollama-endpoint provider) "chat")
               (llm-ollama--chat-request-chat prompt)
