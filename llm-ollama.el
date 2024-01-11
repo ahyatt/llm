@@ -105,10 +105,8 @@ PROVIDER is the llm-ollama provider."
 
 (defun llm-ollama--chat-request-generate (prompt)
   "Create the chat request data for the `generate' endpoint.
-
 PROMPT is the chat prompt to process.
-
-REQUEST-ALIST is the request data to send."
+Returns REQUEST-ALIST with prompt request data."
   (let (request-alist)
     (when (llm-chat-prompt-context prompt)
       (push `("system" . ,(llm-provider-utils-get-system-prompt prompt llm-ollama-example-prelude)) request-alist))
@@ -122,10 +120,8 @@ REQUEST-ALIST is the request data to send."
 
 (defun llm-ollama--chat-request-chat (prompt)
   "Create the chat request data for the `chat' endpoint.
-
 PROMPT is the chat prompt to process.
-
-REQUEST-ALIST is the request data to send."
+Returns REQUEST-ALIST with prompt request data."
   (let (request-alist messages)
     (setq messages
           (mapcar (lambda (interaction)
