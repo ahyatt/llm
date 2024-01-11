@@ -58,8 +58,11 @@ PORT is the localhost port that Ollama is running on.  It is optional.
 
 CHAT-MODEL is the model to use for chat queries. It is required.
 
-EMBEDDING-MODEL is the model to use for embeddings.  It is required."
-  (scheme "http") (host "localhost") (port 11434) chat-model embedding-model)
+EMBEDDING-MODEL is the model to use for embeddings.  It is required.
+
+ENDPOINT is the API endpoint to use, a string. It is optional and
+defaults to `generate'."
+  (scheme "http") (host "localhost") (port 11434) chat-model embedding-model (endpoint "generate"))
 
 ;; Ollama's models may or may not be free, we have no way of knowing. There's no
 ;; way to tell, and no ToS to point out here.
@@ -100,22 +103,54 @@ PROVIDER is the llm-ollama provider."
    (llm-request-sync (format "http://localhost:%d/api/embeddings" (or (llm-ollama-port provider) 11434))
                      :data (llm-ollama--embedding-request provider string))))
 
-(defun llm-ollama--chat-request (provider prompt)
-  "From PROMPT, create the chat request data to send.
-PROVIDER is the llm-ollama provider to use.
-RETURN-JSON-SPEC is the optional specification for the JSON to return.
-STREAMING if non-nil, turn on response streaming." 
-  (let (request-alist options)
+(defun llm-ollama--chat-request-generate (prompt)
+  "Create the chat request data for the `generate' endpoint.
+
+PROMPT is the chat prompt to process.
+
+REQUEST-ALIST is the request data to send."
+  (let (request-alist)
     (when (llm-chat-prompt-context prompt)
       (push `("system" . ,(llm-provider-utils-get-system-prompt prompt llm-ollama-example-prelude)) request-alist))
-    ;; If the first item isn't an interaction, then it's a conversation which
-    ;; we'll set as the chat context.
     (when (not (eq (type-of (car (llm-chat-prompt-interactions prompt)))
                    'llm-chat-prompt-interaction))
       (push `("context" . ,(car (llm-chat-prompt-interactions prompt))) request-alist))
     (push `("prompt" . ,(string-trim (llm-chat-prompt-interaction-content
                                       (car (last (llm-chat-prompt-interactions prompt))))))
           request-alist)
+    request-alist))
+
+(defun llm-ollama--chat-request-chat (prompt)
+  "Create the chat request data for the `chat' endpoint.
+
+PROMPT is the chat prompt to process.
+
+REQUEST-ALIST is the request data to send."
+  (let (request-alist messages)
+    (setq messages
+          (mapcar (lambda (interaction)
+                    `(("role" . ,(symbol-name (llm-chat-prompt-interaction-role interaction)))
+                      ("content" . ,(llm-chat-prompt-interaction-content interaction))))
+                  (llm-chat-prompt-interactions prompt)))
+    (when (llm-chat-prompt-context prompt)
+      (push `(("role" . "system")
+              ("content" . ,(llm-provider-utils-get-system-prompt prompt llm-ollama-example-prelude)))
+            messages))
+    (push `("messages" . ,messages) request-alist)
+    request-alist))
+
+(defun llm-ollama--chat-request (provider prompt)
+  "From PROMPT, create the chat request data to send.
+PROVIDER is the llm-ollama provider to use.
+
+Function will create the appropriate request data for either a
+`chat' or `generate' request depending on the endpoint specified
+in the provider."
+  (let* ((request-alist 
+          (if (string= (llm-ollama-endpoint provider) "chat")
+              (llm-ollama--chat-request-chat prompt)
+            (llm-ollama--chat-request-generate prompt)))
+         (options nil))
     (push `("model" . ,(llm-ollama-chat-model provider)) request-alist)
     (when (llm-chat-prompt-temperature prompt)
       (push `("temperature" . ,(llm-chat-prompt-temperature prompt)) options))
@@ -151,7 +186,16 @@ STREAMING if non-nil, turn on response streaming."
              current-response
              (concat current-response
                      (mapconcat
-                      (lambda (line) (assoc-default 'response (json-read-from-string line)))
+                      (lambda (line)
+                        ;; Process response from /api/chat or
+                        ;; /api/generate endpoint appropriately.
+                        (let* ((json-response (json-read-from-string line))
+                               (response-string
+                                (or (assoc-default 'response json-response)
+                                    (assoc-default 'content
+                                                   (assoc-default 'message json-response)))))
+                          response-string))
+                      
                       ;; Take from response output last-response to the end. This
                       ;; counts only valid responses, so we need to throw out all
                       ;; other lines that aren't valid JSON.
@@ -178,7 +222,7 @@ STREAMING if non-nil, turn on response streaming."
   ;; we really just need it for the local variables.
   (with-temp-buffer
     (let ((output (llm-request-sync-raw-output 
-                   (llm-ollama--url provider "generate")
+                   (llm-ollama--url provider (slot-value provider 'endpoint))
                    :data (llm-ollama--chat-request provider prompt)
                    ;; ollama is run on a user's machine, and it can take a while.
                    :timeout llm-ollama-chat-timeout)))
@@ -191,7 +235,7 @@ STREAMING if non-nil, turn on response streaming."
 
 (cl-defmethod llm-chat-streaming ((provider llm-ollama) prompt partial-callback response-callback error-callback)
   (let ((buf (current-buffer)))
-    (llm-request-async (llm-ollama--url provider "generate")
+    (llm-request-async (llm-ollama--url provider (slot-value provider 'endpoint))
       :data (llm-ollama--chat-request provider prompt)
       :on-success-raw (lambda (response)
                         (setf (llm-chat-prompt-interactions prompt)
