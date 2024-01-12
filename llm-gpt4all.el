@@ -33,6 +33,7 @@
 (require 'llm)
 (require 'llm-request)
 (require 'llm-openai)
+(require 'llm-provider-utils)
 
 (cl-defstruct llm-gpt4all
   "A structure for holding information needed by GPT4All.
@@ -84,6 +85,9 @@ default the default GPT4all port."
 (cl-defmethod llm-name ((provider llm-gpt4all))
   "Return the name of the provider."
   (llm-gpt4all-chat-model provider))
+
+(cl-defmethod llm-chat-token-limit ((provider llm-gpt4all))
+  (llm-provider-utils-model-token-limit (llm-gpt4all-chat-model provider)))
 
 (provide 'llm-gpt4all)
 

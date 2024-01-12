@@ -125,6 +125,10 @@ You can get this at https://makersuite.google.com/app/apikey."
   "Return the name of PROVIDER."
   "Gemini")
 
+;; From https://ai.google.dev/models/gemini.
+(cl-defmethod llm-chat-token-limit ((provider llm-gemini))
+  (llm-vertex--chat-token-limit (llm-gemini-chat-model provider)))
+
 (provide 'llm-gemini)
 
 ;;; llm-gemini.el ends here

@@ -1,3 +1,5 @@
+* Version 0.9
+- Add =llm-chat-token-limit= to find the token limit based on the model.
 * Version 0.8
 - Allow users to change the Open AI URL, to allow for proxies and other services that re-use the API.
 - Add =llm-name= and =llm-cancel-request= to the API.
