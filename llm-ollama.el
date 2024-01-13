@@ -110,6 +110,8 @@ Returns REQUEST-ALIST with prompt request data."
   (let (request-alist)
     (when (llm-chat-prompt-context prompt)
       (push `("system" . ,(llm-provider-utils-get-system-prompt prompt llm-ollama-example-prelude)) request-alist))
+    ;; If the first item isn't an interaction, then it's a conversation which
+    ;; we'll set as the chat context.    
     (when (not (eq (type-of (car (llm-chat-prompt-interactions prompt)))
                    'llm-chat-prompt-interaction))
       (push `("context" . ,(car (llm-chat-prompt-interactions prompt))) request-alist))
