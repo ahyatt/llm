@@ -100,6 +100,20 @@ things.  Providers should probably issue a warning when using this."
                          "\n\nThe current conversation follows:\n\n"
                          (llm-chat-prompt-interaction-content (car (last (llm-chat-prompt-interactions prompt))))))))))
 
+(defun llm-provider-utils-model-token-limit (model)
+  "Return the token limit for MODEL."
+  (let ((model (downcase model)))
+   (cond
+    ((string-match-p "mistral-7b" model) 8192)
+    ((string-match-p "mistral" model) 8192)
+    ((string-match-p "mixtral-45b" model) 131072)
+    ((string-match-p "mixtral" model) 131072)
+    ((string-match-p "falcon" model) 2048)
+    ((string-match-p "orca 2" model) 4096)
+    ((string-match-p "orca" model) 2048)
+    ((string-match-p "llama\s*2" model) 4096)
+    ((string-match-p "llama" model) 2048)
+    ((string-match-p "starcoder" model) 8192))))
 
 (provide 'llm-provider-utils)
 ;;; llm-provider-utils.el ends here

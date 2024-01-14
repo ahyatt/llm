@@ -294,6 +294,18 @@ MODEL "
 (cl-defmethod llm-name ((_ llm-vertex))
   "Gemini")
 
+(defun llm-vertex--chat-token-limit (model)
+  "Get token limit for MODEL."
+  (cond ((equal "gemini-pro" model) 30720)
+        ((equal "gemini-pro-vision" model) 12288)
+        ;; This shouldn't happen unless there's a new model, which could be a
+        ;; smaller or larger model. We'll play it safe and choose a reasonable
+        ;; number.
+        (t 4096)))
+
+(cl-defmethod llm-chat-token-limit ((provider llm-vertex))
+  (llm-vertex--chat-token-limit (llm-vertex-chat-model provider)))
+
 (provide 'llm-vertex)
 
 ;;; llm-vertex.el ends here

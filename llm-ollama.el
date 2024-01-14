@@ -252,6 +252,9 @@ endpoint is specified in the provider."
 (cl-defmethod llm-name ((provider llm-ollama))
   (llm-ollama-chat-model provider))
 
+(cl-defmethod llm-chat-token-limit ((provider llm-ollama))
+  (llm-provider-utils-model-token-limit (llm-ollama-chat-model provider)))
+
 (provide 'llm-ollama)
 
 ;;; llm-ollama.el ends here

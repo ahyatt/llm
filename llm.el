@@ -233,6 +233,14 @@ be passed to `llm-cancel-request'."
   (when-let (info (llm-nonfree-message-info provider))
     (llm--warn-on-nonfree (car info) (cdr info))))
 
+(cl-defgeneric llm-chat-token-limit (provider)
+  "Return max number of tokens that can be sent to the LLM.
+For many models we know this number, but for some we don't have
+enough information to know. In those cases we return a default
+value that should be a reasonable lower bound."
+  (ignore provider)
+  2048)
+
 (cl-defgeneric llm-embedding (provider string)
   "Return a vector embedding of STRING from PROVIDER."
   (ignore provider string)

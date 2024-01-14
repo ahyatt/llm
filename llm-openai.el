@@ -268,6 +268,27 @@ them from 1 to however many are sent.")
 (cl-defmethod llm-name ((_ llm-openai))
   "Open AI")
 
+;; See https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo
+;; and https://platform.openai.com/docs/models/gpt-3-5.
+(cl-defmethod llm-chat-token-limit ((provider llm-openai))
+  (let ((model (llm-openai-chat-model provider)))
+    (cond
+     ((string-match (rx (seq (or ?- ?_) (group-n 1 (+ digit)) ?k)) model)
+      (let ((n (string-to-number (match-string 1 model))))
+        ;; This looks weird but Open AI really has an extra token for 16k
+        ;; models, but not for 32k models.
+        (+ (* n 1024) (if (= n 16) 1 0))))
+     ((equal model "gpt-4") 8192)
+     ((string-match-p (rx (seq "gpt-4-" (+ ascii) "-preview")) model)
+       128000)
+     ((string-match-p (rx (seq "gpt-4-" (+ digit))) model)
+      8192)
+     ((string-match-p (rx (seq "gpt-3.5-turbo-1" (+ digit))) model)
+      16385)
+     ((string-match-p (rx (seq "gpt-3.5-turbo" (opt "-instruct"))) model)
+      4096)
+     (t 4096))))
+
 (provide 'llm-openai)
 
 ;;; llm-openai.el ends here
