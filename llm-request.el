@@ -57,7 +57,7 @@ TIMEOUT is the number of seconds to wait for a response."
         (url-request-extra-headers
          (append headers '(("Content-Type" . "application/json"))))
         (url-request-data (encode-coding-string (json-encode data) 'utf-8)))
-    (let ((buf (url-retrieve-synchronously url t nil (or timeout 5))))
+    (let ((buf (url-retrieve-synchronously url t nil (or timeout 10))))
       (if buf
           (with-current-buffer buf
             (url-http-parse-response)
