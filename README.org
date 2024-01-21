@@ -99,6 +99,7 @@ For all callbacks, the callback will be executed in the buffer the function was 
 - ~llm-count-tokens provider string~: Count how many tokens are in ~string~.  This may vary by ~provider~, because some provideres implement an API for this, but typically is always about the same.  This gives an estimate if the provider has no API support.
 - ~llm-cancel-request request~ Cancels the given request, if possible.  The ~request~ object is the return value of async and streaming functions.
 - ~llm-name provider~.  Provides a short name of the model or provider, suitable for showing to users.
+- ~llm-chat-token-limit~.  Gets the token limit for the chat model.  This isn't possible for some backends like =llama.cpp=, in which the model isn't selected or known by this library.
 
   And the following helper functions:
   - ~llm-make-simple-chat-prompt text~: For the common case of just wanting a simple text prompt without the richness that ~llm-chat-prompt~ struct provides, use this to turn a string into a ~llm-chat-prompt~ that can be passed to the main functions above.
