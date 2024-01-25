@@ -31,37 +31,110 @@
 (require 'llm)
 (require 'ediff)
 
-(cl-defstruct llm-flows-state
-  "State of the current workflow.
+(cl-defstruct llm-flows-acceptor
+  "A function that tests the output from an LLM.
+
+SYMBOL is the symbol that will be used to refer to this acceptor.
+
+FUNCTION is the function that will be called with a
+`llm-flows-loop' arg.
+
+REPEAT-LIMIT is the number of times this acceptor can be called.
+If nil, there is no limit.
+"
+
+  symbol
+  function
+  repeat-limit)
+
+(cl-defstruct llm-flows-loop
+  "State and setup of a single loop in an LLM workflow.
+
+A loop is a single operation, one that can be has acceptance
+criteria and may be repeated in a loop until the acceptance tests
+pass.
+
 NAME is the name of the state machine. PROVIDER is the LLM,
 PROMPT is the prompt that was given to the user, and perhaps
-added to in further conversation."
+added to in further conversation.
+
+acceptor is a list of `llm-flows-acceptor' structs.
+
+LAST-RESPONSE is the last accepted response from the LLM.
+
+TRACE is a list of the last acceptor symbols, from latest to
+earliest. It keeps getting appended to whenever the LLM runs in
+a loop, so it may contain acceptors that have yet to be run in
+the current loop. `nil' values indicate the loop was restarted.
+
+FINALIZER is a function that can be called with the loop to
+affect the change."
   name
   provider
-  prompt)
+  prompt
+  acceptors
+  response
+  finalizer
+  trace)
 
-(defun llm-flows-prompt-for-revision (state)
+(defun llm-flows-advance-loop (loop)
+  "After an acceptor has succeeded, advance the LOOP state.
+This just calls the next acceptor, if there is one, or if there
+is no more, the finalizer."
+  ;; Get the next acceptor, or nil if there are no more.
+  (let* ((a (llm-flows-loop-acceptors loop))
+         (last-acceptor-sym (car (llm-flows-loop-trace loop))))
+    (when last-acceptor-sym
+      (while (and a last-acceptor-sym
+                (not (eq (llm-flows-acceptor-symbol (car a)) last-acceptor-sym)))
+        (setq a (cdr a)))
+      ;; We are now at the current acceptor, set the list so it's the remaining
+      ;; acceptors.
+      (setq a (cdr a)))    
+    (if a
+        (let ((next-acceptor (car a)))
+          (push (llm-flows-acceptor-symbol next-acceptor) (llm-flows-loop-trace loop))
+          (if (funcall (llm-flows-acceptor-function next-acceptor) loop)
+              (llm-flows-advance-loop loop)
+            (llm-flows-restart-loop loop)))
+      (funcall (llm-flows-loop-finalizer loop) loop))))
+
+(defun llm-flows-restart-loop (loop)
+  "Restart LOOP if possible, due to an acceptor failure."
+  (let* ((failed-acceptor
+          (seq-find
+           (lambda (a) (eq (llm-flows-acceptor-symbol a)
+                           (car (llm-flows-loop-trace loop))))
+           (llm-flows-loop-acceptors loop)))
+         (prev-count
+          (seq-count (lambda (sym)
+                       (eq sym (llm-flows-acceptor-symbol failed-acceptor)))
+                     (llm-flows-loop-trace loop))))
+    (if (and (llm-flows-acceptor-repeat-limit failed-acceptor)
+             (>= prev-count (llm-flows-acceptor-repeat-limit failed-acceptor)))
+        (error "LLM flow loop %s unable to complete. Acceptance limit reached for %s"
+               (llm-flows-loop-name loop)
+               (llm-flows-acceptor-symbol failed-acceptor))
+      (push nil (llm-flows-loop-trace loop))
+      (setf (llm-flows-loop-response loop)
+            (llm-chat (llm-flows-loop-provider loop)
+                      (llm-flows-loop-prompt loop)))
+      (llm-flows-advance-loop loop))))
+
+(defun llm-flows-prompt-for-revision (loop)
   "Prompt a revision for the diff.
 
-Returns the new response.
+Returns the new response."
+  (llm-chat-prompt-append-response (llm-flows-loop-prompt loop)
+                                   (read-from-minibuffer "Revision prompt: ")))
 
-STATE is the state of the workflow."
-  (let ((prompt (read-from-minibuffer "Revision prompt: ")))
-    (message "Getting response from %s" (llm-name (llm-flows-state-provider state)))
-    (llm-chat-prompt-append-response (llm-flows-state-prompt state)
-                                     prompt)
-    (llm-chat (llm-flows-state-provider state)
-              (llm-flows-state-prompt state))))
-
-(defun llm-flows-check-result-diff (state before after on-accept)
-  "Ask the user AFTER should be kept, given BEFORE state.
-NEXT is the next state to execute, when the diff is accepted.
-ON-ACCEPT is called with the final text."
+(defun llm-flows-check-result-diff (loop)
+  "Ask the user to accept the result of the LLM."
   (unless (string= before after)
     (let ((buf-begin (get-buffer-create (format "*%s diff before*"
-                                                (llm-flows-state-name state))))
+                                                (llm-flows-loop-name loop))))
           (buf-end (get-buffer-create (format "*%s diff after*"
-                                              (llm-flows-state-name state))))
+                                              (llm-flows-loop-name loop))))
           (orig-ediff-quit-hook ediff-quit-hook))
       (with-current-buffer buf-begin
         (erase-buffer)
@@ -89,10 +162,18 @@ ON-ACCEPT is called with the final text."
         (insert after))
       (ediff-buffers buf-begin buf-end))))
 
-(defun llm-flows-replace-region (provider prompt name)
+(defun llm-flows-acceptor-verify (flow)
+  "Acceptor that has the user verify the results of FLOW."
+  )
+
+(defun llm-flows-user-refinement (provider prompt name after)
   "Replace the region with result of calling llm with PROMPT.
-PROVIDER is the LLM provider to use. NAME is the user-visible
-name for the replacement function."
+PROVIDER is the LLM provider to use.
+
+NAME is the user-visible name for the replacement function.
+
+AFTER is the function to use after the user has accepted the
+change. It is called with the accepted response from the LLM."
   (let* ((buf (current-buffer))
          (start (region-beginning))
          (end (region-end))
@@ -103,10 +184,38 @@ name for the replacement function."
     (message "Getting replacement from %s" (llm-name provider))
     (let* ((response (llm-chat (llm-flows-state-provider state)
                                (llm-flows-state-prompt state))))
-      (llm-flows-check-result-diff state before response
-                                   (lambda (text)
-                                     (with-current-buffer buf
-                                       (replace-region-contents start end (lambda () text))))))))
+      (llm-flows-check-result-diff state before response after))))
+
+(defun llm-flows--fill-template (text var-alist)
+  "Fill variables in TEXT with VAR-ALIST.
+TEXT can have variables in it marked with a double curly
+brackets, so {{var}}, for example, will be replaced with the cdr
+of the cons in VAR-ALIST where car is matches var. You can escape
+this by adding a backlash before the curly brackets, which will
+cause the curly brackets to not be detected as a variable. Note
+that when writing strings, backslashes have to be escaped
+themselves, so you need to write \\ to escape the curly brackets.
+
+VAR can only be alphanumeric letters and dashes.
+
+If TEXT has variables that cannot be found in VAR-ALIST, an error
+is thrown.
+
+The return value is the filled in text."
+  (with-temp-buffer
+    (insert text)
+    (goto-char (point-min))
+    (while (re-search-forward
+            (rx (seq (group-n 1 (not ?\\))
+                     "{{"
+                     (group-n 2 (1+ (or alpha ?-)))
+                     "}}")) nil t)
+      (let ((var (match-string 2)))
+        (let ((value (assoc-default var var-alist)))
+          (unless value
+            (error "Variable %s not found" var))
+          (replace-match (concat (match-string 1) value)))))
+    (buffer-string)))
 
 (defun llm-flows--remove-newlines (text)
   "Remove newlines from TEXT."
