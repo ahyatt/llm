@@ -29,25 +29,14 @@
 ;;; Code:
 
 (require 'llm)
+(require 'fsm)
+(require 'cl-macs)
 (require 'ediff)
 
-(cl-defstruct llm-flows-acceptor
-  "A function that tests the output from an LLM.
+(defvar llm-flows-last-fsm nil
+  "The last FSM that was run.")
 
-SYMBOL is the symbol that will be used to refer to this acceptor.
-
-FUNCTION is the function that will be called with a
-`llm-flows-loop' arg.
-
-REPEAT-LIMIT is the number of times this acceptor can be called.
-If nil, there is no limit.
-"
-
-  symbol
-  function
-  repeat-limit)
-
-(cl-defstruct llm-flows-loop
+(cl-defstruct llm-flows-state
   "State and setup of a single loop in an LLM workflow.
 
 A loop is a single operation, one that can be has acceptance
@@ -58,133 +47,157 @@ NAME is the name of the state machine. PROVIDER is the LLM,
 PROMPT is the prompt that was given to the user, and perhaps
 added to in further conversation.
 
-acceptor is a list of `llm-flows-acceptor' structs.
+RUN-COUNT is the number of times the LLM has been run.
 
-LAST-RESPONSE is the last accepted response from the LLM.
+JSON-VERIFIER, if non-nil, should be a function that takes in
+JSON and checks to make sure it looks like it is supposed to, and
+returns nil if it doesn't. If it is nil, we take that to mean
+there shouldn't be JSON converstion.
 
-TRACE is a list of the last acceptor symbols, from latest to
-earliest. It keeps getting appended to whenever the LLM runs in
-a loop, so it may contain acceptors that have yet to be run in
-the current loop. `nil' values indicate the loop was restarted.
+USER-VERIFIED, if non-nil, is a function that takes in the fsm
+and the result and asks the user to verify. It is expected to
+call fsm with the a cons of one of the symbols `accept',
+`repeat', `revise' or `quit', and the result (which may have been
+revised by the user).
 
-FINALIZER is a function that can be called with the loop to
-affect the change."
+ON-SUCCESS takes the final result (text, or JSON), and does
+whatever needs to be done.
+
+ON-ERROR takes the error type and error message, and handles it
+in whatever way is appropriate.
+
+ON-UNDO is called if we want to undo whatever changes happened in
+ON-SUCCESS.  It does not take any arguments."
   name
   provider
   prompt
-  acceptors
-  response
-  finalizer
-  trace)
+  json-verifier
+  user-verifier
+  on-success
+  on-error
+  on-undo
+  (run-count 0))
 
-(defun llm-flows-advance-loop (loop)
-  "After an acceptor has succeeded, advance the LOOP state.
-This just calls the next acceptor, if there is one, or if there
-is no more, the finalizer."
-  ;; Get the next acceptor, or nil if there are no more.
-  (let* ((a (llm-flows-loop-acceptors loop))
-         (last-acceptor-sym (car (llm-flows-loop-trace loop))))
-    (when last-acceptor-sym
-      (while (and a last-acceptor-sym
-                (not (eq (llm-flows-acceptor-symbol (car a)) last-acceptor-sym)))
-        (setq a (cdr a)))
-      ;; We are now at the current acceptor, set the list so it's the remaining
-      ;; acceptors.
-      (setq a (cdr a)))    
-    (if a
-        (let ((next-acceptor (car a)))
-          (push (llm-flows-acceptor-symbol next-acceptor) (llm-flows-loop-trace loop))
-          (if (funcall (llm-flows-acceptor-function next-acceptor) loop)
-              (llm-flows-advance-loop loop)
-            (llm-flows-restart-loop loop)))
-      (funcall (llm-flows-loop-finalizer loop) loop))))
+(define-fsm llm-flows-simple
+            :start ((start-state)
+                    "Start the LLM flow"
+                    (list :chat start-state 0))
+            :state-data-name state
+            :states
+            ((:chat
+              (:enter (llm-chat-async (llm-flows-state-provider state)
+                                        (llm-flows-state-prompt state)
+                                        (lambda (result)
+                                          (fsm-send fsm (cons :success result)))
+                                        (lambda (_ errmsg)
+                                          (fsm-send fsm (cons :error errmsg))))
+                      (list state nil))
+              (:event
+               (ignore callback)
+               (llm-flows-handle-llm-response fsm state event)))
+             (:json-verifier
+              (:event
+               (ignore callback)
+               (llm-flows-json-extract-and-verify fsm state event)))
+             (:user-verifier              
+              (:event
+               (ignore callback)
+               (if (llm-flows-state-user-verifier state)
+                   (progn (funcall (llm-flows-state-user-verifier state) fsm event)
+                          (list :user-verifier-waiting state))
+                 ;; No verifier, so finalize things here.
+                 (funcall (llm-flows-state-on-success state) event)
+                 (list :end state))))
+             (:user-verifier-waiting
+              (:event
+               (ignore fsm callback)
+               (llm-flows-handle-verification state event)))
+             (:end
+              (:event
+               (ignore callback fsm)
+               (llm-flows-handle-end-state state event)))))
 
-(defun llm-flows-restart-loop (loop)
-  "Restart LOOP if possible, due to an acceptor failure."
-  (let* ((failed-acceptor
-          (seq-find
-           (lambda (a) (eq (llm-flows-acceptor-symbol a)
-                           (car (llm-flows-loop-trace loop))))
-           (llm-flows-loop-acceptors loop)))
-         (prev-count
-          (seq-count (lambda (sym)
-                       (eq sym (llm-flows-acceptor-symbol failed-acceptor)))
-                     (llm-flows-loop-trace loop))))
-    (if (and (llm-flows-acceptor-repeat-limit failed-acceptor)
-             (>= prev-count (llm-flows-acceptor-repeat-limit failed-acceptor)))
-        (error "LLM flow loop %s unable to complete. Acceptance limit reached for %s"
-               (llm-flows-loop-name loop)
-               (llm-flows-acceptor-symbol failed-acceptor))
-      (push nil (llm-flows-loop-trace loop))
-      (setf (llm-flows-loop-response loop)
-            (llm-chat (llm-flows-loop-provider loop)
-                      (llm-flows-loop-prompt loop)))
-      (llm-flows-advance-loop loop))))
+(defun llm-flows-handle-end-state (state event)
+  (if (eq event :revise)
+      (progn (when-let ((undof (llm-flows-state-on-undo state)))
+               (funcall undof))
+             (llm-flows-revise state))                 
+    (list :end state)))
 
-(defun llm-flows-prompt-for-revision (loop)
-  "Prompt a revision for the diff.
+(defun llm-flows-handle-llm-response (fsm state event)
+  "Hand the FSM receiving the LLM response.
+FSM, STATE, and EVENT, and the return value is the same as in
+`define-state'."
+  (cl-incf (llm-flows-state-run-count state))
+  (pcase (car event)
+    (:success (fsm-send fsm (cdr event))
+              (list (if (llm-flows-state-json-verifier state)
+                        :json-verifier
+                      :user-verifier) state))
+    (:failed
+     (funcall (llm-flows-state-on-error state) (cdr event))
+     (list :end state))))
 
-Returns the new response."
-  (llm-chat-prompt-append-response (llm-flows-loop-prompt loop)
-                                   (read-from-minibuffer "Revision prompt: ")))
+(defun llm-flows-revise (state)
+  "Ask for revision and set the next state to be :chat."
+  (setf (llm-flows-state-run-count state) 0)
+  (llm-chat-prompt-append-response
+      (llm-flows-state-prompt state)
+      (read-from-minibuffer "Revision prompt: "))
+  (list :chat state))
 
-(defun llm-flows-check-result-diff (loop)
+(defun llm-flows-handle-verification (state event)
+  "Handle the FSM receiving a user verification event.
+STATE is the current FSM state and EVENT is the event sent."
+  (pcase (car event)
+    ('accept
+     (funcall (llm-flows-state-on-success state) (cdr event))
+     (list :end state))
+    ('repeat
+     (list :chat state))
+    ('revise
+     (llm-flows-revise state))
+    ('quit
+     (list :end state))))
+
+(defun llm-flows-json-extract-and-verify (fsm state text)
+  "Extract and verify JSON from the result of the LLM.
+Return is as expected from `fsm-define-state'."
+  (if (> (llm-flows-state-run-count state) 5)
+      (progn
+        (fsm-send fsm "Could not extract json from LLM output after several tries.")
+        (list :failed state))
+    (let ((json (ignore-errors (llm-flows--extract-json text))))
+      (if (and json (funcall (llm-flows-state-json-verifier state) json))
+          (progn
+            (fsm-send fsm json)
+            (list :user-verifier state))                        
+        (list :chat state)))))
+
+(defun llm-flows-verify-result-diff (fsm before after)
   "Ask the user to accept the result of the LLM."
   (unless (string= before after)
-    (let ((buf-begin (get-buffer-create (format "*%s diff before*"
-                                                (llm-flows-loop-name loop))))
-          (buf-end (get-buffer-create (format "*%s diff after*"
-                                              (llm-flows-loop-name loop))))
-          (orig-ediff-quit-hook ediff-quit-hook))
+    (let* ((name (llm-flows-state-name (fsm-get-state-data fsm)))
+           (buf-begin (get-buffer-create (format "*%s diff before*" name)))
+           (buf-end (get-buffer-create (format "*%s diff after*" name)))
+           (orig-ediff-quit-hook ediff-quit-hook))
       (with-current-buffer buf-begin
         (erase-buffer)
-        (insert before)
-        (add-hook 'ediff-quit-hook
-                  (lambda ()
-                    (setq ediff-quit-hook orig-ediff-quit-hook)
-                    (let ((choice (let ((read-answer-short t))
-                                    (read-answer "Accept this change? "
-                                                 '(("accept" ?a "accept the change")
-                                                   ("revise" ?r "ask llm for revision")
-                                                   ("quit" ?q "exit")))))
-                          (after (with-current-buffer buf-end (buffer-string))))
-                      (kill-buffer buf-begin)
-                      (kill-buffer buf-end)
-                      (pcase choice
-                        ("accept" (funcall on-accept after))
-                        ("revise" (llm-flows-check-result-diff
-                                   state before
-                                   (llm-flows-prompt-for-revision state)
-                                   on-accept))
-                        ("quit" nil))))))
+        (insert before))
       (with-current-buffer buf-end
         (erase-buffer)
         (insert after))
+      (add-hook 'ediff-quit-hook
+                  (lambda ()
+                    (setq ediff-quit-hook orig-ediff-quit-hook)
+                    (llm-flows-verify-query-user
+                     fsm ""
+                     (with-current-buffer buf-end
+                       (buffer-substring-no-properties (point-min) (point-max)))
+                     (lambda ()
+                       (kill-buffer buf-begin)
+                       (kill-buffer buf-end)))))
       (ediff-buffers buf-begin buf-end))))
-
-(defun llm-flows-acceptor-verify (flow)
-  "Acceptor that has the user verify the results of FLOW."
-  )
-
-(defun llm-flows-user-refinement (provider prompt name after)
-  "Replace the region with result of calling llm with PROMPT.
-PROVIDER is the LLM provider to use.
-
-NAME is the user-visible name for the replacement function.
-
-AFTER is the function to use after the user has accepted the
-change. It is called with the accepted response from the LLM."
-  (let* ((buf (current-buffer))
-         (start (region-beginning))
-         (end (region-end))
-         (before (buffer-substring-no-properties start end))
-         (state (make-llm-flows-state :name name
-                                      :provider provider
-                                      :prompt prompt)))
-    (message "Getting replacement from %s" (llm-name provider))
-    (let* ((response (llm-chat (llm-flows-state-provider state)
-                               (llm-flows-state-prompt state))))
-      (llm-flows-check-result-diff state before response after))))
 
 (defun llm-flows--fill-template (text var-alist)
   "Fill variables in TEXT with VAR-ALIST.
@@ -253,6 +266,36 @@ This returns the first successful value, or will throw an error."
     (unless (> times 0)
       (error "Failed to get a successful result"))
     result))
+
+(defun llm-flows-verify-query-user (fsm msg result &optional teardown-func)
+  "Ask the user to verify via MSG.
+
+FSM is the state machine to send the result to.
+
+MSG will be suffixed with asking the user to accept the change,
+and giving them the possibility to accept, revise or quit. MSG
+should end in a period and a space, or a newline.
+
+This is useful as the last expression in a verify function,
+because it returns the correct symbols.
+
+RESULT is the result that is being verified.
+
+TEARDOWN-FUNC has no args and is used between reading the answer
+and exiting."
+  (let ((read-answer-short t))
+    (fsm-send
+     fsm
+     (pcase
+         (let ((answer (read-answer (format "%sAccept this change? " msg)
+                                    '(("accept" ?a "accept the change")
+                                      ("revise" ?r "ask llm for revision")
+                                      ("quit" ?q "exit")))))
+           (when teardown-func (funcall teardown-func))
+           answer)
+       ("accept" (cons 'accept result))
+       ("revise" (cons 'revise result))
+       ("quit" (cons 'quit result))))))
 
 (provide 'llm-flows)
 
