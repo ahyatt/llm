@@ -151,12 +151,15 @@ This handles different kinds of models."
   (pcase (type-of response)
     ('vector (mapconcat #'llm-vertex--get-chat-response-streaming
                         response ""))
-    ('cons (let ((parts (assoc-default 'parts
-                                       (assoc-default 'content 
-                                                      (aref (assoc-default 'candidates response) 0)))))
-             (if parts
-                 (assoc-default 'text (aref parts 0))
-               "")))))
+    ('cons (if (assoc-default 'candidates response)
+               (let ((parts (assoc-default
+                             'parts
+                             (assoc-default 'content
+                                            (aref (assoc-default 'candidates response) 0)))))
+                 (if parts
+                     (assoc-default 'text (aref parts 0))
+                   ""))
+             "NOTE: No response was sent back by the LLM, the prompt may have violated safety checks."))))
 
 (defun llm-vertex--get-partial-chat-ui-repsonse (response)
   "Return the partial response from as much of RESPONSE as we can parse.
@@ -175,12 +178,22 @@ If the response is not parseable, return nil."
         (condition-case nil
             (when-let
                 ((json (ignore-errors
-                        (json-read-from-string
-                         (concat
-                          (buffer-substring-no-properties
-                           start end-of-valid-chunk)
-                          ;; Close off the json
-                          "]")))))
+                         (or
+                          (json-read-from-string
+                           (concat
+                            (buffer-substring-no-properties
+                             start end-of-valid-chunk)
+                            ;; Close off the json
+                            "]"))
+                          ;; Needed when we only get a promptFeedback back,
+                          ;; which happens when the prompt violates safety
+                          ;; checks.
+                          (json-read-from-string
+                           (buffer-substring-no-properties
+                            start (save-excursion
+                                    (goto-char (point-max))
+                                    (search-backward "}" nil t)
+                                    (1+ (point)))))))))
               (llm-vertex--get-chat-response-streaming json))
           (error (message "Unparseable buffer saved to *llm-vertex-unparseable*")
                  (with-current-buffer (get-buffer-create "*llm-vertex-unparseable*")
