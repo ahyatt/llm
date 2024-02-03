@@ -161,44 +161,18 @@ This handles different kinds of models."
                    ""))
              "NOTE: No response was sent back by the LLM, the prompt may have violated safety checks."))))
 
-(defun llm-vertex--get-partial-chat-ui-repsonse (response)
-  "Return the partial response from as much of RESPONSE as we can parse.
-If the response is not parseable, return nil."
+(defun llm-vertex--get-partial-chat-response (response)
+  "Return the partial response from as much of RESPONSE as we can parse."
   (with-temp-buffer
     (insert response)
-    (let ((start (point-min))
-          (end-of-valid-chunk
-           (save-excursion
-             (goto-char (point-max))
-             (search-backward "\n," nil t)
-             (point))))
-      (when (and start end-of-valid-chunk)
-        ;; It'd be nice if our little algorithm always worked, but doesn't, so let's
-        ;; just ignore when it fails.  As long as it mostly succeeds, it should be fine.
-        (condition-case nil
-            (when-let
-                ((json (ignore-errors
-                         (or
-                          (json-read-from-string
-                           (concat
-                            (buffer-substring-no-properties
-                             start end-of-valid-chunk)
-                            ;; Close off the json
-                            "]"))
-                          ;; Needed when we only get a promptFeedback back,
-                          ;; which happens when the prompt violates safety
-                          ;; checks.
-                          (json-read-from-string
-                           (buffer-substring-no-properties
-                            start (save-excursion
-                                    (goto-char (point-max))
-                                    (search-backward "}" nil t)
-                                    (1+ (point)))))))))
-              (llm-vertex--get-chat-response-streaming json))
-          (error (message "Unparseable buffer saved to *llm-vertex-unparseable*")
-                 (with-current-buffer (get-buffer-create "*llm-vertex-unparseable*")
-                     (erase-buffer)
-                     (insert response))))))))
+    (let ((result ""))
+      ;; We just will parse every line that is "text": "..." and concatenate them.   
+      (save-excursion
+        (goto-char (point-min))
+        (while (re-search-forward (rx (seq (literal "\"text\": ")
+                                           (group-n 1 ?\" (* any) ?\") line-end)) nil t)
+          (setq result (concat result (json-read-from-string (match-string 1))))))
+      result)))
 
 (defun llm-vertex--chat-request-streaming (prompt)
   "Return an alist with chat input for the streaming API.
@@ -260,7 +234,7 @@ If STREAMING is non-nil, use the URL for the streaming API."
                      :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
                      :data (llm-vertex--chat-request-streaming prompt)
                      :on-partial (lambda (partial)
-                                   (when-let ((response (llm-vertex--get-partial-chat-ui-repsonse partial)))
+                                   (when-let ((response (llm-vertex--get-partial-chat-response partial)))
                                      (llm-request-callback-in-buffer buf partial-callback response)))
                      :on-success (lambda (data)
                                    (let ((response (llm-vertex--get-chat-response-streaming data)))

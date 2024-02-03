@@ -1,6 +1,7 @@
 * Version 0.9.1
 - Default to the new "text-embedding-3-small" model for Open AI.  *Important*: Anyone who has stored embeddings should either regenerate embeddings (recommended) or hard-code the old embedding model ("text-embedding-ada-002").
 - Fix response breaking when prompts run afoul of Gemini / Vertex's safety checks.
+- Change Gemini streaming to be the correct URL.  This doesn't seem to have an effect on behavior.
 * Version 0.9
 - Add =llm-chat-token-limit= to find the token limit based on the model.
 - Add request timeout customization.
