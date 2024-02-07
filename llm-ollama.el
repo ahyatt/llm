@@ -182,7 +182,6 @@ PROVIDER is the llm-ollama provider to use."
   ;; we really just need it for the local variables.
   (with-temp-buffer
     (let ((output (llm-request-sync-raw-output 
-                   ;; (llm-ollama--url provider (slot-value provider 'endpoint))
                    (llm-ollama--url provider "chat")
                    :data (llm-ollama--chat-request provider prompt)
                    ;; ollama is run on a user's machine, and it can take a while.
@@ -196,22 +195,21 @@ PROVIDER is the llm-ollama provider to use."
 
 (cl-defmethod llm-chat-streaming ((provider llm-ollama) prompt partial-callback response-callback error-callback)
   (let ((buf (current-buffer)))
-    ;; (llm-request-async (llm-ollama--url provider (slot-value provider 'endpoint))
     (llm-request-async (llm-ollama--url provider "chat")
-                       :data (llm-ollama--chat-request provider prompt)
-                       :on-success-raw (lambda (response)
-                                         (setf (llm-chat-prompt-interactions prompt)
-                                               (list (assoc-default 'context (llm-ollama--get-final-response response))))
-                                         (llm-request-callback-in-buffer
-                                          buf response-callback
-                                          (llm-ollama--get-partial-chat-response response)))
-                       :on-partial (lambda (data)
-                                     (when-let ((response (llm-ollama--get-partial-chat-response data)))
-                                       (llm-request-callback-in-buffer buf partial-callback response)))
-                       :on-error (lambda (_ _)
-                                   ;; The problem with ollama is that it doesn't
-                                   ;; seem to have an error response.
-                                   (llm-request-callback-in-buffer buf error-callback "Unknown error calling ollama")))))
+      :data (llm-ollama--chat-request provider prompt)
+      :on-success-raw (lambda (response)
+                        (setf (llm-chat-prompt-interactions prompt)
+                              (list (assoc-default 'context (llm-ollama--get-final-response response))))
+                        (llm-request-callback-in-buffer
+                         buf response-callback
+                         (llm-ollama--get-partial-chat-response response)))
+      :on-partial (lambda (data)
+                    (when-let ((response (llm-ollama--get-partial-chat-response data)))
+                      (llm-request-callback-in-buffer buf partial-callback response)))
+      :on-error (lambda (_ _)
+                  ;; The problem with ollama is that it doesn't
+                  ;; seem to have an error response.
+                  (llm-request-callback-in-buffer buf error-callback "Unknown error calling ollama")))))
 
 (cl-defmethod llm-name ((provider llm-ollama))
   (llm-ollama-chat-model provider))
