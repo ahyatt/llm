@@ -69,7 +69,7 @@ https://api.example.com/v1/chat, then URL should be
   "Return the request to the server for the embedding of STRING.
 MODEL is the embedding model to use, or nil to use the default.."
   `(("input" . ,string)
-    ("model" . ,(or model "text-embedding-ada-002"))))
+    ("model" . ,(or model "text-embedding-3-small"))))
 
 (defun llm-openai--embedding-extract-response (response)
   "Return the embedding from the server RESPONSE."
@@ -113,7 +113,7 @@ This is just the key, if it exists."
             "/") command))
 
 (cl-defmethod llm-embedding-async ((provider llm-openai) string vector-callback error-callback)
-  (llm-openai--check-key provider)
+  (llm-openai--check-key provider)  
   (let ((buf (current-buffer)))
     (llm-request-async (llm-openai--url provider "embeddings")
                        :headers (llm-openai--headers provider)

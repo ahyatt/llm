@@ -25,6 +25,18 @@
 (require 'url-http)
 (require 'rx)
 
+(defcustom llm-request-timeout 20
+  "The number of seconds to wait for a response from a HTTP server.
+
+Request timings are depending on the request. Requests that need
+more output may take more time, and there is other processing
+besides just token generation that can take a while. Sometimes
+the LLM can get stuck, and you don't want it to take too long.
+This should be balanced to be good enough for hard requests but
+not very long so that we can end stuck requests."
+  :type 'integer
+  :group 'llm)
+
 (defun llm-request--content ()
   "From the current buffer, return the content of the response."
   (decode-coding-string
@@ -57,7 +69,7 @@ TIMEOUT is the number of seconds to wait for a response."
         (url-request-extra-headers
          (append headers '(("Content-Type" . "application/json"))))
         (url-request-data (encode-coding-string (json-encode data) 'utf-8)))
-    (let ((buf (url-retrieve-synchronously url t nil (or timeout 5))))
+    (let ((buf (url-retrieve-synchronously url t nil (or timeout llm-request-timeout))))
       (if buf
           (with-current-buffer buf
             (url-http-parse-response)

@@ -72,10 +72,13 @@ You can get this at https://makersuite.google.com/app/apikey."
                                     buf error-callback
                                     'error (llm-vertex--error-message data))))))
 
-(defun llm-gemini--chat-url (provider)
-  "Return the URL for the chat request, using PROVIDER."
-  (format "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s"
+;; from https://ai.google.dev/tutorials/rest_quickstart
+(defun llm-gemini--chat-url (provider streaming-p)
+  "Return the URL for the chat request, using PROVIDER.
+If STREAMING-P is non-nil, use the streaming endpoint."
+  (format "https://generativelanguage.googleapis.com/v1beta/models/%s:%s?key=%s"
           (llm-gemini-chat-model provider)
+          (if streaming-p "streamGenerateContent" "generateContent")
           (llm-gemini-key provider)))
 
 (defun llm-gemini--get-chat-response (response)
@@ -85,7 +88,7 @@ You can get this at https://makersuite.google.com/app/apikey."
 
 (cl-defmethod llm-chat ((provider llm-gemini) prompt)
   (let ((response (llm-vertex--get-chat-response-streaming
-                   (llm-request-sync (llm-gemini--chat-url provider)
+                   (llm-request-sync (llm-gemini--chat-url provider nil)
                                      :data (llm-vertex--chat-request-streaming prompt)))))
     (setf (llm-chat-prompt-interactions prompt)
           (append (llm-chat-prompt-interactions prompt)
@@ -94,10 +97,10 @@ You can get this at https://makersuite.google.com/app/apikey."
 
 (cl-defmethod llm-chat-streaming ((provider llm-gemini) prompt partial-callback response-callback error-callback)
   (let ((buf (current-buffer)))
-    (llm-request-async (llm-gemini--chat-url provider)
+    (llm-request-async (llm-gemini--chat-url provider t)
                        :data (llm-vertex--chat-request-streaming prompt)
                        :on-partial (lambda (partial)
-                                     (when-let ((response (llm-vertex--get-partial-chat-ui-repsonse partial)))
+                                     (when-let ((response (llm-vertex--get-partial-chat-response partial)))
                                        (llm-request-callback-in-buffer buf partial-callback response)))
                        :on-success (lambda (data)
                                      (let ((response (llm-vertex--get-chat-response-streaming data)))
