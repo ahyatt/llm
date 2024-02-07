@@ -104,28 +104,22 @@ PROVIDER is the llm-ollama provider."
   "From PROMPT, create the chat request data to send.
 PROVIDER is the llm-ollama provider to use."
   (let (request-alist messages options)
-    ;; Create messages from prompt interactions
     (setq messages
           (mapcar (lambda (interaction)
                     `(("role" . ,(symbol-name (llm-chat-prompt-interaction-role interaction)))
                       ("content" . ,(llm-chat-prompt-interaction-content interaction))))
                   (llm-chat-prompt-interactions prompt)))
-    ;; Add system prompt to messages if it exists
     (when (llm-chat-prompt-context prompt)
       (push `(("role" . "system")
               ("content" . ,(llm-provider-utils-get-system-prompt prompt llm-ollama-example-prelude)))
             messages))
-    ;; Add messages to request-alist
     (push `("messages" . ,messages) request-alist)
-    ;; Add model to request-alist
     (push `("model" . ,(llm-ollama-chat-model provider)) request-alist)
-    ;; Add options to request-alist if they exist
     (when (llm-chat-prompt-temperature prompt)
       (push `("temperature" . ,(llm-chat-prompt-temperature prompt)) options))
     (when (llm-chat-prompt-max-tokens prompt)
       (push `("num_predict" . ,(llm-chat-prompt-max-tokens prompt)) options))
     (when options (push `("options" . ,options) request-alist))
-    ;; Return request-alist
     request-alist))
 
 (defvar-local llm-ollama-current-response ""
