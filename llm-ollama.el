@@ -181,7 +181,10 @@ PROVIDER is the llm-ollama provider to use."
                    ;; ollama is run on a user's machine, and it can take a while.
                    :timeout llm-ollama-chat-timeout)))
       (setf (llm-chat-prompt-interactions prompt)
-	        (list (assoc-default 'context (llm-ollama--get-final-response output))))
+	        (append (llm-chat-prompt-interactions prompt)
+                    (list (make-llm-chat-prompt-interaction
+                           :role 'assistant
+                           :content (assoc-default 'context (llm-ollama--get-final-response output))))))
       (llm-ollama--get-partial-chat-response output))))
 
 (cl-defmethod llm-chat-streaming ((provider llm-ollama) prompt partial-callback response-callback error-callback)
@@ -190,7 +193,11 @@ PROVIDER is the llm-ollama provider to use."
       :data (llm-ollama--chat-request provider prompt)
       :on-success-raw (lambda (response)
                         (setf (llm-chat-prompt-interactions prompt)
-                              (list (assoc-default 'context (llm-ollama--get-final-response response))))
+                              (append (llm-chat-prompt-interactions prompt)
+                                      (list
+                                       (make-llm-chat-prompt-interaction
+                                        :role 'assistant
+                                        :content (llm-ollama--get-partial-chat-response response)))))
                         (llm-request-callback-in-buffer
                          buf response-callback
                          (llm-ollama--get-partial-chat-response response)))
