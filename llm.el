@@ -48,6 +48,12 @@
   "Whether to issue a warning when using a non-free LLM."
   :type 'boolean)
 
+(defcustom llm-log nil
+  "Whether to log messages to the llm module.
+Logs will be in the buffer *llm log*. This should only be used
+for debugging, because the log buffer will grow without bound."
+  :type 'boolean)
+
 (defun llm--warn-on-nonfree (name tos)
   "Issue a warning if `llm-warn-on-nonfree' is non-nil.
 NAME is the human readable name of the LLM (e.g \"Open AI\").
@@ -98,6 +104,35 @@ MAX-TOKENS is the maximum number of tokens to generate.  This is optional."
 ROLE can a symbol, of either `user' or `assistant'."
   role content)
 
+(cl-defun llm--log (type &key provider prompt msg)
+  "Log a MSG of TYPE, given PROVIDER, PROMPT, and MSG.
+These are all optional, each one should be the normal meaning of
+this variable in this library. TYPE can be one of `api-send',
+`api-receive-parial', `api-receive-complete', `api-error', or
+`prompt-append'."
+  (when llm-log
+    (with-current-buffer (get-buffer-create "*llm log*")
+      (goto-char (point-max))
+      (let ((marker (make-marker)))
+        (set-marker marker (point))
+        (insert (format "[%s] %s\n\n"
+                        (format-time-string "%Y-%m-%d %H:%M:%S")
+                        (pcase type
+                          ('api-send (format
+                                      "[Emacs --> %s]:\n%s"
+                                      (llm-name provider)
+                                      (llm-chat-prompt-to-text prompt)))
+                          ('api-receive-partial
+                           (format "[%s --> Emacs] (partial): %s"
+                                   (llm-name provider)
+                                   msg))
+                          ('api-receive
+                           (format "[%s --> Emacs]: %s"
+                                   (llm-name provider) msg))
+                          ('api-error "[Error]: %s" msg)
+                          ('prompt-append (format "[Append to conversation]: %s"
+                                                  msg)))))))))
+
 (defun llm-make-simple-chat-prompt (text)
   "Create a `llm-chat-prompt' with TEXT sent to the LLM provider.
 This is a helper function for when you just need to send text to
@@ -142,6 +177,17 @@ conversation so far."
   (when-let (info (llm-nonfree-message-info provider))
     (llm--warn-on-nonfree (car info) (cdr info))))
 
+(cl-defmethod llm-chat :around (provider prompt)
+  "Log the input to llm-chat."
+  (llm--log 'api-send :provider provider :prompt prompt)
+  ;; We set the debug flag to nil around the next-method so that we don't log
+  ;; twice.
+  (let* ((llm-log nil)
+         (result (cl-call-next-method))
+         (llm-log t))
+    (llm--log 'api-receive :provider provider :msg result)
+    result))
+
 (cl-defgeneric llm-chat-async (provider prompt response-callback error-callback)
   "Return a response to PROMPT from PROVIDER.
 PROMPT is a `llm-chat-prompt'.
@@ -157,12 +203,32 @@ This returns an object representing the async request, which can
 be passed to `llm-cancel-request'."
   ;; By default, you can turn a streaming call into an async call, so we can
   ;; fall back to streaming if async is not populated.
+  ;; However, first, we don't want to log twice, so let's delete the last log so that llm-chat-streaming will
   (llm-chat-streaming provider prompt
                       ;; Do nothing on partial callback
-                      (lambda (_))
+                      nil
                       (lambda (text)
                         (funcall response-callback text))
                       (lambda (err msg) (funcall error-callback err msg))))
+
+(cl-defmethod llm-chat-async :around (provider prompt response-callback error-callback)
+  "Log the input to llm-chat-async."
+  (llm--log 'api-send :provider provider :prompt prompt)
+  (let* ((new-response-callback (lambda (response)
+                                  (llm--log 'api-receive :provider provider :msg response)
+                                  (let ((llm-log nil))
+                                    (funcall response-callback response))))
+         (new-error-callback (lambda (type err)
+                               (llm--log 'api-error :provider provider
+                                           :msg (format "Error type: %s, message: %s" type err))
+                               (let ((llm-log nil))
+                                 (funcall error-callback type err))))
+         (llm-log nil)
+         (result (cl-call-next-method provider prompt
+                                      new-response-callback
+                                      new-error-callback)))
+    
+    result))
 
 (cl-defgeneric llm-chat-streaming (provider prompt partial-callback response-callback error-callback)
   "Stream a response to PROMPT from PROVIDER.
@@ -172,7 +238,10 @@ PARTIAL-CALLBACK is called with the output of the string response
 as it is built up. The callback is called with the entire
 response that has been received, as it is streamed back. It is
 not guaranteed to be called with the complete response before
-RESPONSE-CALLBACK is called.
+RESPONSE-CALLBACK is called. This can be nil, so that
+implementations can just define this method which can be called
+by `llm-chat-async', but with a nil value here to never get
+partial callbacks.
 
 RESPONSE-CALLBACK receives the each piece of the string response.
 It is called once after the response has been completed, with the
@@ -196,6 +265,30 @@ be passed to `llm-cancel-request'."
   "Issue a warning if the LLM is non-free."
   (when-let (info (llm-nonfree-message-info provider))
     (llm--warn-on-nonfree (car info) (cdr info))))
+
+(cl-defmethod llm-chat-streaming :around (provider prompt partial-callback response-callback error-callback)
+  "Log the input to llm-chat-async."
+  (llm--log 'api-send :provider provider :prompt prompt)
+  ;; We need to wrap the callbacks before we set llm-log to nil. 
+  (let* ((new-partial-callback (lambda (response)
+                                 (when partial-callback
+                                   (llm--log 'api-receive-partial :provider provider :msg response)
+                                   (let ((llm-log nil))
+                                     (funcall partial-callback response)))))
+         (new-response-callback (lambda (response)
+                                  (llm--log 'api-receive :provider provider :msg response)
+                                  (let ((llm-log nil))
+                                    (funcall response-callback response))))
+         (new-error-callback (lambda (type err)
+                               (llm--log 'api-error :provider provider
+                                           :msg (format "Error type: %s, message: %s" type err))
+                               (let ((llm-log nil))
+                                 (funcall error-callback type err))))
+         (llm-log nil)
+         (result (cl-call-next-method provider prompt new-partial-callback
+                                      new-response-callback
+                                      new-error-callback)))
+    result))
 
 (defun llm-chat-streaming-to-point (provider prompt buffer point finish-callback)
   "Stream the llm output of PROMPT to POINT in BUFFER.
@@ -314,24 +407,28 @@ makes sense. This is not expected to be unique per provider."
 (defun llm-chat-prompt-to-text (prompt)
   "Convert PROMPT `llm-chat-prompt' to a simple text.
 This should only be used for logging or debugging."
-  (format "Context: %s\nExamples: %s\nInteractions: %s\n%s%s\n"
-          (llm-chat-prompt-context prompt)
-          (mapconcat (lambda (e) (format "User: %s\nResponse: %s" (car e) (cdr e)))
-                     (llm-chat-prompt-examples prompt) "\n")
-          (mapconcat (lambda (i)
-               (format "%s: %s"
-                       (pcase (llm-chat-prompt-interaction-role i)
-                         ('user "User")
-                         ('system "System")
-                         ('assistant "Assistant"))
-                       (llm-chat-prompt-interaction-content i)))
-                     (llm-chat-prompt-interactions prompt) "\n")
-          (if (llm-chat-prompt-temperature prompt)
-              (format "Temperature: %s\n" (llm-chat-prompt-temperature prompt))
-            "")
-          (if (llm-chat-prompt-max-tokens prompt)
-              (format "Max tokens: %s\n" (llm-chat-prompt-max-tokens prompt))
-            "")))
+  (concat
+   (when (llm-chat-prompt-context prompt)
+     (format "Context: %s\n" (llm-chat-prompt-context prompt)))
+   (when (llm-chat-prompt-examples prompt)
+     (concat "Examples:\n"
+             (mapconcat (lambda (e) (format "  User: %s\n. Response: %s" (car e) (cdr e)))
+                        (llm-chat-prompt-examples prompt) "\n")
+             "\n"))
+   "Interactions:\n"
+   (mapconcat (lambda (i)
+                (format "%s: %s"
+                        (pcase (llm-chat-prompt-interaction-role i)
+                          ('user "User")
+                          ('system "System")
+                          ('assistant "Assistant"))
+                        (llm-chat-prompt-interaction-content i)))
+              (llm-chat-prompt-interactions prompt) "\n")
+   "\n"
+   (when (llm-chat-prompt-temperature prompt)
+     (format "Temperature: %s\n" (llm-chat-prompt-temperature prompt)))
+   (when (llm-chat-prompt-max-tokens prompt)
+     (format "Max tokens: %s\n" (llm-chat-prompt-max-tokens prompt)))))
 
 (provide 'llm)
 ;;; llm.el ends here

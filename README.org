@@ -108,6 +108,8 @@ For all callbacks, the callback will be executed in the buffer the function was 
   - ~llm-chat-prompt-to-text prompt~: Somewhat opposite of the above, from a prompt, return a string representation.  This is not usually suitable for passing to LLMs, but for debugging purposes.
   - ~llm-chat-streaming-to-point provider prompt buffer point finish-callback~: Same basic arguments as ~llm-chat-streaming~, but will stream to ~point~ in ~buffer~.
   - ~llm-chat-prompt-append-response prompt response role~: Append a new response (from the user, usually) to the prompt.  The ~role~ is optional, and defaults to ~'user~.
+** Logging
+Interactions with the =llm= package can be logged by setting ~llm-log~ to a non-nil value.  This should be done only when developing.  The log can be found in the =*llm log*= buffer.
 ** How to handle conversations
 Conversations can take place by repeatedly calling ~llm-chat~ and its variants.  For a conversation, the entire prompt must be a variable, because the ~llm-chat-prompt-interactions~ slot will be getting changed by the chat functions to store the conversation.  For some providers, this will store the history directly in ~llm-chat-prompt-interactions~, but for others (such as ollama), the conversation history is opaque.  For that reason, the correct way to handle a conversation is to repeatedly call ~llm-chat~ or variants, and after each time, add the new user text with ~llm-chat-prompt-append-response~.  The following is an example:
 

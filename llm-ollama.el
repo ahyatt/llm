@@ -184,9 +184,6 @@ PROVIDER is the llm-ollama provider to use."
 	        (list (assoc-default 'context (llm-ollama--get-final-response output))))
       (llm-ollama--get-partial-chat-response output))))
 
-(cl-defmethod llm-chat-async ((provider llm-ollama) prompt response-callback error-callback)
-  (llm-chat-streaming provider prompt (lambda (_)) response-callback error-callback))
-
 (cl-defmethod llm-chat-streaming ((provider llm-ollama) prompt partial-callback response-callback error-callback)
   (let ((buf (current-buffer)))
     (llm-request-async (llm-ollama--url provider "chat")
