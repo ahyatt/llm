@@ -1,5 +1,6 @@
 * Version 0.10.0
-- Introduce llm logging, set ~llm-log~ to non-nil to enable logging of all interactions with the =llm= package.
+- Introduce llm logging (for help with developing against =llm=), set ~llm-log~ to non-nil to enable logging of all interactions with the =llm= package.
+- Change the default interaction with ollama to one more suited for converesations (thanks to Thomas Allen).
 * Version 0.9.1
 - Default to the new "text-embedding-3-small" model for Open AI.  *Important*: Anyone who has stored embeddings should either regenerate embeddings (recommended) or hard-code the old embedding model ("text-embedding-ada-002").
 - Fix response breaking when prompts run afoul of Gemini / Vertex's safety checks.
