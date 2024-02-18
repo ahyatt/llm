@@ -89,7 +89,7 @@ message cons. If nil, the response will be a simple vector."
               (setq accum (concat accum word " "))
               (funcall partial-callback accum)
               (sleep-for 0 100))
-            (string-split text))
+            (split-string text))
       (setf (llm-chat-prompt-interactions prompt)
             (append (llm-chat-prompt-interactions prompt)
                     (list (make-llm-chat-prompt-interaction :role 'assistant :content text))))
