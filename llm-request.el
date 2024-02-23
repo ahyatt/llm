@@ -1,4 +1,4 @@
-;;; llm-request.el --- Request handling code -*- lexical-binding: t -*-
+;;; llm-request.el --- Request handling code -*- lexical-binding: t; package-lint-main-file: "llm.el"; -*-
 
 ;; Copyright (c) 2023  Free Software Foundation, Inc.
 
