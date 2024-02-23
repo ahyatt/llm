@@ -100,5 +100,5 @@
   (should (= 8192 (llm-chat-token-limit
                    (make-llm-ollama :chat-model "Mistral")))))
 
-
+(provide 'llm-test)
 ;;; llm-test.el ends here
