@@ -1,4 +1,4 @@
-;;; llm-provider-utils-test.el --- Tests for llm-provider-utils -*- lexical-binding: t -*-
+;;; llm-provider-utils-test.el --- Tests for llm-provider-utils -*- lexical-binding: t; package-lint-main-file: "llm.el"; -*-
 
 ;; Copyright (c) 2023  Free Software Foundation, Inc.
 
@@ -23,7 +23,7 @@
 
 (require 'llm-provider-utils)
 
-(ert-deftest test-llm-provider-utils-combine-to-system-prompt ()
+(ert-deftest llm-provider-utils-combine-to-system-prompt ()
   (let* ((interaction1 (make-llm-chat-prompt-interaction :role 'user :content "Hello"))
          (interaction2 (make-llm-chat-prompt-interaction :role 'assistant :content "Hi! How can I assist you?"))
          (example1 (cons "Request 1" "Response 1"))
@@ -65,7 +65,7 @@
     (should (equal "Existing system prompt.\nExample context\nHere are 2 examples of how to respond:\n\nUser: Request 1\nAssistant: Response 1\nUser: Request 2\nAssistant: Response 2"
                    (llm-chat-prompt-interaction-content (nth 0 (llm-chat-prompt-interactions prompt-with-existing-system-prompt)))))))
 
-(ert-deftest test-llm-provider-utils-combine-to-user-prompt ()
+(ert-deftest llm-provider-utils-combine-to-user-prompt ()
   (let* ((interaction1 (make-llm-chat-prompt-interaction :role 'user :content "Hello"))
          (interaction2 (make-llm-chat-prompt-interaction :role 'assistant :content "Hi! How can I assist you?"))
          (example1 (cons "Request 1" "Response 1"))
@@ -93,7 +93,7 @@
     (should (equal interaction1 (nth 0 (llm-chat-prompt-interactions prompt-for-second-request))))
     (should (equal interaction2 (nth 1 (llm-chat-prompt-interactions prompt-for-second-request))))))
 
-(ert-deftest test-provider-utils-collapse-history ()
+(ert-deftest llm-provider-utils-collapse-history ()
   (let* ((interaction1 (make-llm-chat-prompt-interaction :role 'user :content "Hello"))
          (interaction2 (make-llm-chat-prompt-interaction :role 'assistant :content "Hi! How can I assist you?"))
          (interaction3 (make-llm-chat-prompt-interaction :role 'assistant :content "Earl Grey, hot."))

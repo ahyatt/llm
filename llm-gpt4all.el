@@ -1,4 +1,4 @@
-;;; llm-gpt4all.el --- llm module for integrating with GPT4All -*- lexical-binding: t; -*-
+;;; llm-gpt4all.el --- llm module for integrating with GPT4All -*- lexical-binding: t; package-lint-main-file: "llm.el"; -*-
 
 ;; Copyright (c) 2023  Free Software Foundation, Inc.
 

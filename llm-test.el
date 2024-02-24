@@ -1,4 +1,4 @@
-;;; llm-test.el --- Unit tests for the llm module -*- lexical-binding: t -*-
+;;; llm-test.el --- Unit tests for the llm module -*- lexical-binding: t; package-lint-main-file: "llm.el"; -*-
 
 ;; Copyright (c) 2023  Free Software Foundation, Inc.
 
@@ -100,5 +100,5 @@
   (should (= 8192 (llm-chat-token-limit
                    (make-llm-ollama :chat-model "Mistral")))))
 
-
+(provide 'llm-test)
 ;;; llm-test.el ends here

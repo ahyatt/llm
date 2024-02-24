@@ -1,4 +1,4 @@
-;;; llm-vertex.el --- LLM implementation of Google Cloud Vertex AI -*- lexical-binding: t -*-
+;;; llm-vertex.el --- LLM implementation of Google Cloud Vertex AI -*- lexical-binding: t; package-lint-main-file: "llm.el"; -*-
 
 ;; Copyright (c) 2023  Free Software Foundation, Inc.
 

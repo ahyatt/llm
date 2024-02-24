@@ -1,4 +1,4 @@
-;;; llm-fake.el --- Use for developers looking at llm calls. -*- lexical-binding: t -*-
+;;; llm-fake.el --- Use for developers looking at llm calls. -*- lexical-binding: t; package-lint-main-file: "llm.el"; -*-
 
 ;; Copyright (c) 2023  Free Software Foundation, Inc.
 
@@ -119,3 +119,4 @@ message cons. If nil, the response will be a simple vector."
   "Fake")
 
 (provide 'llm-fake)
+;;; llm-fake.el ends here

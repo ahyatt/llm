@@ -1,4 +1,4 @@
-;;; llm-tester.el --- Helpers for testing LLM implementation -*- lexical-binding: t -*-
+;;; llm-tester.el --- Helpers for testing LLM implementation -*- lexical-binding: t; package-lint-main-file: "llm.el"; -*-
 
 ;; Copyright (c) 2023  Free Software Foundation, Inc.
 
