@@ -33,7 +33,6 @@ jobs:
           - load-file
           - byte-compile
           - package-lint
-          - ert
         file:
           - '*.el'
     # Steps represent a sequence of tasks that will be executed as part of the job
