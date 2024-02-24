@@ -1,5 +1,3 @@
-# This is a basic workflow to help you get started with Actions
-
 name: CI
 
 # Controls when the workflow will run
@@ -30,7 +28,12 @@ jobs:
         warnings_as_errors:
           - false
         check:
-          - melpa
+          # checkdoc gives too many warnings at the moment, and doesn't deal
+          # with generic functions correctly.
+          - load-file
+          - byte-compile
+          - package-lint
+          - ert
         file:
           - '*.el'
     # Steps represent a sequence of tasks that will be executed as part of the job
