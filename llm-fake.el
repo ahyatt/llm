@@ -118,5 +118,8 @@ message cons. If nil, the response will be a simple vector."
 (cl-defmethod llm-name ((_ llm-fake))
   "Fake")
 
+(cl-defmethod llm-capabilities ((_ llm-fake))
+  (list 'streaming 'embeddings))
+
 (provide 'llm-fake)
 ;;; llm-fake.el ends here

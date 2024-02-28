@@ -187,5 +187,9 @@ them from 1 to however many are sent.")
   ;; CPP itself.
   "Llama CPP")
 
+(cl-defmethod llm-capabilities ((_ llm-llamacpp))
+  "Return the capabilities of llama.cpp."
+  (list 'streaming 'embeddings))
+
 (provide 'llm-llamacpp)
 ;;; llm-llamacpp.el ends here

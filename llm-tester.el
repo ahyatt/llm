@@ -213,6 +213,97 @@
                (message "SUCCESS: Provider %s provided a conversation with responses %s" (type-of provider) (buffer-string))
                (kill-buffer buf))))))))))
 
+(defun llm-tester-create-test-function-prompt ()
+  "Create a function to test function calling with."
+  (make-llm-chat-prompt
+                 :context "The user will describe an emacs lisp function they are looking
+for, and you need to provide the most likely function you know
+of by calling the `describe_function' function."
+                 :interactions (list (make-llm-chat-prompt-interaction
+                                      :role 'user
+                                      :content "I'm looking for a function that will return the current buffer's file name."))
+                 :temperature 0.1
+                 :functions
+                 (list (make-llm-function-call
+                        :function (lambda (f) f)
+                        :name "describe_function"
+                        :description "Takes an elisp function name and shows the user the functions and their descriptions."
+                        :args (list (make-llm-function-arg
+                                     :name "function_name"
+                                     :description "A function name to describe."
+                                     :type 'string
+                                     :required t))))))
+
+(defun llm-tester-function-calling-sync (provider)
+  "Test that PROVIDER can call functions."
+  (let ((prompt (llm-tester-create-test-function-prompt)))
+    (message "SUCCESS: Provider %s called a function and got result %s"
+             (type-of provider)
+             (llm-chat provider prompt))))
+
+(defun llm-tester-function-calling-conversation-sync (provider)
+  "Test that PROVIDER can call functions in a conversation."
+  (let ((prompt (llm-tester-create-test-function-prompt))
+        (responses nil))
+    (push (llm-chat provider prompt) responses)
+    ;; The expectation (a requirement for Gemini) is we call back into the LLM
+    ;; with the results of the previous call to get a text response based on the
+    ;; function call results.
+    (push (llm-chat provider prompt) responses)
+    (llm-chat-prompt-append-response prompt "I'm now looking for a function that will return the directory of a filename")
+    (push (llm-chat provider prompt) responses)
+    (push (llm-chat provider prompt) responses)
+    (message "SUCCESS: Provider %s had a function conversation and got results %s"
+             (type-of provider)
+             (nreverse responses))))
+
+(defun llm-tester-function-calling-async (provider)
+  "Test that PROVIDER can call functions asynchronously."
+  (let ((prompt (llm-tester-create-test-function-prompt)))
+    (llm-chat-async provider prompt
+                    (lambda (result)
+                      (message "SUCCESS: Provider %s called a function and got a result of %s"
+                               (type-of provider) result))
+                    (lambda (type message)
+                      (message "ERROR: Provider %s returned an error of type %s with message %s"
+                               (type-of provider) type message)))))
+
+(defun llm-tester-function-calling-conversation-async (provider)
+  "Test that PROVIDER can call functions in a conversation."
+  (let* ((prompt (llm-tester-create-test-function-prompt))
+         (responses nil)
+         (error-callback (lambda (type msg) (message "FAILURE: async function calling conversation for %s, error of type %s received: %s" (type-of provider) type msg)))
+         (last-callback (lambda (result)
+                          (push result responses)
+                          (message "SUCCESS: Provider %s had an async function calling conversation, and got results %s"
+                                   (type-of provider)
+                                   (nreverse responses))))
+         (third-callback (lambda (result) (push result responses)
+                           (llm-chat-async provider prompt last-callback error-callback)))
+         (second-callback (lambda (result) (push result responses)
+                            (llm-chat-prompt-append-response prompt "I'm now looking for a function that will return the directory of a filename.")
+                            (llm-chat-async provider prompt third-callback error-callback)))
+         (first-callback (lambda (result) (push result responses)
+                           (llm-chat-async provider prompt second-callback error-callback))))
+    (llm-chat-async provider prompt first-callback error-callback)))
+
+(defun llm-tester-function-calling-streaming (provider)
+  "Test that PROVIDER can call functions with the streaming API."
+  (let ((partial-counts 0))
+    (llm-chat-streaming
+     provider
+     (llm-tester-create-test-function-prompt)
+     (lambda (_)
+       (cl-incf partial-counts))
+     (lambda (text)
+       (message "SUCCESS: Provider %s called a function and got a final result of %s"
+                (type-of provider) text)
+       (unless (= 0 partial-counts)
+         (message "WARNING: Provider %s returned partial updates, but it shouldn't for function calling" (type-of provider))))
+     (lambda (type message)
+       (message "ERROR: Provider %s returned an error of type %s with message %s"
+                (type-of provider) type message)))))
+
 (defun llm-tester-cancel (provider)
   "Test that PROVIDER can do async calls which can be cancelled."
   (message "Testing provider %s for cancellation" (type-of provider))

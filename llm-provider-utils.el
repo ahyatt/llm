@@ -115,5 +115,163 @@ things.  Providers should probably issue a warning when using this."
     ((string-match-p "llama" model) 2048)
     ((string-match-p "starcoder" model) 8192))))
 
+(defun llm-provider-utils-openai-arguments (args)
+  "Convert ARGS to the Open AI function calling spec.
+ARGS is a list of `llm-function-arg' structs."
+  (let ((required (mapcar
+                   #'llm-function-arg-name
+                   (seq-filter #'llm-function-arg-required args))))
+    (append
+     `((type . object)
+       (properties
+        .
+        ,(mapcar (lambda (arg)
+                   `(,(llm-function-arg-name arg) .
+                     ,(if (and (listp (llm-function-arg-type arg))
+                               (llm-function-arg-p (car (llm-function-arg-type arg))))
+                          (llm-provider-utils-openai-arguments (llm-function-arg-type arg))
+                        (append
+                         `((type .
+                                 ,(pcase (llm-function-arg-type arg)
+                                    ('string 'string)
+                                    ('integer 'integer)
+                                    ('float 'number)
+                                    ('boolean 'boolean)
+                                    ((cl-type cons)
+                                     (pcase (car (llm-function-arg-type arg))
+                                       ('or (cdr (llm-function-arg-type arg)))
+                                       ('list 'array)
+                                       ('enum 'string)))
+                                    (_ (error "Unknown argument type: %s" (llm-function-arg-type arg))))))
+                         (when (llm-function-arg-description arg)
+                           `((description
+                              .
+                              ,(llm-function-arg-description arg))))
+                         (when (and (eq 'cons
+                                        (type-of (llm-function-arg-type arg))))
+                           (pcase (car (llm-function-arg-type arg))
+                             ('enum `((enum
+                                       .
+                                       ,(cdr (llm-function-arg-type arg)))))
+                             ('list
+                              `((items .
+                                       ,(if (llm-function-arg-p
+                                             (cadr (llm-function-arg-type arg)))
+                                            (llm-provider-utils-openai-arguments
+                                             (cdr (llm-function-arg-type arg)))
+                                          `((type . ,(cadr (llm-function-arg-type arg))))))))))))))
+                 args)))
+     (when required
+       `((required . ,required))))))
+
+;; The Open AI function calling spec follows the JSON schema spec.
+;; See https://json-schema.org/understanding-json-schema.
+(defun llm-provider-utils-openai-function-spec (call)
+  "Convert `llm-function-call' CALL to an Open AI function spec.
+Open AI's function spec is a standard way to do this, and will be
+applicable to many endpoints.
+
+This returns a JSON object (a list that can be converted to JSON)."
+  `((type . function)
+     (function
+      .
+      ,(append
+        `((name . ,(llm-function-call-name call))
+          (description . ,(llm-function-call-description call)))
+        (when (llm-function-call-args call)
+          `((parameters
+            .
+            ,(llm-provider-utils-openai-arguments (llm-function-call-args call)))))))))
+
+(defun llm-provider-utils-append-to-prompt (prompt output &optional func-results role)
+  "Append OUTPUT to PROMPT as an assistant interaction.
+
+OUTPUT can be a string or a structure in the case of function calls.
+
+ROLE will be `assistant' by default, but can be passed in for other roles."
+  (setf (llm-chat-prompt-interactions prompt)
+        (append (llm-chat-prompt-interactions prompt)
+                (list (make-llm-chat-prompt-interaction
+                       :role (if func-results
+                                 'function
+                               (or role 'assistant))
+                       :content output
+                       :function-call-result func-results)))))
+
+(cl-defstruct llm-provider-utils-function-call
+  "A struct to hold information about a function call.
+ID is a call ID, which is optional.
+NAME is the function name.
+ARG is an alist of arguments to values."
+  id name args)
+
+(cl-defgeneric llm-provider-utils-populate-function-calls (provider prompt calls)
+  "For PROVIDER, in PROMPT, record that function CALLS were received.
+This is the recording before the calls were executed.
+CALLS are a list of `llm-provider-utils-function-call'."
+  (ignore provider prompt calls)
+  (signal 'not-implemented nil))
+
+(defun llm-provider-utils-populate-function-results (prompt func result)
+  "Append the RESULT of FUNC to PROMPT.
+FUNC is a `llm-provider-utils-function-call' struct."
+  (llm-provider-utils-append-to-prompt
+   prompt result (make-llm-chat-prompt-function-call-result
+                  :call-id (llm-provider-utils-function-call-id func)
+                  :function-name (llm-provider-utils-function-call-name func)
+                  :result result)))
+
+(defun llm-provider-utils-process-result (provider prompt response)
+  "From RESPONSE, execute function call.
+
+RESPONSE is either a string or list of
+`llm-provider-utils-function-calls'.
+
+This should be called with any response that might have function
+calls. If the response is a string, nothing will happen, but in
+either case, the response suitable for returning to the client
+will be returned.
+
+PROVIDER is the provider that supplied the response.
+
+PROMPT was the prompt given to the provider, which will get
+updated with the response from the LLM, and if there is a
+function call, the result.
+
+This returns the response suitable for output to the client; a
+cons of functions called and their output."
+  (if (consp response)
+      (progn
+        ;; Then this must be a function call, return the cons of a the funcion
+        ;; called and the result.
+        (llm-provider-utils-populate-function-calls provider prompt response)
+        (cl-loop for func in response collect
+                        (let* ((name (llm-provider-utils-function-call-name func))
+                               (arguments (llm-provider-utils-function-call-args func))
+                               (function (seq-find
+                                          (lambda (f) (equal name (llm-function-call-name f)))
+                                          (llm-chat-prompt-functions prompt))))
+                          (cons name
+                                (let* ((args (cl-loop for arg in (llm-function-call-args function)
+                                                      collect (cdr (seq-find (lambda (a)
+                                                                               (eq (intern
+                                                                                    (llm-function-arg-name arg))
+                                                                                   (car a)))
+                                                                             arguments))))
+                                       (result (apply (llm-function-call-function function) args)))
+                                  (llm-provider-utils-populate-function-results
+                                   prompt func result)
+                                  (llm--log
+                                   'api-funcall
+                                   :provider provider
+                                   :msg (format "%s --> %s"
+                                                (format "%S"
+                                                        (cons (llm-function-call-name function)
+                                                              args))
+                                                (format "%s" result)))
+                                  result)))))
+    (llm-provider-utils-append-to-prompt prompt response)
+    response))
+
 (provide 'llm-provider-utils)
 ;;; llm-provider-utils.el ends here

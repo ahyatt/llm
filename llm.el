@@ -91,18 +91,74 @@ function, for continuing chats, the whole prompt MUST be a
 variable passed in to the chat function. INTERACTIONS is
 required.
 
+FUNCTIONS is a list of `llm-function-call' structs. These may be
+called IF the LLM supports them. If the LLM does not support
+them, a `not-implemented' signal will be thrown. This is
+optional. When this is given, the LLM will either call the
+function or return text as normal, depending on what the LLM
+decides.
+
 TEMPERATURE is a floating point number with a minimum of 0, and
 maximum of 1, which controls how predictable the result is, with
 0 being the most predicatable, and 1 being the most creative.
 This is not required.
 
 MAX-TOKENS is the maximum number of tokens to generate.  This is optional."
-  context examples interactions temperature max-tokens)
+  context examples interactions functions temperature max-tokens)
 
 (cl-defstruct llm-chat-prompt-interaction
   "This defines a single interaction given as part of a chat prompt.
-ROLE can a symbol, of either `user' or `assistant'."
-  role content)
+ROLE can a symbol, of either `user', `assistant', or `function'.
+
+FUNCTION-CALL-RESULTS is a struct of type
+`llm-chat-prompt-function-call-results', which is only populated
+if `role' is `function'. It stores the results of just one
+function call."  
+  role content function-call-result)
+
+(cl-defstruct llm-chat-prompt-function-call-result
+  "This defines the result from a function call.
+
+CALL-ID is an ID for this function call, if available.
+
+FUNCTION-NAME is the name of the function. This is required.
+
+RESULT is the result of the function call. This is required."
+  call-id function-name result)
+
+(cl-defstruct llm-function-call
+  "This is a struct to represent a function call the LLM can make.
+
+FUNCTION is a function to call.
+
+NAME is a human readable name of the function.
+
+DESCRIPTION is a human readable description of the function.
+
+ARGS is a list of `llm-function-arg' structs. "
+  function
+  name
+  description
+  args)
+
+(cl-defstruct llm-function-arg
+  "An argument to an `llm-function-call'.
+
+NAME is the name of the argument.
+
+DESCRIPTION is a human readable description of the argument. It
+can be nil for enums.
+
+TYPE is the type of the argument. It can be one of `string',
+`integer', `float', `boolean' or the special lists, `(or <type1>
+<type2> ... <typen>)', `(enum <string1> <string2> ...
+<stringn>)', or `(list <type>)'.
+
+REQUIRED is whether this is required or not."
+  name
+  description
+  type
+  required)
 
 (cl-defun llm--log (type &key provider prompt msg)
   "Log a MSG of TYPE, given PROVIDER, PROMPT, and MSG.
@@ -130,6 +186,7 @@ this variable in this library. TYPE can be one of `api-send',
                            (format "[%s --> Emacs]: %s"
                                    (llm-name provider) msg))
                           ('api-error "[Error]: %s" msg)
+                          ('api-funcall "[%s execution] %s" msg)
                           ('prompt-append (format "[Append to conversation]: %s"
                                                   msg)))))))))
 
@@ -161,7 +218,12 @@ need to override it."
 
 (cl-defgeneric llm-chat (provider prompt)
   "Return a response to PROMPT from PROVIDER.
-PROMPT is a `llm-chat-prompt'. The response is a string response by the LLM.
+PROMPT is a `llm-chat-prompt'.
+
+The response is a string response by the LLM when functions are
+not called. If functions are called, the response is a list of
+conses of the function named called (as a symbol), and the
+corresponding result from calling it.
 
 The prompt's interactions list will be updated to encode the
 conversation so far."
@@ -185,11 +247,18 @@ conversation so far."
   (let* ((llm-log nil)
          (result (cl-call-next-method))
          (llm-log t))
-    (llm--log 'api-receive :provider provider :msg result)
+    (when (stringp result)
+      (llm--log 'api-receive :provider provider :msg result))
     result))
 
 (cl-defgeneric llm-chat-async (provider prompt response-callback error-callback)
-  "Return a response to PROMPT from PROVIDER.
+  "Call RESPONSE-CALLBACK with a response to PROMPT from PROVIDER.
+
+The response is a string response by the LLM when functions are
+not called. If functions are called, the response is a list of
+conses of the function named called (as a symbol), and the
+corresponding result from calling it.
+
 PROMPT is a `llm-chat-prompt'.
 
 RESPONSE-CALLBACK receives the final text.
@@ -230,9 +299,17 @@ be passed to `llm-cancel-request'."
     
     result))
 
+(cl-defmethod llm-chat-function-call ((_ (eql nil)) _ _ _)
+  (error "LLM provider was nil.  Please set the provider in the application you are using."))
+
 (cl-defgeneric llm-chat-streaming (provider prompt partial-callback response-callback error-callback)
   "Stream a response to PROMPT from PROVIDER.
 PROMPT is a `llm-chat-prompt'.
+
+The response is a string response by the LLM when functions are
+not called. If functions are called, the response is a list of
+conses of the function named called (as a symbol), and the
+corresponding result from calling it.
 
 PARTIAL-CALLBACK is called with the output of the string response
 as it is built up. The callback is called with the entire
@@ -325,6 +402,25 @@ be passed to `llm-cancel-request'."
   "Issue a warning if the LLM is non-free."
   (when-let (info (llm-nonfree-message-info provider))
     (llm--warn-on-nonfree (car info) (cdr info))))
+
+(cl-defgeneric llm-capabilities (provider)
+  "Return a list of the capabilities of PROVIDER.
+
+This possible values are only those things that are not the bare
+minimum of functionality to be included in this package, which is
+non-streaming chat:
+
+`streaming': the LLM can actually stream responses in the
+ streaming call. Calls to `llm-chat-streaming' will work
+ regardless even if the LLM doesn't support streaming, it just
+ won't have any partial responses, so basically just operates
+ like `llm-chat-async'.
+
+`embeddings': the LLM can return vector embeddings of text.
+
+`function-calls': the LLM can call functions."
+  (ignore provider)
+  nil)
 
 (cl-defgeneric llm-chat-token-limit (provider)
   "Return max number of tokens that can be sent to the LLM.

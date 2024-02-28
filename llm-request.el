@@ -25,7 +25,7 @@
 (require 'url-http)
 (require 'rx)
 
-(defcustom llm-request-timeout 20
+(defcustom llm-request-timeout 60
   "The number of seconds to wait for a response from a HTTP server.
 
 Request timings are depending on the request. Requests that need
@@ -170,10 +170,12 @@ the buffer is turned into JSON and passed to ON-SUCCESS."
 ;; to make callbacks.
 (defun llm-request-callback-in-buffer (buf f &rest args)
   "Run F with ARSG in the context of BUF.
-But if BUF has been killed, use a temporary buffer instead."
-  (if (buffer-live-p buf)
-      (with-current-buffer buf (apply f args))
-    (with-temp-buffer (apply f args))))
+But if BUF has been killed, use a temporary buffer instead.
+If F is nil, nothing is done."
+  (when f
+    (if (buffer-live-p buf)
+        (with-current-buffer buf (apply f args))
+      (with-temp-buffer (apply f args)))))
 
 (provide 'llm-request)
 ;;; llm-request.el ends here
