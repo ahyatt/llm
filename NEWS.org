@@ -1,6 +1,7 @@
 * Version 0.11.0
 - Introduce function calling, now available only in Open AI and Gemini.
-- Introduce =llm-capabilities=, which returns a list of extra capabilities for each backend. 
+- Introduce =llm-capabilities=, which returns a list of extra capabilities for each backend.
+- Fix issue with logging when we weren't supposed to.
 * Version 0.10.0
 - Introduce llm logging (for help with developing against =llm=), set ~llm-log~ to non-nil to enable logging of all interactions with the =llm= package.
 - Change the default interaction with ollama to one more suited for converesations (thanks to Thomas Allen).

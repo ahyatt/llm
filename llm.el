@@ -244,9 +244,10 @@ conversation so far."
   (llm--log 'api-send :provider provider :prompt prompt)
   ;; We set the debug flag to nil around the next-method so that we don't log
   ;; twice.
-  (let* ((llm-log nil)
+  (let* ((llm-log-orig llm-log)
+	 (llm-log nil)
          (result (cl-call-next-method))
-         (llm-log t))
+         (llm-log llm-log-orig))
     (when (stringp result)
       (llm--log 'api-receive :provider provider :msg result))
     result))
