@@ -28,6 +28,7 @@
 (require 'cl-lib)
 (require 'llm)
 (require 'llm-request)
+(require 'llm-request-plz)
 (require 'llm-provider-utils)
 (require 'json)
 
@@ -73,20 +74,22 @@ MODEL is the embedding model to use, or nil to use the default.."
 
 (defun llm-openai--embedding-extract-response (response)
   "Return the embedding from the server RESPONSE."
-  (cdr (assoc 'embedding (aref (cdr (assoc 'data response)) 0))))
+  (let ((body (plz-response-body response)))
+    (cdr (assoc 'embedding (aref (cdr (assoc 'data body)) 0)))))
 
 (defun llm-openai--error-message (err-response)
   "Return a user-visible error message from ERR-RESPONSE."
-  (let ((errdata (cdr (assoc 'error err-response))))
+  (let ((errdata (cdr (assoc 'error (plz-response-body err-response)))))
     (format "Problem calling Open AI: %s message: %s"
             (cdr (assoc 'type errdata))
             (cdr (assoc 'message errdata)))))
 
 (defun llm-openai--handle-response (response extractor)
   "If RESPONSE is an error, throw it, else call EXTRACTOR."
-  (if (cdr (assoc 'error response))
-      (error (llm-openai--error-message response))
-    (funcall extractor response)))
+  (let ((body (plz-response-body response)))
+    (if (cdr (assoc 'error body))
+        (error (llm-openai--error-message response))
+      (funcall extractor response))))
 
 (cl-defmethod llm-openai--check-key ((provider llm-openai))
   (unless (llm-openai-key provider)
@@ -113,25 +116,26 @@ This is just the key, if it exists."
             "/") command))
 
 (cl-defmethod llm-embedding-async ((provider llm-openai) string vector-callback error-callback)
-  (llm-openai--check-key provider)  
+  (llm-openai--check-key provider)
   (let ((buf (current-buffer)))
-    (llm-request-async (llm-openai--url provider "embeddings")
-                       :headers (llm-openai--headers provider)
-                       :data (llm-openai--embedding-request (llm-openai-embedding-model provider) string)
-                       :on-success (lambda (data)
-                                     (llm-request-callback-in-buffer
-                                      buf vector-callback (llm-openai--embedding-extract-response data)))
-                       :on-error (lambda (_ data) 
-                                   (llm-request-callback-in-buffer
-                                    buf error-callback 'error
-                                    (llm-openai--error-message data))))))
+    (llm-request-plz-async (llm-openai--url provider "embeddings")
+                           :headers (llm-openai--headers provider)
+                           :data (llm-openai--embedding-request (llm-openai-embedding-model provider) string)
+                           :on-success (lambda (data)
+                                         (llm-request-callback-in-buffer
+                                          buf vector-callback (llm-openai--embedding-extract-response data)))
+                           :on-error (lambda (error)
+                                       (let ((response (plz-error-response error)))
+                                         (llm-request-callback-in-buffer
+                                          buf error-callback 'error
+                                          (llm-openai--error-message response)))))))
 
 (cl-defmethod llm-embedding ((provider llm-openai) string)
   (llm-openai--check-key provider)
   (llm-openai--handle-response
-   (llm-request-sync (llm-openai--url provider "embeddings")
-               :headers (llm-openai--headers provider)
-               :data (llm-openai--embedding-request (llm-openai-embedding-model provider) string))
+   (llm-request-plz-sync (llm-openai--url provider "embeddings")
+                         :headers (llm-openai--headers provider)
+                         :data (llm-openai--embedding-request (llm-openai-embedding-model provider) string))
    #'llm-openai--embedding-extract-response))
 
 (defun llm-openai--chat-request (model prompt &optional streaming)
@@ -171,14 +175,15 @@ STREAMING if non-nil, turn on response streaming."
 
 (defun llm-openai--extract-chat-response (response)
   "Return chat response from server RESPONSE."
-  (let ((result (cdr (assoc 'content
-                            (cdr (assoc
-                                  'message
-                                  (aref (cdr (assoc 'choices response)) 0))))))
-        (func-result (assoc-default
-                      'tool_calls
-                      (assoc-default 'message
-                                     (aref (assoc-default 'choices response) 0)))))
+  (let* ((body (plz-response-body response))
+         (result (cdr (assoc 'content
+                             (cdr (assoc
+                                   'message
+                                   (aref (cdr (assoc 'choices body)) 0))))))
+         (func-result (assoc-default
+                       'tool_calls
+                       (assoc-default 'message
+                                      (aref (assoc-default 'choices body) 0)))))
     (or func-result result)))
 
 (cl-defmethod llm-provider-utils-populate-function-calls ((_ llm-openai) prompt calls)
@@ -210,45 +215,48 @@ This function adds the response to the prompt, executes any
 functions, and returns the value that the client should get back.
 
 PROMPT is the prompt that needs to be updated with the response."
-  (if (and (consp response) (cdr (assoc 'error response)))
-      (progn
-        (when error-callback
-          (funcall error-callback 'error (llm-openai--error-message response)))
-        response)
-    ;; When it isn't an error
-    (llm-provider-utils-process-result
-     provider prompt
-     (llm-openai--normalize-function-calls
-      (if (consp response) (llm-openai--extract-chat-response response)
-        (llm-openai--get-partial-chat-response response))))))
+  (let ((body (plz-response-body response)))
+    (if (and (consp body) (cdr (assoc 'error body)))
+        (progn
+          (when error-callback
+            (funcall error-callback 'error (llm-openai--error-message response)))
+          body)
+      ;; When it isn't an error
+      (llm-provider-utils-process-result
+       provider prompt
+       (llm-openai--normalize-function-calls
+        (if (consp body)
+            (llm-openai--extract-chat-response response)
+          (llm-openai--get-partial-chat-response response)))))))
 
 (cl-defmethod llm-chat-async ((provider llm-openai) prompt response-callback error-callback)
   (llm-openai--check-key provider)
   (let ((buf (current-buffer)))
-    (llm-request-async (llm-openai--url provider "chat/completions")
-      :headers (llm-openai--headers provider)
-      :data (llm-openai--chat-request (llm-openai-chat-model provider) prompt)
-      :on-success (lambda (data)
-                    (llm-request-callback-in-buffer
-                       buf response-callback
-                       (llm-openai--process-and-return
-                        provider prompt data error-callback)))
-      :on-error (lambda (_ data)
-                  (let ((errdata (cdr (assoc 'error data))))
-                    (llm-request-callback-in-buffer buf error-callback 'error
-                             (format "Problem calling Open AI: %s message: %s"
-                                     (cdr (assoc 'type errdata))
-                                     (cdr (assoc 'message errdata)))))))))
+    (llm-request-plz-async (llm-openai--url provider "chat/completions")
+                           :headers (llm-openai--headers provider)
+                           :data (llm-openai--chat-request (llm-openai-chat-model provider) prompt)
+                           :on-success (lambda (response)
+                                         (llm-request-callback-in-buffer
+                                          buf response-callback
+                                          (llm-openai--process-and-return
+                                           provider prompt response error-callback)))
+                           :on-error (lambda (error)
+                                       (let* ((response (plz-error-response error))
+                                              (errdata (cdr (assoc 'error (plz-response-body response)))))
+                                         (llm-request-callback-in-buffer
+                                          buf error-callback 'error
+                                          (format "Problem calling Open AI: %s message: %s"
+                                                  (cdr (assoc 'type errdata))
+                                                  (cdr (assoc 'message errdata)))))))))
 
 (cl-defmethod llm-chat ((provider llm-openai) prompt)
   (llm-openai--check-key provider)
   (llm-openai--process-and-return
    provider prompt
-   (llm-request-sync
-    (llm-openai--url provider "chat/completions")
-    :headers (llm-openai--headers provider)
-    :data (llm-openai--chat-request (llm-openai-chat-model provider)
-                                    prompt))))
+   (llm-request-plz-sync (llm-openai--url provider "chat/completions")
+                         :headers (llm-openai--headers provider)
+                         :data (llm-openai--chat-request (llm-openai-chat-model provider)
+                                                         prompt))))
 
 (defvar-local llm-openai-current-response ""
   "The response so far from the server.")
@@ -313,14 +321,14 @@ them from 1 to however many are sent.")
                                                          (concat (plist-get plist :arguments)
                                                                  arguments)))
                                   (aset current-response index plist)))))
-            
+
             (setq last-response (length all-lines))))))
     ;; Has to be >= because when we store plists the length doesn't change, but
     ;; we still want to store the new response. For text, it should indeed be
     ;; ever-growing (but sometimes it shrinks and we don't want to store that).
     (when (>= (length current-response) (length llm-openai-current-response))
-        (setq llm-openai-current-response current-response)
-        (setq llm-openai-last-response last-response))
+      (setq llm-openai-current-response current-response)
+      (setq llm-openai-last-response last-response))
     ;; If we are dealing with function calling, massage it to look like the
     ;; normal function calling output.
     (if (vectorp current-response)
@@ -333,35 +341,89 @@ them from 1 to however many are sent.")
                             ((name . ,(plist-get plist :name))
                              (arguments . ,(plist-get plist :arguments))))))
                        current-response))
-        current-response)))
+      current-response)))
+
+(defun llm-openai--parse-chat-event (event)
+  "Parse the EVENT data slots as JSON and update it."
+  (with-slots (data) event
+    (when (not (equal "[DONE]" data))
+      (setf data (json-parse-string data :null-object nil :object-type 'alist)))
+    event))
+
+(defun llm-openai--chat-completion-content (event)
+  "Extract the content of the first completions choice of EVENT."
+  (with-slots (data) event
+    (when (and (listp data) (equal "chat.completion.chunk" (alist-get 'object data)))
+      (let ((choices (alist-get 'choices data)))
+        (unless (zerop (length choices))
+          (when-let ((choice (seq-first choices))
+                     (delta (alist-get 'delta choice)))
+            (alist-get 'content delta)))))))
+
+(defun llm-openai--render-message-events (events)
+  "Render the contents of the message EVENTS."
+  (string-join (seq-remove #'null (seq-map #'llm-openai--chat-completion-content (reverse events)))))
 
 (cl-defmethod llm-chat-streaming ((provider llm-openai) prompt partial-callback
                                   response-callback error-callback)
   (llm-openai--check-key provider)
-  (let ((buf (current-buffer)))
-    (llm-request-async (llm-openai--url provider "chat/completions")
-                       :headers (llm-openai--headers provider)
-                       :data (llm-openai--chat-request (llm-openai-chat-model provider) prompt t)
-                       :on-error (lambda (_ data)
-                                   (let ((errdata (cdr (assoc 'error data))))
-                                     (llm-request-callback-in-buffer
-                                      buf error-callback 'error
-                                      (format "Problem calling Open AI: %s message: %s"
-                                              (cdr (assoc 'type errdata))
-                                              (cdr (assoc 'message errdata))))))
-                       :on-partial (lambda (data)
-                                     (when-let ((response (llm-openai--get-partial-chat-response data)))
-                                       ;; We only send partial text updates, not
-                                       ;; updates related to function calls.
-                                       (when (stringp response)
-                                         (llm-request-callback-in-buffer buf partial-callback response))))
-                       :on-success-raw (lambda (data)
-                                         (llm-request-callback-in-buffer
-                                          buf
-                                          response-callback
-                                          (llm-openai--process-and-return
-                                           provider prompt
-                                           data error-callback))))))
+  (let ((buf (current-buffer))
+        (message-events))
+    (llm-request-plz-async (llm-openai--url provider "chat/completions")
+                           :headers (llm-openai--headers provider)
+                           :data (llm-openai--chat-request (llm-openai-chat-model provider) prompt t)
+                           :event-stream-handlers
+                           `(("message" . ,(lambda (_ event)
+                                             (let ((event (llm-openai--parse-chat-event event)))
+                                               (push event message-events)
+                                               (with-slots (data) event
+                                                 (unless (equal "[DONE]" data)
+                                                   (llm-request-callback-in-buffer
+                                                    buf partial-callback
+                                                    (llm-openai--render-message-events message-events)))))))
+                             ("error" . ,(lambda (_ event)
+                                           ;; TODO: Add proper error handling.
+                                           (message "llm-openai: Event source error event: %s" event)))
+                             ("close" . ,(lambda (_ event)
+                                           (with-slots (data) event
+                                             (cond
+                                              ((plz-error-p data)
+                                               ;; TODO: Add proper error handling.
+                                               (message "llm-openai: Event source error event: %s" event))
+                                              ((plz-response-p data)
+                                               ;; TODO: Handle function calls with llm-openai--process-and-return.
+                                               (llm-request-callback-in-buffer
+                                                buf response-callback
+                                                (llm-openai--render-message-events message-events))))))))
+                           :on-error (lambda (error)
+                                       (if-let (response (plz-error-response error))
+                                           (let ((errdata (cdr (assoc 'error (plz-response-body response)))))
+                                             (llm-request-callback-in-buffer
+                                              buf error-callback 'error
+                                              (format "Problem calling Open AI: %s message: %s"
+                                                      (cdr (assoc 'type errdata))
+                                                      (cdr (assoc 'message errdata)))))))
+                           ;; :on-error (lambda (_ data)
+                           ;;             (let ((errdata (cdr (assoc 'error data))))
+                           ;;               (llm-request-callback-in-buffer
+                           ;;                buf error-callback 'error
+                           ;;                (format "Problem calling Open AI: %s message: %s"
+                           ;;                        (cdr (assoc 'type errdata))
+                           ;;                        (cdr (assoc 'message errdata))))))
+                           ;; :on-partial (lambda (data)
+                           ;;               (when-let ((response (llm-openai--get-partial-chat-response data)))
+                           ;;                 ;; We only send partial text updates, not
+                           ;;                 ;; updates related to function calls.
+                           ;;                 (when (stringp response)
+                           ;;                   (llm-request-callback-in-buffer buf partial-callback response))))
+                           ;; :on-success-raw (lambda (data)
+                           ;;                   (llm-request-callback-in-buffer
+                           ;;                    buf
+                           ;;                    response-callback
+                           ;;                    (llm-openai--process-and-return
+                           ;;                     provider prompt
+                           ;;                     data error-callback)))
+                           )))
 
 (cl-defmethod llm-name ((_ llm-openai))
   "Open AI")
@@ -378,7 +440,7 @@ them from 1 to however many are sent.")
         (+ (* n 1024) (if (= n 16) 1 0))))
      ((equal model "gpt-4") 8192)
      ((string-match-p (rx (seq "gpt-4-" (+ ascii) "-preview")) model)
-       128000)
+      128000)
      ((string-match-p (rx (seq "gpt-4-" (+ digit))) model)
       8192)
      ((string-match-p (rx (seq "gpt-3.5-turbo-1" (+ digit))) model)
