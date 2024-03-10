@@ -125,7 +125,7 @@ the buffer is turned into JSON and passed to ON-SUCCESS."
             (when on-success-raw
               (user-error "Not supported yet: on-success-raw"))
             (when on-success
-              (funcall on-success response)))
+              (funcall on-success (plz-response-body response))))
     :else (lambda (error)
             (when on-error
               (funcall on-error error)))

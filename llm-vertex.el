@@ -25,7 +25,7 @@
 
 (require 'cl-lib)
 (require 'llm)
-(require 'llm-request)
+(require 'llm-request-plz)
 (require 'llm-provider-utils)
 (require 'json)
 
@@ -126,23 +126,24 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
 (cl-defmethod llm-embedding-async ((provider llm-vertex) string vector-callback error-callback)
   (llm-vertex-refresh-key provider)
   (let ((buf (current-buffer)))
-    (llm-request-async (llm-vertex--embedding-url provider)
-                     :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
-                     :data `(("instances" . [(("content" . ,string))]))
-                     :on-success (lambda (data)
-                                   (llm-request-callback-in-buffer
-                                    buf vector-callback (llm-vertex--embedding-extract-response data)))
-                     :on-error (lambda (_ data)
-                                 (llm-request-callback-in-buffer
-                                  buf error-callback
-                                  'error (llm-vertex--error-message data))))))
+    (llm-request-plz-async
+     (llm-vertex--embedding-url provider)
+     :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
+     :data `(("instances" . [(("content" . ,string))]))
+     :on-success (lambda (data)
+                   (llm-request-callback-in-buffer
+                    buf vector-callback (llm-vertex--embedding-extract-response data)))
+     :on-error (lambda (_ data)
+                 (llm-request-callback-in-buffer
+                  buf error-callback
+                  'error (llm-vertex--error-message data))))))
 
 (cl-defmethod llm-embedding ((provider llm-vertex) string)
   (llm-vertex-refresh-key provider)
   (llm-vertex--handle-response
-   (llm-request-sync (llm-vertex--embedding-url provider)
-                     :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
-                     :data `(("instances" . [(("content" . ,string))])))
+   (llm-request-plz-sync (llm-vertex--embedding-url provider)
+                         :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
+                         :data `(("instances" . [(("content" . ,string))])))
    #'llm-vertex--embedding-extract-response))
 
 (defun llm-vertex--get-chat-response (response)
