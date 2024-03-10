@@ -343,44 +343,44 @@ them from 1 to however many are sent.")
                        current-response))
       current-response)))
 
-(defun llm-openai--parse-chat-event (event)
-  "Parse the EVENT data slots as JSON and update it."
+(defun llm-openai--event-completion (event)
+  "Parse the data slot of EVENT and return the chat completion."
   (with-slots (data) event
     (when (not (equal "[DONE]" data))
-      (setf data (json-parse-string data :null-object nil :object-type 'alist)))
-    event))
+      (json-parse-string data :null-object nil :object-type 'alist))))
 
-(defun llm-openai--chat-completion-content (event)
-  "Extract the content of the first completions choice of EVENT."
-  (with-slots (data) event
-    (when (and (listp data) (equal "chat.completion.chunk" (alist-get 'object data)))
-      (let ((choices (alist-get 'choices data)))
-        (unless (zerop (length choices))
-          (when-let ((choice (seq-first choices))
-                     (delta (alist-get 'delta choice)))
-            (alist-get 'content delta)))))))
+(defun llm-openai--completion-content (completion)
+  "Extract the content of the first choice from COMPLETION."
+  (when (and (listp completion)
+             (equal "chat.completion.chunk" (alist-get 'object completion)))
+    (let ((choices (alist-get 'choices completion)))
+      (unless (zerop (length choices))
+        (when-let ((choice (seq-first choices))
+                   (delta (alist-get 'delta choice)))
+          (alist-get 'content delta))))))
 
-(defun llm-openai--render-message-events (events)
-  "Render the contents of the message EVENTS."
-  (string-join (seq-remove #'null (seq-map #'llm-openai--chat-completion-content (reverse events)))))
+(defun llm-openai--render-completions (completions)
+  "Render the content of the chat COMPLETIONS."
+  (thread-last (reverse completions)
+               (seq-map #'llm-openai--completion-content)
+               (seq-remove #'null)
+               (string-join)))
 
 (cl-defmethod llm-chat-streaming ((provider llm-openai) prompt partial-callback
                                   response-callback error-callback)
   (llm-openai--check-key provider)
   (let ((buf (current-buffer))
-        (message-events))
+        (completions))
     (llm-request-plz-async (llm-openai--url provider "chat/completions")
                            :headers (llm-openai--headers provider)
                            :data (llm-openai--chat-request (llm-openai-chat-model provider) prompt t)
                            :event-stream-handlers
                            `(("message" . ,(lambda (_ event)
-                                             (let ((event (llm-openai--parse-chat-event event)))
-                                               (push event message-events)
-                                               (with-slots (data) event
-                                                 (unless (equal "[DONE]" data)
-                                                   (llm-request-callback-in-buffer
-                                                    buf partial-callback
-                                                    (llm-openai--render-message-events message-events)))))))
+                                             (when-let (completion (llm-openai--event-completion event))
+                                               (push completion completions)
+                                               (llm-request-callback-in-buffer
+                                                buf partial-callback
+                                                (llm-openai--render-completions completions)))))
                              ("error" . ,(lambda (_ event)
                                            ;; TODO: Add proper error handling.
                                            (message "llm-openai: Event source error event: %s" event)))
@@ -394,7 +394,7 @@ them from 1 to however many are sent.")
                                                ;; TODO: Handle function calls with llm-openai--process-and-return.
                                                (llm-request-callback-in-buffer
                                                 buf response-callback
-                                                (llm-openai--render-message-events message-events))))))))
+                                                (llm-openai--render-completions completions))))))))
                            :on-error (lambda (error)
                                        (if-let (response (plz-error-response error))
                                            (let ((errdata (cdr (assoc 'error (plz-response-body response)))))
