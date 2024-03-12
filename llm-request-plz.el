@@ -39,6 +39,10 @@ not very long so that we can end stuck requests."
   :type 'integer
   :group 'llm)
 
+(defun llm-request-success (status)
+  "Return non-nil if STATUS is a successful HTTP status code."
+  (<= 200 status 299))
+
 (cl-defun llm-request-plz-sync-raw-output (url &key headers data timeout)
   "Make a request to URL.  The raw text response will be returned.
 
@@ -50,13 +54,16 @@ This is required.
 
 TIMEOUT is the number of seconds to wait for a response."
   (condition-case error
-      (plz-media-type-request
+      (let ((resp (plz-media-type-request
         'post url
         :as `(media-types ,plz-media-types)
         :body (when data
                 (encode-coding-string (json-encode data) 'utf-8))
         :headers (append headers '(("Content-Type" . "application/json")))
-        :timeout (or timeout llm-request-plz-timeout))
+        :timeout (or timeout llm-request-plz-timeout))))
+        (if (llm-request-success (plz-response-status resp))
+            (plz-response-body resp)
+          (signal 'plz-http-error resp)))
     (plz-error
      (seq-let [error-sym message data] error
        (cond

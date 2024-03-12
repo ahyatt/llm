@@ -28,7 +28,7 @@
 
 (require 'cl-lib)
 (require 'llm)
-(require 'llm-request)
+(require 'llm-request-plz)
 (require 'llm-vertex)
 (require 'llm-provider-utils)
 (require 'json)
@@ -57,21 +57,21 @@ You can get this at https://makersuite.google.com/app/apikey."
 
 (cl-defmethod llm-embedding ((provider llm-gemini) string)
   (llm-vertex--handle-response
-   (llm-request-sync (llm-gemini--embedding-url provider)
-                     :data (llm-gemini--embedding-request provider string))
+   (llm-request-plz-sync (llm-gemini--embedding-url provider)
+                         :data (llm-gemini--embedding-request provider string))
    #'llm-gemini--embedding-response-handler))
 
 (cl-defmethod llm-embedding-async ((provider llm-gemini) string vector-callback error-callback)
   (let ((buf (current-buffer)))
-    (llm-request-async (llm-gemini--embedding-url provider)
-                       :data (llm-gemini--embedding-request provider string)
-                       :on-success (lambda (data)
-                                     (llm-request-callback-in-buffer
-                                      buf vector-callback (llm-gemini--embedding-response-handler data)))
-                       :on-error (lambda (_ data)
-                                   (llm-request-callback-in-buffer
-                                    buf error-callback
-                                    'error (llm-vertex--error-message data))))))
+    (llm-request-plz-async (llm-gemini--embedding-url provider)
+                           :data (llm-gemini--embedding-request provider string)
+                           :on-success (lambda (data)
+                                         (llm-request-callback-in-buffer
+                                          buf vector-callback (llm-gemini--embedding-response-handler data)))
+                           :on-error (lambda (_ data)
+                                       (llm-request-callback-in-buffer
+                                        buf error-callback
+                                        'error (llm-vertex--error-message data))))))
 
 ;; from https://ai.google.dev/tutorials/rest_quickstart
 (defun llm-gemini--chat-url (provider streaming-p)
@@ -103,39 +103,39 @@ If STREAMING-P is non-nil, use the streaming endpoint."
 (cl-defmethod llm-chat ((provider llm-gemini) prompt)
   (llm-vertex--process-and-return
    provider prompt
-   (llm-request-sync (llm-gemini--chat-url provider nil)
-                     :data (llm-gemini--chat-request prompt))))
+   (llm-request-plz-sync (llm-gemini--chat-url provider nil)
+                         :data (llm-gemini--chat-request prompt))))
 
 (cl-defmethod llm-chat-async ((provider llm-gemini) prompt response-callback error-callback)
   (let ((buf (current-buffer)))
-    (llm-request-async (llm-gemini--chat-url provider nil)
-                       :data (llm-gemini--chat-request prompt)
-                       :on-success (lambda (data)
-                                     (llm-request-callback-in-buffer
-                                      buf response-callback
-                                      (llm-vertex--process-and-return
-                                       provider prompt
-                                       data)))
-                       :on-error (lambda (_ data)
-                                   (llm-request-callback-in-buffer buf error-callback 'error
-                                                                   (llm-vertex--error-message data))))))
+    (llm-request-plz-async (llm-gemini--chat-url provider nil)
+                           :data (llm-gemini--chat-request prompt)
+                           :on-success (lambda (data)
+                                         (llm-request-callback-in-buffer
+                                          buf response-callback
+                                          (llm-vertex--process-and-return
+                                           provider prompt
+                                           data)))
+                           :on-error (lambda (_ data)
+                                       (llm-request-callback-in-buffer buf error-callback 'error
+                                                                       (llm-vertex--error-message data))))))
 
 (cl-defmethod llm-chat-streaming ((provider llm-gemini) prompt partial-callback response-callback error-callback)
   (let ((buf (current-buffer)))
-    (llm-request-async (llm-gemini--chat-url provider t)
-                       :data (llm-gemini--chat-request prompt)
-                       :on-partial (lambda (partial)
-                                     (when-let ((response (llm-vertex--get-partial-chat-response partial)))
-                                       (when (> (length response) 0)
-                                         (llm-request-callback-in-buffer buf partial-callback response))))
-                       :on-success (lambda (data)
-                                     (llm-request-callback-in-buffer
-                                        buf response-callback
-                                        (llm-vertex--process-and-return
-                                         provider prompt data)))
-                       :on-error (lambda (_ data)
-                                 (llm-request-callback-in-buffer buf error-callback 'error
-                                                                 (llm-vertex--error-message data))))))
+    (llm-request-plz-async (llm-gemini--chat-url provider t)
+                           :data (llm-gemini--chat-request prompt)
+                           :on-partial (lambda (partial)
+                                         (when-let ((response (llm-vertex--get-partial-chat-response partial)))
+                                           (when (> (length response) 0)
+                                             (llm-request-callback-in-buffer buf partial-callback response))))
+                           :on-success (lambda (data)
+                                         (llm-request-callback-in-buffer
+                                          buf response-callback
+                                          (llm-vertex--process-and-return
+                                           provider prompt data)))
+                           :on-error (lambda (_ data)
+                                       (llm-request-callback-in-buffer buf error-callback 'error
+                                                                       (llm-vertex--error-message data))))))
 
 (defun llm-gemini--count-token-url (provider)
   "Return the URL for the count token call, using PROVIDER."
@@ -145,9 +145,9 @@ If STREAMING-P is non-nil, use the streaming endpoint."
 
 (cl-defmethod llm-count-tokens ((provider llm-gemini) string)
   (llm-vertex--handle-response
-   (llm-request-sync (llm-gemini--count-token-url provider)
-                     :data (llm-vertex--to-count-token-request
-                            (llm-vertex--chat-request (llm-make-simple-chat-prompt string))))
+   (llm-request-plz-sync (llm-gemini--count-token-url provider)
+                         :data (llm-vertex--to-count-token-request
+                                (llm-vertex--chat-request (llm-make-simple-chat-prompt string))))
    #'llm-vertex--count-tokens-extract-response))
 
 (cl-defmethod llm-name ((_ llm-gemini))

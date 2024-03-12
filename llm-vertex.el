@@ -303,24 +303,24 @@ If STREAMING is non-nil, use the URL for the streaming API."
   (llm-vertex-refresh-key provider)
   (llm-vertex--process-and-return
      provider prompt
-     (llm-request-sync (llm-vertex--chat-url provider)
-                       :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
-                       :data (llm-vertex--chat-request prompt))))
+     (llm-request-plz-sync (llm-vertex--chat-url provider)
+                           :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
+                           :data (llm-vertex--chat-request prompt))))
 
 (cl-defmethod llm-chat-async ((provider llm-vertex) prompt response-callback error-callback)
   (llm-vertex-refresh-key provider)
   (let ((buf (current-buffer)))
-    (llm-request-async (llm-vertex--chat-url provider)
-                       :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
-                       :data (llm-vertex--chat-request prompt)
-                       :on-success (lambda (data)
-                                     (llm-request-callback-in-buffer
-                                      buf response-callback
-                                      (llm-vertex--process-and-return
-                                       provider prompt data)))
-                       :on-error (lambda (_ data)
-                                   (llm-request-callback-in-buffer buf error-callback 'error
-                                                                   (llm-vertex--error-message data))))))
+    (llm-request-plz-async (llm-vertex--chat-url provider)
+                           :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
+                           :data (llm-vertex--chat-request prompt)
+                           :on-success (lambda (data)
+                                         (llm-request-callback-in-buffer
+                                          buf response-callback
+                                          (llm-vertex--process-and-return
+                                           provider prompt data)))
+                           :on-error (lambda (_ data)
+                                       (llm-request-callback-in-buffer buf error-callback 'error
+                                                                       (llm-vertex--error-message data))))))
 
 (cl-defmethod llm-chat-streaming ((provider llm-vertex) prompt partial-callback response-callback error-callback)
   (llm-vertex-refresh-key provider)
