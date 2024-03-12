@@ -156,6 +156,53 @@ CHUNK is a part of the HTTP body."
                                :object-type object-type)))
     response))
 
+;; Content Type: application/x-ndjson
+
+(defclass plz-media-type:application/x-ndjson (plz-media-type:application/json)
+  ((name :initform "application/x-ndjson")
+   (handler :documentation "The handler that will be called for each JSON object in the response."
+            :initarg :handler)))
+
+(defconst plz-media-type:application/x-ndjson--line-regexp
+  (rx (* not-newline) (or "\r\n" "\n" "\r"))
+  "Regular expression matching a JSON Object line.")
+
+(defun plz-media-type:application/x-ndjson--parse-line (media-type)
+  "Parse a single line of the newline delimited JSON MEDIA-TYPE."
+  (when (looking-at plz-media-type:application/x-ndjson--line-regexp)
+    (when-let (line (delete-and-extract-region (match-beginning 0) (match-end 0)))
+      (with-slots (array-type false-object null-object object-type) media-type
+        (json-parse-string line
+                           :array-type array-type
+                           :false-object false-object
+                           :null-object null-object
+                           :object-type object-type)))))
+
+(defun plz-media-type:application/x-ndjson--parse-stream (media-type process)
+  "Parse all lines of the newline delimited JSON MEDIA-TYPE in the PROCESS buffer."
+  (with-slots (handler) media-type
+    (goto-char (process-get process :plz-media-type:application/x-ndjson-position))
+    (when-let (object (plz-media-type:application/x-ndjson--parse-line media-type))
+      (while object
+        (process-put process :plz-media-type:application/x-ndjson-position (point))
+        (when (functionp handler)
+          (funcall handler object))
+        (setq object (plz-media-type:application/x-ndjson--parse-line media-type))))))
+
+(cl-defmethod plz-media-type-process ((media-type plz-media-type:application/x-ndjson) process chunk)
+  "Process the CHUNK according to MEDIA-TYPE using PROCESS."
+  (when (buffer-live-p (process-buffer process))
+    (with-current-buffer (process-buffer process)
+      (unless (process-get process :plz-media-type:application/x-ndjson-position)
+        (process-put process :plz-media-type:application/x-ndjson-position (point)))
+      (cl-call-next-method media-type process chunk)
+      (plz-media-type:application/x-ndjson--parse-stream media-type process))))
+
+(cl-defmethod plz-media-type-then ((media-type plz-media-type:application/x-ndjson) response)
+  "Transform the RESPONSE into a format suitable for MEDIA-TYPE."
+  (plz-media-type:application/x-ndjson--parse-stream media-type (plz-response-process response))
+  response)
+
 ;; Content Type: application/xml
 
 (defclass plz-media-type:application/xml (plz-media-type:application/octet-stream)
@@ -172,17 +219,8 @@ CHUNK is a part of the HTTP body."
 
 ;; Content Type: text/html
 
-(defclass plz-media-type:text/html (plz-media-type:application/octet-stream)
+(defclass plz-media-type:text/html (plz-media-type:application/xml)
   ((name :initform "text/html")))
-
-(cl-defmethod plz-media-type-then ((media-type plz-media-type:text/html) response)
-  "Transform the RESPONSE into a format suitable for MEDIA-TYPE."
-  (with-slots (array-type false-object null-object object-type) media-type
-    (setf (plz-response-body response)
-          (with-temp-buffer
-            (insert (plz-response-body response))
-            (libxml-parse-html-region)))
-    response))
 
 (defvar plz-media-types
   `(("application/json" . ,(plz-media-type:application/json))
