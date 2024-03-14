@@ -93,7 +93,8 @@ TIMEOUT is the number of seconds to wait for a response."
                                    :data data
                                    :timeout timeout))
 
-(cl-defun llm-request-plz-async (url &key headers data on-success on-success-raw on-error _on-partial event-stream-handlers timeout)
+(cl-defun llm-request-plz-async (url &key headers data on-success on-success-raw on-error 
+                                     on-partial timeout)
   "Make a request to URL.
 Nothing will be returned.
 
@@ -119,10 +120,17 @@ optional argument, and mostly useful for streaming.  If not set,
 the buffer is turned into JSON and passed to ON-SUCCESS."
   (plz-media-type-request
     'post url
-    :as `(media-types ,(cons (cons "text/event-stream"
-                                   (plz-media-type:text/event-stream
-                                    :events event-stream-handlers))
-                             plz-media-types))
+    :as `(media-types
+          ,(cons
+            (cons "text/event-stream"
+                  (plz-media-type:text/event-stream
+                   :events `(("message" . ,(lambda (_ event)
+                                             (funcall on-partial
+                                                      (plz-event-source-event-data event))))
+                             ("error" . ,(lambda (_ event)
+                                          (funcall on-error
+                                                   'error (plz-event-source-event-data event)))))))
+            plz-media-types))
     :body (when data
             (encode-coding-string (json-encode data) 'utf-8))
     :headers (append headers
