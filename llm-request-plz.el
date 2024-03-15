@@ -120,17 +120,6 @@ optional argument, and mostly useful for streaming.  If not set,
 the buffer is turned into JSON and passed to ON-SUCCESS."
   (plz-media-type-request
     'post url
-    :as `(media-types
-          ,(cons
-            (cons "text/event-stream"
-                  (plz-media-type:text/event-stream
-                   :events `(("message" . ,(lambda (_ event)
-                                             (funcall on-partial
-                                                      (plz-event-source-event-data event))))
-                             ("error" . ,(lambda (_ event)
-                                          (funcall on-error
-                                                   'error (plz-event-source-event-data event)))))))
-            plz-media-types))
     :body (when data
             (encode-coding-string (json-encode data) 'utf-8))
     :headers (append headers
