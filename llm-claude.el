@@ -68,94 +68,91 @@ STREAM is a boolean indicating whether the response should be streamed."
         (assoc-default 'text content)
       (format "Unsupported non-text response: %s" content))))
 
-;; see https://docs.anthropic.com/claude/reference/messages-streaming
-(defun llm-claude-get-partial-response (response)
-  "Return the partial response from text RESPONSE."
-  (let ((regex (rx (seq "\"text\":" (0+ whitespace)
-                        (group-n 1 ?\" (* anychar) ?\") "}}"))))
-    (with-temp-buffer
-      (insert response)
-      ;; We use the quick and dirty solution of just looking for any line that
-      ;; has a "text" field.
-      (let ((matched-lines))
-        (goto-char (point-min))
-        (while (re-search-forward "\"text\":" nil t)
-          (push (buffer-substring-no-properties
-                 (line-beginning-position)
-                 (line-end-position))
-                matched-lines))
-        (mapconcat (lambda (line)
-                     (string-match regex line)
-                     (read (match-string 1 line)))
-                   (nreverse matched-lines) "")))))
-
 (cl-defmethod llm-chat ((provider llm-claude) prompt)
   (llm-claude-check-key provider)
   (let ((content (llm-claude-get-response
-                  (llm-request-sync "https://api.anthropic.com/v1/messages"
-                                    :headers `(("x-api-key" . ,(llm-claude-key provider))
-                                               ("anthropic-version" . "2023-06-01"))
-                                    :data (llm-claude-request provider prompt nil)))))
+                  (llm-request-plz-sync "https://api.anthropic.com/v1/messages"
+                                        :headers `(("x-api-key" . ,(llm-claude-key provider))
+                                                   ("anthropic-version" . "2023-06-01"))
+                                        :data (llm-claude-request provider prompt nil)))))
     (llm-provider-utils-append-to-prompt prompt content)
     content))
 
 (cl-defmethod llm-chat-async ((provider llm-claude) prompt response-callback error-callback)
   (llm-claude-check-key provider)
   (let ((buf (current-buffer)))
-    (llm-request-async "https://api.anthropic.com/v1/messages"
-                       :headers `(("x-api-key" . ,(llm-claude-key provider))
-                                  ("anthropic-version" . "2023-06-01"))
-                       :data (llm-claude-request provider prompt nil)
-                       :on-success
-                       (lambda (response)
-                         (let ((content (llm-claude-get-response response)))
-                           (llm-provider-utils-append-to-prompt prompt content)
-                           (llm-request-callback-in-buffer
-                            buf
-                            response-callback
-                            content)))
-                       :on-error
-                       (lambda (_ msg)
-                         (message "Error: %s" msg)
-                         (let ((error (assoc-default 'error msg)))
-                           (llm-request-callback-in-buffer
-                            buf error-callback
-                            'error
-                            (format "%s: %s" (assoc-default 'type error)
-                                    (assoc-default 'message error))))))))
+    (llm-request-plz-async
+     "https://api.anthropic.com/v1/messages"
+     :headers `(("x-api-key" . ,(llm-claude-key provider))
+                ("anthropic-version" . "2023-06-01"))
+     :data (llm-claude-request provider prompt nil)
+     :on-success
+     (lambda (response)
+       (let ((content (llm-claude-get-response response)))
+         (llm-provider-utils-append-to-prompt prompt content)
+         (llm-request-callback-in-buffer
+          buf
+          response-callback
+          content)))
+     :on-error
+     (lambda (_ msg)
+       (message "Error: %s" msg)
+       (let ((error (assoc-default 'error msg)))
+         (llm-request-callback-in-buffer
+          buf error-callback
+          'error
+          (format "%s: %s" (assoc-default 'type error)
+                  (assoc-default 'message error))))))))
 
+;; see https://docs.anthropic.com/claude/reference/messages-streaming
 (cl-defmethod llm-chat-streaming ((provider llm-claude) prompt partial-callback
                                   response-callback error-callback)
   (llm-claude-check-key provider)
-  (let ((buf (current-buffer)))
-    (llm-request-async "https://api.anthropic.com/v1/messages"
-                       :headers `(("x-api-key" . ,(llm-claude-key provider))
-                                  ("anthropic-version" . "2023-06-01"))
-                       :data (llm-claude-request provider prompt t)
-                       :on-partial
-                       (lambda (data)
-                         (llm-request-callback-in-buffer
-                          buf
-                          partial-callback
-                          (llm-claude-get-partial-response data)))
-                       :on-success-raw
-                       (lambda (response)
-                         (let ((content
-                                (llm-claude-get-partial-response response)))
-                           (llm-provider-utils-append-to-prompt prompt content)
-                           (llm-request-callback-in-buffer
-                            buf
-                            response-callback
-                            content)))
-                       :on-error
-                       (lambda (_ msg)
-                         (message "Error: %s" msg)
-                         (let ((error (assoc-default 'error msg)))
-                           (llm-request-callback-in-buffer
-                            buf error-callback
-                            'error
-                            (format "%s: %s" (assoc-default 'type error)
-                                    (assoc-default 'message error))))))))
+  (let ((buf (current-buffer))
+        (in-flight-message ""))
+    (llm-request-plz-event-stream
+     "https://api.anthropic.com/v1/messages"
+     :headers `(("x-api-key" . ,(llm-claude-key provider))
+                ("anthropic-version" . "2023-06-01"))
+     :data (llm-claude-request provider prompt t)
+     :event-stream-handlers
+     ;; We ignore many types of messages; these might become important if Claude
+     ;; sends a few different alternate contents, but for now they don't do
+     ;; that.
+     `(("message_start" . ,(lambda (_)))
+       ("content_block_start" . ,(lambda (_)))
+       ("ping" . ,(lambda (_)))
+       ("message_stop" . ,(lambda (_)))
+       ("content_block_stop" . ,(lambda (_)))
+       ("content_block_delta" .
+        ,(lambda (data)
+           (setq in-flight-message
+                 (concat in-flight-message
+                         (let* ((json (json-parse-string data :object-type 'alist))
+                                (delta (assoc-default 'delta json))
+                                (type (assoc-default 'type delta)))
+                           (when (equal type "text_delta")
+                             (assoc-default 'text delta)))))
+           (llm-request-callback-in-buffer
+            buf
+            partial-callback
+            in-flight-message))))
+     :on-success
+     (lambda (_)
+       (llm-provider-utils-append-to-prompt prompt in-flight-message)
+       (llm-request-callback-in-buffer
+        buf
+        response-callback
+        in-flight-message))
+     :on-error
+     (lambda (_ msg)
+       (message "Error: %s" msg)
+       (let ((error (assoc-default 'error msg)))
+         (llm-request-callback-in-buffer
+          buf error-callback
+          'error
+          (format "%s: %s" (assoc-default 'type error)
+                  (assoc-default 'message error))))))))
 
 ;; See https://docs.anthropic.com/claude/docs/models-overview
 (cl-defmethod llm-chat-token-limit ((provider llm-claude))
