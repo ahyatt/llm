@@ -265,18 +265,21 @@ RESPONSE can be nil if the response is complete."
         (if (stringp content-or-call)
             (setq llm-openai-current-response
                   (concat llm-openai-current-response content-or-call))
-          (let* ((index (assoc-default 'index content-or-call))
-                 (plist (aref llm-openai-current-response index))
-                 (function (assoc-default 'function content-or-call))
-                 (name (assoc-default 'name function))
-                 (id (assoc-default 'id content-or-call))
-                 (arguments (assoc-default 'arguments function)))
-            (when name (setq plist (plist-put plist :name name)))
-            (when id (setq plist (plist-put plist :id id)))
-            (setq plist (plist-put plist :arguments
-                                   (concat (plist-get plist :arguments)
-                                           arguments)))
-            (aset llm-openai-current-response index plist))))))
+          (when (equal "" llm-openai-current-response)
+            (setq llm-openai-current-response (make-vector (length content-or-call) nil)))
+          (cl-loop for call in (append content-or-call nil) do
+                   (let* ((index (assoc-default 'index call))
+                          (plist (aref llm-openai-current-response index))
+                          (function (assoc-default 'function call))
+                          (name (assoc-default 'name function))
+                          (id (assoc-default 'id call))
+                          (arguments (assoc-default 'arguments function)))
+                     (when name (setq plist (plist-put plist :name name)))
+                     (when id (setq plist (plist-put plist :id id)))
+                     (setq plist (plist-put plist :arguments
+                                            (concat (plist-get plist :arguments)
+                                                    arguments)))
+                     (aset llm-openai-current-response index plist)))))))
   (if (vectorp llm-openai-current-response)
       (apply #'vector
              (mapcar (lambda (plist)
