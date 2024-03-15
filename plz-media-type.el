@@ -34,9 +34,9 @@
 (require 'eieio)
 (require 'plz)
 
-(defclass plz:media-type ()
+(defclass plz-media-type ()
   ((name
-    :documentation "The MIME Type of the handler."
+    :documentation "The name of the media type."
     :initarg :name
     :initform "application/octet-stream"
     :type string)))
@@ -67,6 +67,15 @@
   (let ((media-type (plz-media-type--content-type response)))
     (plz-media--type-find media-types media-type)))
 
+(defvar-local plz-media-type--current nil
+  "The media type of the process buffer.")
+
+(defvar-local plz-media-type--position nil
+  "The position in the process buffer.")
+
+(defvar-local plz-media-type--response nil
+  "The response of the process buffer.")
+
 (defun plz-media-type-process-filter (process media-types chunk)
   "The process filter that handles different content types.
 
@@ -79,8 +88,8 @@ CHUNK is a part of the HTTP body."
   (when (buffer-live-p (process-buffer process))
     (with-current-buffer (process-buffer process)
       (let ((moving (= (point) (process-mark process))))
-        (if-let (media-type (process-get process :plz-media-type))
-            (let ((response (process-get process :plz-media-type-response)))
+        (if-let (media-type plz-media-type--current)
+            (let ((response plz-media-type--response))
               (setf (plz-response-body response) chunk)
               (plz-media-type-process media-type process response))
           (progn
@@ -94,20 +103,20 @@ CHUNK is a part of the HTTP body."
                 (goto-char (point-min))
                 (let* ((response (prog1 (plz--response) (widen)))
                        (media-type (plz-media-type--of-response media-types response)))
-                  (process-put process :plz-media-type media-type)
+                  (setq-local plz-media-type--current media-type)
                   (when-let (body (plz-response-body response))
                     (when (> (length body) 0)
                       (delete-region body-start (point-max))
                       (set-marker (process-mark process) (point))
                       (plz-media-type-process media-type process response)))
                   (setf (plz-response-body response) nil)
-                  (process-put process :plz-media-type-response response))))))
+                  (setq-local plz-media-type--response response))))))
         (when moving
           (goto-char (process-mark process)))))))
 
 ;; Content Type: application/octet-stream
 
-(defclass plz-media-type:application/octet-stream (plz:media-type)
+(defclass plz-media-type:application/octet-stream (plz-media-type)
   ((name :initform "application/octet-stream")))
 
 (cl-defmethod plz-media-type-else ((media-type plz-media-type:application/octet-stream) error)
@@ -119,49 +128,115 @@ CHUNK is a part of the HTTP body."
 (cl-defmethod plz-media-type-then ((media-type plz-media-type:application/octet-stream) response)
   "Transform the RESPONSE into a format suitable for MEDIA-TYPE."
   (ignore media-type)
+  (setf (plz-response-body response) (buffer-string))
   response)
 
 (cl-defmethod plz-media-type-process ((media-type plz-media-type:application/octet-stream) process chunk)
   "Process the CHUNK according to MEDIA-TYPE using PROCESS."
   (ignore media-type)
-  (when (buffer-live-p (process-buffer process))
-    (with-current-buffer (process-buffer process)
-      (let ((moving (= (point) (process-mark process))))
-        (save-excursion
-          (goto-char (process-mark process))
-          (insert (plz-response-body chunk))
-          (set-marker (process-mark process) (point)))
-        (when moving
-          (goto-char (process-mark process)))))))
+  (save-excursion
+    (goto-char (process-mark process))
+    (insert (plz-response-body chunk))
+    (set-marker (process-mark process) (point))))
 
 ;; Content Type: application/json
 
 (defclass plz-media-type:application/json (plz-media-type:application/octet-stream)
-  ((name :initform "application/json")
-   (array-type :initform 'array)
-   (false-object :initform :json-false)
-   (null-object :initform nil)
-   (object-type :initform 'alist)))
+  ((name
+    :initform "application/json")
+   (array-type
+    :documentation "Specifies which Lisp type is used to represent arrays.  It can be
+`array' (the default) or `list'."
+    :initarg :array-type
+    :initform 'array
+    :type symbol)
+   (false-object
+    :documentation "Specifies which object to use to represent a JSON false value. It
+defaults to `:json-false'."
+    :initarg :false-object
+    :initform :json-false)
+   (null-object
+    :documentation "Specifies which object to use to represent a JSON null value.  It
+defaults to `nil`."
+    :initarg :null-object
+    :initform nil)
+   (object-type
+    :documentation "Specifies which Lisp type is used to represent objects.  It can
+be `hash-table', `alist' (the default) or `plist'."
+    :initarg :object-type
+    :initform 'alist
+    :type symbol)))
+
+(defun plz-media-type--parse-json-object (media-type)
+  "Parse the JSON object in the current buffer according to MEDIA-TYPE."
+  (with-slots (array-type false-object null-object object-type) media-type
+    (json-parse-buffer :array-type array-type
+                       :false-object false-object
+                       :null-object null-object
+                       :object-type object-type)) )
 
 (cl-defmethod plz-media-type-then ((media-type plz-media-type:application/json) response)
   "Transform the RESPONSE into a format suitable for MEDIA-TYPE."
-  (with-slots (array-type false-object null-object object-type) media-type
-    (setf (plz-response-body response)
-          (with-temp-buffer
-            (insert (plz-response-body response))
-            (goto-char (point-min))
-            (json-parse-buffer :array-type array-type
-                               :false-object false-object
-                               :null-object null-object
-                               :object-type object-type)))
-    response))
+  (setf (plz-response-body response) (plz-media-type--parse-json-object media-type))
+  response)
+
+;; Content Type: application/json (array of objects)
+
+(defclass plz-media-type:application/json-array (plz-media-type:application/json)
+  ((handler
+    :documentation "A function that will be called for each object in the JSON array."
+    :initarg :handler
+    :type (or function symbol))))
+
+(defun plz-media-type:application/json-array--parse-next (media-type)
+  "Parse a single line of the newline delimited JSON MEDIA-TYPE."
+  (cond ((looking-at "\\[")
+         (delete-char 1))
+        ((looking-at "[ ,\n\r]")
+         (delete-char 1))
+        ((looking-at "\\]")
+         (delete-char 1))
+        ((not (eobp))
+         (ignore-errors
+           (let ((begin (point)))
+             (prog1 (plz-media-type--parse-json-object media-type)
+               (delete-region begin (point))))))))
+
+(defun plz-media-type:application/json-array--parse-stream (media-type)
+  "Parse all lines of the newline delimited JSON MEDIA-TYPE in the PROCESS buffer."
+  (with-slots (handler) media-type
+    (unless plz-media-type--position
+      (setq-local plz-media-type--position (point)))
+    (goto-char plz-media-type--position)
+    (let ((object (plz-media-type:application/json-array--parse-next media-type)))
+      (setq-local plz-media-type--position (point))
+      (while object
+        (setq-local plz-media-type--position (point))
+        (when (functionp handler)
+          (funcall handler object))
+        (setq object (plz-media-type:application/json-array--parse-next media-type))))))
+
+(cl-defmethod plz-media-type-process ((media-type plz-media-type:application/json-array) process chunk)
+  "Process the CHUNK according to MEDIA-TYPE using PROCESS."
+  (ignore media-type)
+  (cl-call-next-method media-type process chunk)
+  (plz-media-type:application/json-array--parse-stream media-type))
+
+(cl-defmethod plz-media-type-then ((media-type plz-media-type:application/json-array) response)
+  "Transform the RESPONSE into a format suitable for MEDIA-TYPE."
+  (ignore media-type)
+  (plz-media-type:application/json-array--parse-stream media-type)
+  response)
 
 ;; Content Type: application/x-ndjson
 
 (defclass plz-media-type:application/x-ndjson (plz-media-type:application/json)
   ((name :initform "application/x-ndjson")
-   (handler :documentation "The handler that will be called for each JSON object in the response."
-            :initarg :handler)))
+   (handler
+    :documentation "A function that will be called for each line that contains a JSON object."
+    :initarg :handler
+    :initform nil
+    :type (or function null symbol))))
 
 (defconst plz-media-type:application/x-ndjson--line-regexp
   (rx (* not-newline) (or "\r\n" "\n" "\r"))
@@ -170,37 +245,30 @@ CHUNK is a part of the HTTP body."
 (defun plz-media-type:application/x-ndjson--parse-line (media-type)
   "Parse a single line of the newline delimited JSON MEDIA-TYPE."
   (when (looking-at plz-media-type:application/x-ndjson--line-regexp)
-    (when-let (line (delete-and-extract-region (match-beginning 0) (match-end 0)))
-      (with-slots (array-type false-object null-object object-type) media-type
-        (json-parse-string line
-                           :array-type array-type
-                           :false-object false-object
-                           :null-object null-object
-                           :object-type object-type)))))
+    (prog1 (plz-media-type--parse-json-object media-type)
+      (delete-region (match-beginning 0) (match-end 0)))))
 
-(defun plz-media-type:application/x-ndjson--parse-stream (media-type process)
+(defun plz-media-type:application/x-ndjson--parse-stream (media-type)
   "Parse all lines of the newline delimited JSON MEDIA-TYPE in the PROCESS buffer."
   (with-slots (handler) media-type
-    (goto-char (process-get process :plz-media-type:application/x-ndjson-position))
+    (unless plz-media-type--position
+      (setq-local plz-media-type--position (point)))
+    (goto-char plz-media-type--position)
     (when-let (object (plz-media-type:application/x-ndjson--parse-line media-type))
       (while object
-        (process-put process :plz-media-type:application/x-ndjson-position (point))
+        (setq-local plz-media-type--position (point))
         (when (functionp handler)
           (funcall handler object))
         (setq object (plz-media-type:application/x-ndjson--parse-line media-type))))))
 
 (cl-defmethod plz-media-type-process ((media-type plz-media-type:application/x-ndjson) process chunk)
   "Process the CHUNK according to MEDIA-TYPE using PROCESS."
-  (when (buffer-live-p (process-buffer process))
-    (with-current-buffer (process-buffer process)
-      (unless (process-get process :plz-media-type:application/x-ndjson-position)
-        (process-put process :plz-media-type:application/x-ndjson-position (point)))
-      (cl-call-next-method media-type process chunk)
-      (plz-media-type:application/x-ndjson--parse-stream media-type process))))
+  (cl-call-next-method media-type process chunk)
+  (plz-media-type:application/x-ndjson--parse-stream media-type))
 
 (cl-defmethod plz-media-type-then ((media-type plz-media-type:application/x-ndjson) response)
   "Transform the RESPONSE into a format suitable for MEDIA-TYPE."
-  (plz-media-type:application/x-ndjson--parse-stream media-type (plz-response-process response))
+  (plz-media-type:application/x-ndjson--parse-stream media-type)
   response)
 
 ;; Content Type: application/xml
@@ -211,10 +279,7 @@ CHUNK is a part of the HTTP body."
 (cl-defmethod plz-media-type-then ((media-type plz-media-type:application/xml) response)
   "Transform the RESPONSE into a format suitable for MEDIA-TYPE."
   (with-slots (array-type false-object null-object object-type) media-type
-    (setf (plz-response-body response)
-          (with-temp-buffer
-            (insert (plz-response-body response))
-            (libxml-parse-html-region)))
+    (setf (plz-response-body response) (libxml-parse-html-region))
     response))
 
 ;; Content Type: text/html
@@ -224,11 +289,25 @@ CHUNK is a part of the HTTP body."
 
 (defvar plz-media-types
   `(("application/json" . ,(plz-media-type:application/json))
-    ("application/octet-stream" . ,(plz-media-type:application/json))
+    ("application/octet-stream" . ,(plz-media-type:application/octet-stream))
     ("application/xml" . ,(plz-media-type:application/xml))
     ("text/html" . ,(plz-media-type:text/html))
     (t . ,(plz-media-type:application/octet-stream)))
   "Alist from media type to content type.")
+
+(defun plz-media-type--handle-sync-error (media-types error)
+  "Handle the synchronous ERROR of type `plz-http-error' with MEDIA-TYPES."
+  (let* ((msg (cadr error))
+         (plzerror (caddr error)))
+    (signal (car error)
+            (let ((response (plz-error-response plzerror)))
+              (if-let (media-type (plz-media-type--of-response media-types response))
+                  (list msg (with-temp-buffer
+                              (when-let (body (plz-response-body response))
+                                (insert body)
+                                (goto-char (point-min)))
+                              (plz-media-type-else media-type plzerror)))
+                (cdr error))))))
 
 (cl-defun plz-media-type-request
     (method
@@ -333,43 +412,40 @@ not.
   (if-let (media-types (pcase as
                          (`(media-types ,media-types)
                           media-types)))
-      (let* ((plz-curl-default-args (cons "--no-buffer" plz-curl-default-args))
-             (result (plz method url
-                       :as 'response
-                       :body body
-                       :body-type body-type
-                       :connect-timeout connect-timeout
-                       :decode decode
-                       :else (when (functionp else)
-                               (lambda (object)
-                                 (let* ((media-type (plz-media-type--of-response media-types (plz-error-response object)))
-                                        (object (plz-media-type-else media-type object)))
-                                   (funcall else object))))
-                       :finally (when (functionp finally)
-                                  (lambda () (funcall finally)))
-                       :headers headers
-                       :noquery noquery
-                       :process-filter (lambda (process chunk)
-                                         (plz-media-type-process-filter process media-types chunk))
-                       :timeout timeout
-                       :then (cond
-                              ((symbolp then) then)
-                              ((functionp then)
-                               (lambda (object)
-                                 (let* ((media-type (plz-media-type--of-response media-types object))
-                                        (object (plz-media-type-then media-type object)))
-                                   (funcall then object))))))))
-        ;; TODO: Handle sync event stream
-        (cond
-         ((processp result)
-          result)
-         ((plz-response-p result)
-          (let ((media-type (plz-media-type--of-response media-types result)))
-            (plz-media-type-then media-type result)))
-         ((plz-error-p result)
-          (let ((media-type (plz-media-type--of-response media-types (plz-error-response result))))
-            (plz-media-type-else media-type result)))
-         (t result)))
+      (condition-case error
+          (let* ((plz-curl-default-args (cons "--no-buffer" plz-curl-default-args))
+                 (result (plz method url
+                           :as 'buffer
+                           :body body
+                           :body-type body-type
+                           :connect-timeout connect-timeout
+                           :decode decode
+                           :else (when (functionp else)
+                                   (lambda (error)
+                                     (funcall else (plz-media-type-else
+                                                    plz-media-type--current
+                                                    error))))
+                           :finally (when (functionp finally)
+                                      (lambda () (funcall finally)))
+                           :headers headers
+                           :noquery noquery
+                           :process-filter (lambda (process chunk)
+                                             (plz-media-type-process-filter process media-types chunk))
+                           :timeout timeout
+                           :then (cond
+                                  ((symbolp then) then)
+                                  ((functionp then)
+                                   (lambda (_)
+                                     (funcall then (plz-media-type-then
+                                                    plz-media-type--current
+                                                    plz-media-type--response))))))))
+            (cond ((bufferp result)
+                   (with-current-buffer result
+                     (plz-media-type-then plz-media-type--current plz-media-type--response)))
+                  ((processp result)
+                   result)
+                  (t (user-error "Unexpected response: %s" result))))
+        (plz-error (plz-media-type--handle-sync-error media-types error)))
     (apply #'plz (append (list method url) rest))))
 
 ;;;; Footer

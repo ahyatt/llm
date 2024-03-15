@@ -403,16 +403,16 @@
 (defclass plz-media-type:text/event-stream (plz-media-type:application/octet-stream)
   ((name :initform "text/event-stream")
    (events :documentation "Association list from event type to handler."
-           :initarg :events)))
+           :initarg :events
+           :initform nil
+           :type list)))
 
-(defun plz-media-type:text/event-stream--event-source (response)
-  "Return the event source of the RESPONSE."
-  (process-get (plz-response-process response) :plz-event-source))
+(defvar-local plz-event-source--current nil
+  "The event source of the current buffer.")
 
 (cl-defmethod plz-media-type-else ((_ plz-media-type:text/event-stream) error)
   "Transform the ERROR into a format suitable for MEDIA-TYPE."
-  (let* ((response (plz-error-response error))
-         (source (plz-media-type:text/event-stream--event-source response))
+  (let* ((source plz-event-source--current)
          (event (plz-event-source-event :type "error" :data error)))
     (plz-event-source-close source)
     (plz-event-source-dispatch-event source event)
@@ -422,7 +422,7 @@
   "Process the CHUNK according to MEDIA-TYPE using PROCESS."
   (when (buffer-live-p (process-buffer process))
     (with-current-buffer (process-buffer process)
-      (unless (process-get process :plz-event-source)
+      (unless plz-event-source--current
         (let* ((response (make-plz-response
                           :status (plz-response-status chunk)
                           :headers (plz-response-headers chunk)))
@@ -444,15 +444,13 @@
                                                        (funcall handler source event))))
                                          (t pair))))
                                     (oref media-type events))))))
-          (process-put process :plz-event-source source)))
-      (plz-event-source-insert (process-get process :plz-event-source)
-                               (plz-response-body chunk)))))
+          (setq-local plz-event-source--current source)))
+      (plz-event-source-insert plz-event-source--current (plz-response-body chunk)))))
 
-(cl-defmethod plz-media-type-then ((_ plz-media-type:text/event-stream) response)
+(cl-defmethod plz-media-type-then ((media-type plz-media-type:text/event-stream) response)
   "Transform the RESPONSE into a format suitable for MEDIA-TYPE."
-  (let ((source (plz-media-type:text/event-stream--event-source response)))
-    (plz-event-source-close source)
-    response))
+  (plz-event-source-close plz-event-source--current)
+  (cl-call-next-method media-type response))
 
 (provide 'plz-event-source)
 ;;; plz-event-source.el ends here
