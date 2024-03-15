@@ -71,8 +71,8 @@ STREAM is a boolean indicating whether the response should be streamed."
 ;; see https://docs.anthropic.com/claude/reference/messages-streaming
 (defun llm-claude-get-partial-response (response)
   "Return the partial response from text RESPONSE."
-  (let ((regex (rx (seq "\"text\":" (0+ whitespace) ?\"
-                        (group-n 1 (* anychar)) "\"}}"))))
+  (let ((regex (rx (seq "\"text\":" (0+ whitespace)
+                        (group-n 1 ?\" (* anychar) ?\") "}}"))))
     (with-temp-buffer
       (insert response)
       ;; We use the quick and dirty solution of just looking for any line that
@@ -85,17 +85,19 @@ STREAM is a boolean indicating whether the response should be streamed."
                  (line-end-position))
                 matched-lines))
         (mapconcat (lambda (line)
-                                 (string-match regex line)
-                                 (match-string 1 line))
+                     (string-match regex line)
+                     (read (match-string 1 line)))
                    (nreverse matched-lines) "")))))
 
 (cl-defmethod llm-chat ((provider llm-claude) prompt)
   (llm-claude-check-key provider)
-  (llm-claude-get-response
-   (llm-request-sync "https://api.anthropic.com/v1/messages"
-                     :headers `(("x-api-key" . ,(llm-claude-key provider))
-                                ("anthropic-version" . "2023-06-01"))
-                     :data (llm-claude-request provider prompt nil))))
+  (let ((content (llm-claude-get-response
+                  (llm-request-sync "https://api.anthropic.com/v1/messages"
+                                    :headers `(("x-api-key" . ,(llm-claude-key provider))
+                                               ("anthropic-version" . "2023-06-01"))
+                                    :data (llm-claude-request provider prompt nil)))))
+    (llm-provider-utils-append-to-prompt prompt content)
+    content))
 
 (cl-defmethod llm-chat-async ((provider llm-claude) prompt response-callback error-callback)
   (llm-claude-check-key provider)
@@ -106,10 +108,12 @@ STREAM is a boolean indicating whether the response should be streamed."
                        :data (llm-claude-request provider prompt nil)
                        :on-success
                        (lambda (response)
-                         (llm-request-callback-in-buffer
-                          buf
-                          response-callback
-                          (llm-claude-get-response response)))
+                         (let ((content (llm-claude-get-response response)))
+                           (llm-provider-utils-append-to-prompt prompt content)
+                           (llm-request-callback-in-buffer
+                            buf
+                            response-callback
+                            content)))
                        :on-error
                        (lambda (_ msg)
                          (message "Error: %s" msg)
@@ -138,6 +142,7 @@ STREAM is a boolean indicating whether the response should be streamed."
                        (lambda (response)
                          (let ((content
                                 (llm-claude-get-partial-response response)))
+                           (llm-provider-utils-append-to-prompt prompt content)
                            (llm-request-callback-in-buffer
                             buf
                             response-callback
@@ -151,6 +156,13 @@ STREAM is a boolean indicating whether the response should be streamed."
                             'error
                             (format "%s: %s" (assoc-default 'type error)
                                     (assoc-default 'message error))))))))
+
+;; See https://docs.anthropic.com/claude/docs/models-overview
+(cl-defmethod llm-chat-token-limit ((provider llm-claude))
+  (pcase (llm-claude-chat-model provider)
+    ("claude-2.0" 100000)
+    ("claude-instant-1.2" 100000)
+    (_ 200000)))
 
 (cl-defmethod llm-name ((_ llm-claude))
   "Claude")
