@@ -146,6 +146,55 @@ the buffer is turned into JSON and passed to ON-SUCCESS."
               (funcall on-error error)))
     :timeout (or timeout llm-request-plz-timeout)))
 
+(cl-defun llm-request-plz-event-stream (url &key headers data on-error on-success
+                                            event-stream-handlers timeout)
+  "Make a request to URL.
+Nothing will be returned.
+
+HEADERS will be added in the Authorization header, in addition to
+standard json header. This is optional.
+
+DATA will be jsonified and sent as the request body.
+This is required.
+
+ON-SUCCESS will be called with the response body as a json
+object. This is optional in the case that ON-SUCCESS-DATA is set,
+and required otherwise.
+
+EVENT-STREAM-HANDLERS are an alist of event names to functions
+that handle the event's corresponding data, which will be called
+with the new event data as a string.
+
+ON-ERROR will be called with the error code and a response-body.
+This is required.
+"
+  (plz-media-type-request
+    'post url
+    :as `(media-types
+          ,(cons
+            (cons "text/event-stream"
+                  (plz-media-type:text/event-stream
+                   ;; Convert so that each event handler gets the body, not the
+                   ;; `plz-response' itself.
+                   :events (mapcar
+                            (lambda (cons)
+                              (cons (car cons)
+                                    (lambda (_ resp) (funcall (cdr cons) (plz-event-source-event-data resp)))))
+                            event-stream-handlers)))
+            plz-media-types))
+    :body (when data
+            (encode-coding-string (json-encode data) 'utf-8))
+    :headers (append headers
+                     '(("Accept-encoding" . "identity")
+                       ("Content-Type" . "application/json")))
+    :then (lambda (response)
+            (when on-success
+              (funcall on-success (plz-response-body response))))
+    :else (lambda (error)
+            (when on-error
+              (funcall on-error error)))
+    :timeout (or timeout llm-request-plz-timeout)))
+
 ;; This is a useful method for getting out of the request buffer when it's time
 ;; to make callbacks.
 (defun llm-request-plz-callback-in-buffer (buf f &rest args)

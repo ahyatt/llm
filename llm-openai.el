@@ -296,31 +296,35 @@ RESPONSE can be nil if the response is complete."
                                   response-callback error-callback)
   (llm-openai--check-key provider)
   (let ((buf (current-buffer)))
-    (llm-request-plz-async (llm-openai--url provider "chat/completions")
-                           :headers (llm-openai--headers provider)
-                           :data (llm-openai--chat-request (llm-openai-chat-model provider) prompt t)
-                           :on-error (lambda (_ data)
-                                       (let ((errdata (cdr
-                                                       (assoc 'error
-                                                              (json-read-from-string data)))))
-                                         (llm-request-callback-in-buffer
-                                          buf error-callback 'error
-                                          (format "Problem calling Open AI: %s message: %s"
-                                                  (cdr (assoc 'type errdata))
-                                                  (cdr (assoc 'message errdata))))))
-                           :on-partial (lambda (data)
-                                         (when (not (equal data "[DONE]"))
-                                           (when-let ((response (llm-openai--get-partial-chat-response
-                                                                 (json-read-from-string data))))
-                                             (when (stringp response)
-                                               (llm-request-callback-in-buffer buf partial-callback response)))))
-                           :on-success (lambda (_)
-                                         (llm-request-callback-in-buffer
-                                          buf
-                                          response-callback
-                                          (llm-openai--process-and-return
-                                           provider prompt nil
-                                           error-callback))))))
+    (llm-request-plz-event-stream
+     (llm-openai--url provider "chat/completions")
+     :headers (llm-openai--headers provider)
+     :data (llm-openai--chat-request (llm-openai-chat-model provider) prompt t)
+     :event-stream-handlers
+     `(("message" . ,(lambda (data)
+                       (when (not (equal data "[DONE]"))
+                         (when-let ((response (llm-openai--get-partial-chat-response
+                                               (json-read-from-string data))))
+                           (when (stringp response)
+                             (llm-request-callback-in-buffer buf partial-callback response))))))
+       ("error" . ,(lambda (data)
+                     (llm-request-callback-in-buffer
+                      buf error-callback 'error data))))
+     :on-error (lambda (_ data)
+                 (let ((errdata
+                        (cdr (assoc 'error (json-read-from-string data)))))
+                   (llm-request-callback-in-buffer
+                    buf error-callback 'error
+                    (format "Problem calling Open AI: %s message: %s"
+                            (cdr (assoc 'type errdata))
+                            (cdr (assoc 'message errdata))))))
+     :on-success (lambda (_)
+                   (llm-request-callback-in-buffer
+                    buf
+                    response-callback
+                    (llm-openai--process-and-return
+                     provider prompt nil
+                     error-callback))))))
 
 (cl-defmethod llm-name ((_ llm-openai))
   "Open AI")
