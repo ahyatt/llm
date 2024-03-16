@@ -90,7 +90,7 @@ STREAM is a boolean indicating whether the response should be streamed."
      (lambda (response)
        (let ((content (llm-claude-get-response response)))
          (llm-provider-utils-append-to-prompt prompt content)
-         (llm-request-callback-in-buffer
+         (llm-request-plz-callback-in-buffer
           buf
           response-callback
           content)))
@@ -98,7 +98,7 @@ STREAM is a boolean indicating whether the response should be streamed."
      (lambda (_ msg)
        (message "Error: %s" msg)
        (let ((error (assoc-default 'error msg)))
-         (llm-request-callback-in-buffer
+         (llm-request-plz-callback-in-buffer
           buf error-callback
           'error
           (format "%s: %s" (assoc-default 'type error)
@@ -133,14 +133,14 @@ STREAM is a boolean indicating whether the response should be streamed."
                                 (type (assoc-default 'type delta)))
                            (when (equal type "text_delta")
                              (assoc-default 'text delta)))))
-           (llm-request-callback-in-buffer
+           (llm-request-plz-callback-in-buffer
             buf
             partial-callback
             in-flight-message))))
      :on-success
      (lambda (_)
        (llm-provider-utils-append-to-prompt prompt in-flight-message)
-       (llm-request-callback-in-buffer
+       (llm-request-plz-callback-in-buffer
         buf
         response-callback
         in-flight-message))
@@ -148,7 +148,7 @@ STREAM is a boolean indicating whether the response should be streamed."
      (lambda (_ msg)
        (message "Error: %s" msg)
        (let ((error (assoc-default 'error msg)))
-         (llm-request-callback-in-buffer
+         (llm-request-plz-callback-in-buffer
           buf error-callback
           'error
           (format "%s: %s" (assoc-default 'type error)
