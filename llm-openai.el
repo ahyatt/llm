@@ -27,7 +27,7 @@
 
 (require 'cl-lib)
 (require 'llm)
-(require 'llm-request)
+(require 'llm-request-plz)
 (require 'llm-provider-utils)
 (require 'json)
 
@@ -113,25 +113,25 @@ This is just the key, if it exists."
             "/") command))
 
 (cl-defmethod llm-embedding-async ((provider llm-openai) string vector-callback error-callback)
-  (llm-openai--check-key provider)  
+  (llm-openai--check-key provider)
   (let ((buf (current-buffer)))
-    (llm-request-async (llm-openai--url provider "embeddings")
-                       :headers (llm-openai--headers provider)
-                       :data (llm-openai--embedding-request (llm-openai-embedding-model provider) string)
-                       :on-success (lambda (data)
-                                     (llm-request-callback-in-buffer
-                                      buf vector-callback (llm-openai--embedding-extract-response data)))
-                       :on-error (lambda (_ data) 
-                                   (llm-request-callback-in-buffer
-                                    buf error-callback 'error
-                                    (llm-openai--error-message data))))))
+    (llm-request-plz-async (llm-openai--url provider "embeddings")
+                           :headers (llm-openai--headers provider)
+                           :data (llm-openai--embedding-request (llm-openai-embedding-model provider) string)
+                           :on-success (lambda (data)
+                                         (llm-request-plz-callback-in-buffer
+                                          buf vector-callback (llm-openai--embedding-extract-response data)))
+                           :on-error (lambda (_ data)
+                                       (llm-request-plz-callback-in-buffer
+                                        buf error-callback 'error
+                                        (llm-openai--error-message data))))))
 
 (cl-defmethod llm-embedding ((provider llm-openai) string)
   (llm-openai--check-key provider)
   (llm-openai--handle-response
-   (llm-request-sync (llm-openai--url provider "embeddings")
-               :headers (llm-openai--headers provider)
-               :data (llm-openai--embedding-request (llm-openai-embedding-model provider) string))
+   (llm-request-plz-sync (llm-openai--url provider "embeddings")
+                         :headers (llm-openai--headers provider)
+                         :data (llm-openai--embedding-request (llm-openai-embedding-model provider) string))
    #'llm-openai--embedding-extract-response))
 
 (defun llm-openai--chat-request (model prompt &optional streaming)
@@ -226,17 +226,17 @@ PROMPT is the prompt that needs to be updated with the response."
 (cl-defmethod llm-chat-async ((provider llm-openai) prompt response-callback error-callback)
   (llm-openai--check-key provider)
   (let ((buf (current-buffer)))
-    (llm-request-async (llm-openai--url provider "chat/completions")
+    (llm-request-plz-async (llm-openai--url provider "chat/completions")
       :headers (llm-openai--headers provider)
       :data (llm-openai--chat-request (llm-openai-chat-model provider) prompt)
       :on-success (lambda (data)
-                    (llm-request-callback-in-buffer
+                    (llm-request-plz-callback-in-buffer
                        buf response-callback
                        (llm-openai--process-and-return
                         provider prompt data error-callback)))
       :on-error (lambda (_ data)
                   (let ((errdata (cdr (assoc 'error data))))
-                    (llm-request-callback-in-buffer buf error-callback 'error
+                    (llm-request-plz-callback-in-buffer buf error-callback 'error
                              (format "Problem calling Open AI: %s message: %s"
                                      (cdr (assoc 'type errdata))
                                      (cdr (assoc 'message errdata)))))))))
@@ -245,7 +245,7 @@ PROMPT is the prompt that needs to be updated with the response."
   (llm-openai--check-key provider)
   (llm-openai--process-and-return
    provider prompt
-   (llm-request-sync
+   (llm-request-plz-sync
     (llm-openai--url provider "chat/completions")
     :headers (llm-openai--headers provider)
     :data (llm-openai--chat-request (llm-openai-chat-model provider)
@@ -306,20 +306,20 @@ RESPONSE can be nil if the response is complete."
                          (when-let ((response (llm-openai--get-partial-chat-response
                                                (json-read-from-string data))))
                            (when (stringp response)
-                             (llm-request-callback-in-buffer buf partial-callback response))))))
+                             (llm-request-plz-callback-in-buffer buf partial-callback response))))))
        ("error" . ,(lambda (data)
-                     (llm-request-callback-in-buffer
+                     (llm-request-plz-callback-in-buffer
                       buf error-callback 'error data))))
      :on-error (lambda (_ data)
                  (let ((errdata
                         (cdr (assoc 'error (json-read-from-string data)))))
-                   (llm-request-callback-in-buffer
+                   (llm-request-plz-callback-in-buffer
                     buf error-callback 'error
                     (format "Problem calling Open AI: %s message: %s"
                             (cdr (assoc 'type errdata))
                             (cdr (assoc 'message errdata))))))
      :on-success (lambda (_)
-                   (llm-request-callback-in-buffer
+                   (llm-request-plz-callback-in-buffer
                     buf
                     response-callback
                     (llm-openai--process-and-return

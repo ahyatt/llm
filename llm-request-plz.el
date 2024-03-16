@@ -120,6 +120,7 @@ optional argument, and mostly useful for streaming.  If not set,
 the buffer is turned into JSON and passed to ON-SUCCESS."
   (plz-media-type-request
     'post url
+    :as 'string
     :body (when data
             (encode-coding-string (json-encode data) 'utf-8))
     :headers (append headers
@@ -127,9 +128,9 @@ the buffer is turned into JSON and passed to ON-SUCCESS."
                        ("Content-Type" . "application/json")))
     :then (lambda (response)
             (when on-success-raw
-              (user-error "Not supported yet: on-success-raw"))
+              (funcall on-success-raw response))
             (when on-success
-              (funcall on-success (plz-response-body response))))
+              (funcall on-success (json-read-from-string response))))
     :else (lambda (error)
             (when on-error
               (funcall on-error error)))
