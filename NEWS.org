@@ -1,3 +1,5 @@
+* Version 0.12.0
+- Add provider =llm-claude=, for Anthropic's Claude.
 * Version 0.11.0
 - Introduce function calling, now available only in Open AI and Gemini.
 - Introduce =llm-capabilities=, which returns a list of extra capabilities for each backend.

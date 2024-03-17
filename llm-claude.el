@@ -72,7 +72,7 @@ STREAM is a boolean indicating whether the response should be streamed."
 (defun llm-claude-get-partial-response (response)
   "Return the partial response from text RESPONSE."
   (let ((regex (rx (seq "\"text\":" (0+ whitespace)
-                        (group-n 1 ?\" (* anychar) ?\") "}}"))))
+                        (group-n 1 ?\" (0+ anychar) ?\") (0+ whitespace) ?} (0+ whitespace) ?}))))
     (with-temp-buffer
       (insert response)
       ;; We use the quick and dirty solution of just looking for any line that
@@ -85,8 +85,9 @@ STREAM is a boolean indicating whether the response should be streamed."
                  (line-end-position))
                 matched-lines))
         (mapconcat (lambda (line)
-                     (string-match regex line)
-                     (read (match-string 1 line)))
+                     (if (string-match regex line)
+                         (read (match-string 1 line))
+                       (warn "Could not parse streaming response: %s" line)))
                    (nreverse matched-lines) "")))))
 
 (cl-defmethod llm-chat ((provider llm-claude) prompt)
