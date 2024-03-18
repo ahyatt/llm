@@ -420,32 +420,31 @@
 
 (cl-defmethod plz-media-type-process ((media-type plz-media-type:text/event-stream) process chunk)
   "Process the CHUNK according to MEDIA-TYPE using PROCESS."
-  (when (buffer-live-p (process-buffer process))
-    (with-current-buffer (process-buffer process)
-      (unless plz-event-source--current
-        (let* ((response (make-plz-response
-                          :status (plz-response-status chunk)
-                          :headers (plz-response-headers chunk)))
-               (source (plz-event-source-open
-                        (plz-buffer-event-source
-                         :buffer (buffer-name (process-buffer process))
-                         :handlers (seq-map
-                                    (lambda (pair)
-                                      (let ((type (car pair))
-                                            (handler (cdr pair)))
-                                        (cond
-                                         ((equal "open" type)
-                                          (cons type (lambda (source event)
-                                                       (setf (oref event data) response)
-                                                       (funcall handler source event))))
-                                         ((equal "close" type)
-                                          (cons type (lambda (source event)
-                                                       (setf (oref event data) response)
-                                                       (funcall handler source event))))
-                                         (t pair))))
-                                    (oref media-type events))))))
-          (setq-local plz-event-source--current source)))
-      (plz-event-source-insert plz-event-source--current (plz-response-body chunk)))))
+  (unless plz-event-source--current
+    (let* ((response (make-plz-response
+                      :status (plz-response-status chunk)
+                      :headers (plz-response-headers chunk)))
+           (source (plz-event-source-open
+                    (plz-buffer-event-source
+                     :buffer (buffer-name (process-buffer process))
+                     :handlers (seq-map
+                                (lambda (pair)
+                                  (let ((type (car pair))
+                                        (handler (cdr pair)))
+                                    (cond
+                                     ((equal "open" type)
+                                      (cons type (lambda (source event)
+                                                   (setf (oref event data) response)
+                                                   (funcall handler source event))))
+                                     ((equal "close" type)
+                                      (cons type (lambda (source event)
+                                                   (setf (oref event data) response)
+                                                   (funcall handler source event))))
+                                     (t pair))))
+                                (oref media-type events))))))
+      (setq-local plz-event-source--current source)))
+  (plz-event-source-insert plz-event-source--current (plz-response-body chunk))
+  (set-marker (process-mark process) (point)))
 
 (cl-defmethod plz-media-type-then ((media-type plz-media-type:text/event-stream) response)
   "Transform the RESPONSE into a format suitable for MEDIA-TYPE."
