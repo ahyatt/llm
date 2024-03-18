@@ -258,7 +258,9 @@ PROMPT is the prompt that needs to be updated with the response."
   "Return the text in the partial chat response from RESPONSE.
 RESPONSE can be nil if the response is complete."
   (when response
-    (let* ((delta (assoc-default 'delta (aref (assoc-default 'choices response) 0)))
+    (let* ((choices (assoc-default 'choices response))
+           (delta (when (> (length choices) 0)
+                    (assoc-default 'delta (aref choices 0))))
            (content-or-call (or (assoc-default 'content delta)
                                 (assoc-default 'tool_calls delta))))
       (when content-or-call
@@ -312,7 +314,7 @@ RESPONSE can be nil if the response is complete."
                       buf error-callback 'error data))))
      :on-error (lambda (_ data)
                  (let ((errdata
-                        (cdr (assoc 'error (json-read-from-string data)))))
+                        (cdr (assoc 'error data))))
                    (llm-request-plz-callback-in-buffer
                     buf error-callback 'error
                     (format "Problem calling Open AI: %s message: %s"

@@ -93,7 +93,27 @@ TIMEOUT is the number of seconds to wait for a response."
                                    :data data
                                    :timeout timeout))
 
-(cl-defun llm-request-plz-async (url &key headers data on-success on-success-raw on-error 
+(defun llm-request-plz--handle-error (error on-error)
+  "Handle the ERROR with the ON-ERROR callback.
+
+For HTTP errors, ON-ERROR will be called with the HTTP status
+code and the HTTP body of the error response.
+
+For Curl errors, ON-ERROR will be called with the exit code of
+the curl process and an error message."
+  (cond ((plz-error-response error)
+         (let ((response (plz-error-response error)))
+           (funcall on-error
+                    (plz-response-status response)
+                    (plz-response-body response))))
+        ((plz-error-curl-error error)
+         (let ((curl-error (plz-error-curl-error error)))
+           (funcall on-error
+                    (car curl-error)
+                    (cdr curl-error))))
+        (t (user-error "Unexpected error: %s" error))))
+
+(cl-defun llm-request-plz-async (url &key headers data on-success on-success-raw on-error
                                      on-partial timeout)
   "Make a request to URL.
 Nothing will be returned.
@@ -133,7 +153,7 @@ the buffer is turned into JSON and passed to ON-SUCCESS."
               (funcall on-success (json-read-from-string response))))
     :else (lambda (error)
             (when on-error
-              (funcall on-error error)))
+              (llm-request-plz--handle-error error on-error)))
     :timeout (or timeout llm-request-plz-timeout)))
 
 (cl-defun llm-request-plz-event-stream (url &key headers data on-error on-success
@@ -162,7 +182,7 @@ This is required.
     'post url
     :as `(media-types
           ,(cons
-            (cons "text/event-stream"
+            (cons 'text/event-stream
                   (plz-media-type:text/event-stream
                    ;; Convert so that each event handler gets the body, not the
                    ;; `plz-response' itself.
@@ -182,7 +202,7 @@ This is required.
               (funcall on-success (plz-response-body response))))
     :else (lambda (error)
             (when on-error
-              (funcall on-error error)))
+              (llm-request-plz--handle-error error on-error)))
     :timeout (or timeout llm-request-plz-timeout)))
 
 ;; This is a useful method for getting out of the request buffer when it's time
