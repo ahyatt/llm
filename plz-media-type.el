@@ -35,11 +35,37 @@
 (require 'plz)
 
 (defclass plz-media-type ()
-  ((name
-    :documentation "The name of the media type."
-    :initarg :name
-    :initform "application/octet-stream"
-    :type string)))
+  ((type
+    :documentation "The media type."
+    :initarg :type
+    :type symbol)
+   (subtype
+    :documentation "The media subtype."
+    :initarg :subtype
+    :subtype symbol)
+   (parameters
+    :documentation "The parameters of the media type."
+    :initarg :parameters
+    :initform nil
+    :subtype list)))
+
+(defun plz-media-type-charset (media-type)
+  "Return the character set of the MEDIA-TYPE."
+  (with-slots (parameters) media-type
+    (alist-get "charset" parameters nil nil #'equal)))
+
+(defun plz-media-type-coding-system (media-type)
+  "Return the coding system of the MEDIA-TYPE."
+  (coding-system-from-name (or (plz-media-type-charset media-type) "UTF-8")))
+
+(defun plz-media-type-name (media-type)
+  "Return the name of the MEDIA-TYPE as a string."
+  (with-slots (type subtype) media-type
+    (format "%s/%s" type subtype)))
+
+(defun plz-media-type-symbol (media-type)
+  "Return the name of the MEDIA-TYPE as a symbol."
+  (intern (plz-media-type-name media-type)))
 
 (cl-defgeneric plz-media-type-else (media-type error)
   "Transform the ERROR into a format suitable for MEDIA-TYPE.")
@@ -50,22 +76,43 @@
 (cl-defgeneric plz-media-type-process (media-type process chunk)
   "Process the CHUNK according to MEDIA-TYPE using PROCESS.")
 
+(defun plz-media-type-parse (header)
+  "Parse the Content-Type HEADER.
+
+Return a cons cell where the car is the MIME type, and the cdr is
+an alist of parameters."
+  (unless (or (null header) (string-blank-p header))
+    (let* ((components (split-string header ";"))
+           (mime-type (string-trim (car components)))
+           (parameters-list (cdr components))
+           (parameters-alist '()))
+      (dolist (param parameters-list parameters-alist)
+        (let* ((key-value (split-string param "="))
+               (key (string-trim (car key-value)))
+               (value (string-trim (cadr key-value) "\"")))
+          (setq parameters-alist (cons (cons key value) parameters-alist))))
+      (let ((parts (split-string mime-type "/")))
+        (plz-media-type
+         :type (intern (car parts))
+         :subtype (intern (cadr parts))
+         :parameters (nreverse parameters-alist))))))
+
 (defun plz-media-type--content-type (response)
   "Return the content type header of RESPONSE, or nil if it's not set."
   (let ((headers (plz-response-headers response)))
     (when-let (header (cdr (assoc 'content-type headers)))
-      (replace-regexp-in-string "\s*\\(;.*\\)?" "" header))))
+      (plz-media-type-parse header))))
 
 (defun plz-media--type-find (media-types media-type)
   "Lookup the MEDIA-TYPE in MEDIA-TYPES."
-  (or (alist-get media-type media-types nil nil #'equal)
+  (or (alist-get (plz-media-type-symbol media-type) media-types)
       (alist-get t media-types)
       (plz-media-type:application/octet-stream)))
 
 (defun plz-media-type--of-response (media-types response)
   "Lookup the content type of RESPONSE in MEDIA-TYPES."
   (let ((media-type (plz-media-type--content-type response)))
-    (plz-media--type-find media-types media-type)))
+    (clone (plz-media--type-find media-types media-type))))
 
 (defvar-local plz-media-type--current nil
   "The media type of the process buffer.")
@@ -89,8 +136,10 @@ CHUNK is a part of the HTTP body."
     (with-current-buffer (process-buffer process)
       (let ((moving (= (point) (process-mark process))))
         (if-let (media-type plz-media-type--current)
-            (let ((response plz-media-type--response))
-              (setf (plz-response-body response) chunk)
+            (let ((coding-system (plz-media-type-coding-system media-type))
+                  (response plz-media-type--response))
+              (setf (plz-response-body response)
+                    (decode-coding-string chunk coding-system))
               (plz-media-type-process media-type process response))
           (progn
             (save-excursion
@@ -102,10 +151,13 @@ CHUNK is a part of the HTTP body."
               (let ((body-start (point)))
                 (goto-char (point-min))
                 (let* ((response (prog1 (plz--response) (widen)))
-                       (media-type (plz-media-type--of-response media-types response)))
+                       (media-type (plz-media-type--of-response media-types response))
+                       (coding-system (plz-media-type-coding-system media-type)))
                   (setq-local plz-media-type--current media-type)
                   (when-let (body (plz-response-body response))
                     (when (> (length body) 0)
+                      (setf (plz-response-body response)
+                            (decode-coding-string body coding-system))
                       (delete-region body-start (point-max))
                       (set-marker (process-mark process) (point))
                       (plz-media-type-process media-type process response)))
@@ -117,7 +169,8 @@ CHUNK is a part of the HTTP body."
 ;; Content Type: application/octet-stream
 
 (defclass plz-media-type:application/octet-stream (plz-media-type)
-  ((name :initform "application/octet-stream")))
+  ((type :initform 'application)
+   (subtype :initform 'octet-stream)))
 
 (cl-defmethod plz-media-type-else ((media-type plz-media-type:application/octet-stream) error)
   "Transform the ERROR into a format suitable for MEDIA-TYPE."
@@ -142,8 +195,7 @@ CHUNK is a part of the HTTP body."
 ;; Content Type: application/json
 
 (defclass plz-media-type:application/json (plz-media-type:application/octet-stream)
-  ((name
-    :initform "application/json")
+  ((subtype :initform 'json)
    (array-type
     :documentation "Specifies which Lisp type is used to represent arrays.  It can be
 `array' (the default) or `list'."
@@ -231,7 +283,7 @@ be `hash-table', `alist' (the default) or `plist'."
 ;; Content Type: application/x-ndjson
 
 (defclass plz-media-type:application/x-ndjson (plz-media-type:application/json)
-  ((name :initform "application/x-ndjson")
+  ((subtype :initform 'x-ndjson)
    (handler
     :documentation "A function that will be called for each line that contains a JSON object."
     :initarg :handler
@@ -274,7 +326,7 @@ be `hash-table', `alist' (the default) or `plist'."
 ;; Content Type: application/xml
 
 (defclass plz-media-type:application/xml (plz-media-type:application/octet-stream)
-  ((name :initform "application/xml")))
+  ((subtype :initform 'xml)))
 
 (cl-defmethod plz-media-type-then ((media-type plz-media-type:application/xml) response)
   "Transform the RESPONSE into a format suitable for MEDIA-TYPE."
@@ -285,13 +337,14 @@ be `hash-table', `alist' (the default) or `plist'."
 ;; Content Type: text/html
 
 (defclass plz-media-type:text/html (plz-media-type:application/xml)
-  ((name :initform "text/html")))
+  ((type :initform 'text)
+   (subtype :initform 'xml)))
 
 (defvar plz-media-types
-  `(("application/json" . ,(plz-media-type:application/json))
-    ("application/octet-stream" . ,(plz-media-type:application/octet-stream))
-    ("application/xml" . ,(plz-media-type:application/xml))
-    ("text/html" . ,(plz-media-type:text/html))
+  `((application/json . ,(plz-media-type:application/json))
+    (application/octet-stream . ,(plz-media-type:application/octet-stream))
+    (application/xml . ,(plz-media-type:application/xml))
+    (text/html . ,(plz-media-type:text/html))
     (t . ,(plz-media-type:application/octet-stream)))
   "Alist from media type to content type.")
 

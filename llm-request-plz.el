@@ -182,7 +182,7 @@ This is required.
     'post url
     :as `(media-types
           ,(cons
-            (cons "text/event-stream"
+            (cons 'text/event-stream
                   (plz-media-type:text/event-stream
                    ;; Convert so that each event handler gets the body, not the
                    ;; `plz-response' itself.

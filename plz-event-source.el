@@ -371,7 +371,7 @@
   "Return the media types of the event SOURCE."
   (with-slots (handlers) source
     (let ((media-type (plz-media-type:text/event-stream :events handlers)))
-      (cons (cons "text/event-stream" media-type) plz-media-types))))
+      (cons (cons 'text/event-stream media-type) plz-media-types))))
 
 (cl-defmethod plz-event-source-open ((source plz-http-event-source))
   "Open a connection to the URL of the event SOURCE."
@@ -401,7 +401,8 @@
 ;; Content Type: text/event-stream
 
 (defclass plz-media-type:text/event-stream (plz-media-type:application/octet-stream)
-  ((name :initform "text/event-stream")
+  ((type :initform 'text)
+   (subtype :initform 'event-stream)
    (events :documentation "Association list from event type to handler."
            :initarg :events
            :initform nil
