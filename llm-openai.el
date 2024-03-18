@@ -314,7 +314,7 @@ RESPONSE can be nil if the response is complete."
                       buf error-callback 'error data))))
      :on-error (lambda (_ data)
                  (let ((errdata
-                        (cdr (assoc 'error (json-read-from-string data)))))
+                        (cdr (assoc 'error data))))
                    (llm-request-plz-callback-in-buffer
                     buf error-callback 'error
                     (format "Problem calling Open AI: %s message: %s"
