@@ -132,7 +132,7 @@
       :interactions (list
                      (make-llm-chat-prompt-interaction
                       :role 'user
-                      :content "Write a medium length poem in iambic pentameter about the pleasures of using Emacs.  The poem should make snide references to vi."))
+                      :content "Write a long story about a magic backpack."))
       :temperature 0.5)
      (lambda (text)
        (unless (eq buf (current-buffer))

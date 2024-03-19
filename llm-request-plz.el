@@ -113,8 +113,8 @@ the curl process and an error message."
                     (cdr curl-error))))
         (t (user-error "Unexpected error: %s" error))))
 
-(cl-defun llm-request-plz-async (url &key headers data on-success on-success-raw on-error
-                                     on-partial timeout)
+(cl-defun llm-request-plz-async (url &key headers data on-success on-success-raw media-type
+                                     on-error timeout)
   "Make a request to URL.
 Nothing will be returned.
 
@@ -131,8 +131,9 @@ and required otherwise.
 ON-ERROR will be called with the error code and a response-body.
 This is required.
 
-ON-PARTIAL will be called with the potentially incomplete response
-body as a string.  This is an optional argument.
+MEDIA-TYPE is an optional argument that sets a media type, useful
+for streaming formats.  It is expected that this is only used by
+other methods in this file.
 
 ON-SUCCESS-RAW, if set, will be called in the buffer with the
 response body, and expect the response content. This is an
@@ -140,12 +141,13 @@ optional argument, and mostly useful for streaming.  If not set,
 the buffer is turned into JSON and passed to ON-SUCCESS."
   (plz-media-type-request
     'post url
-    :as 'string
+    :as (if media-type
+            `(media-types ,(cons media-type plz-media-types))
+            'string)
     :body (when data
             (encode-coding-string (json-encode data) 'utf-8))
     :headers (append headers
-                     '(("Accept-encoding" . "identity")
-                       ("Content-Type" . "application/json")))
+                     '(("Content-Type" . "application/json")))
     :then (lambda (response)
             (when on-success-raw
               (funcall on-success-raw response))
@@ -155,6 +157,41 @@ the buffer is turned into JSON and passed to ON-SUCCESS."
             (when on-error
               (llm-request-plz--handle-error error on-error)))
     :timeout (or timeout llm-request-plz-timeout)))
+
+(cl-defun llm-request-plz-json-array (url &key headers data on-error on-success
+                                          on-element timeout)
+  "Make a request to URL.
+
+HEADERS will be added in the Authorization header, in addition to
+standard json header. This is optional.
+
+DATA will be jsonified and sent as the request body.
+This is required.
+
+ON-SUCCESS will be called with the response body as a json
+object. This is optional in the case that ON-SUCCESS-DATA is set,
+and required otherwise.
+
+ON-ELEMENT will be called with each new element in the enclosing
+JSON array that is being streamed.
+
+ON-ERROR will be called with the error code and a response-body.
+This is required.
+"
+  (llm-request-plz-async url
+                         :headers headers
+                         :data data
+                         :on-error on-error
+                         ;; Have to use :on-success-raw because :on-success will try to
+                         ;; convert to JSON, and this already should be JSON.
+                         :on-success-raw (lambda (resp)
+                                           (funcall on-success (plz-response-body resp)))
+                         :timeout timeout
+                         :media-type
+                         (cons 'application/json-array
+                               (plz-media-type:application/json-array
+                                :handler (lambda (resp)
+                                           (funcall on-element (plz-response-body resp)))))))
 
 (cl-defun llm-request-plz-event-stream (url &key headers data on-error on-success
                                             event-stream-handlers timeout)
@@ -178,32 +215,22 @@ with the new event data as a string.
 ON-ERROR will be called with the error code and a response-body.
 This is required.
 "
-  (plz-media-type-request
-    'post url
-    :as `(media-types
-          ,(cons
-            (cons 'text/event-stream
-                  (plz-media-type:text/event-stream
-                   ;; Convert so that each event handler gets the body, not the
-                   ;; `plz-response' itself.
-                   :events (mapcar
-                            (lambda (cons)
-                              (cons (car cons)
-                                    (lambda (_ resp) (funcall (cdr cons) (plz-event-source-event-data resp)))))
-                            event-stream-handlers)))
-            plz-media-types))
-    :body (when data
-            (encode-coding-string (json-encode data) 'utf-8))
-    :headers (append headers
-                     '(("Accept-encoding" . "identity")
-                       ("Content-Type" . "application/json")))
-    :then (lambda (response)
-            (when on-success
-              (funcall on-success (plz-response-body response))))
-    :else (lambda (error)
-            (when on-error
-              (llm-request-plz--handle-error error on-error)))
-    :timeout (or timeout llm-request-plz-timeout)))
+  (llm-request-plz-async url
+                         :headers headers
+                         :data data
+                         :on-error on-error
+                         :on-success on-success
+                         :timeout timeout
+                         :media-type
+                         (cons 'text/event-stream
+                                (plz-media-type:text/event-stream
+                                 ;; Convert so that each event handler gets the body, not the
+                                 ;; `plz-response' itself.
+                                 :events (mapcar
+                                          (lambda (cons)
+                                            (cons (car cons)
+                                                  (lambda (_ resp) (funcall (cdr cons) (plz-event-source-event-data resp)))))
+                                          event-stream-handlers)))))
 
 ;; This is a useful method for getting out of the request buffer when it's time
 ;; to make callbacks.

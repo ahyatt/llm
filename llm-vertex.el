@@ -171,19 +171,6 @@ This handles different kinds of models."
                    ""))
              "NOTE: No response was sent back by the LLM, the prompt may have violated safety checks."))))
 
-(defun llm-vertex--get-partial-chat-response (response)
-  "Return the partial response from as much of RESPONSE as we can parse."
-  (with-temp-buffer
-    (insert response)
-    (let ((result ""))
-      ;; We just will parse every line that is "text": "..." and concatenate them.   
-      (save-excursion
-        (goto-char (point-min))
-        (while (re-search-forward (rx (seq (literal "\"text\": ")
-                                           (group-n 1 ?\" (* any) ?\") line-end)) nil t)
-          (setq result (concat result (json-read-from-string (match-string 1))))))
-      result)))
-
 (defun llm-vertex--chat-request (prompt)
   "Return an alist with chat input for the streaming API.
 PROMPT contains the input to the call to the chat API."
@@ -284,7 +271,7 @@ ERROR-CALLBACK is called when an error is detected."
          (llm-provider-utils-process-result
           provider prompt
           (llm-vertex--normalize-function-calls
-           (llm-vertex--get-chat-response response)))))
+           (if (stringp response) response (llm-vertex--get-chat-response response))))))
     return-val))
 
 (defun llm-vertex--chat-url (provider &optional streaming)
@@ -324,22 +311,25 @@ If STREAMING is non-nil, use the URL for the streaming API."
 
 (cl-defmethod llm-chat-streaming ((provider llm-vertex) prompt partial-callback response-callback error-callback)
   (llm-vertex-refresh-key provider)
-  (let ((buf (current-buffer)))
-    (llm-request-async (llm-vertex--chat-url provider)
-                     :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
-                     :data (llm-vertex--chat-request prompt)
-                     :on-partial (lambda (partial)
-                                   (when-let ((response (llm-vertex--get-partial-chat-response partial)))
-                                     (when (> (length response) 0)
-                                       (llm-request-callback-in-buffer buf partial-callback response))))
-                     :on-success (lambda (data)
-                                   (llm-request-callback-in-buffer
-                                    buf response-callback
-                                    (llm-vertex--process-and-return
-                                     provider prompt data)))
-                     :on-error (lambda (_ data)
-                                 (llm-request-callback-in-buffer buf error-callback 'error
-                                                                 (llm-vertex--error-message data))))))
+  (let ((buf (current-buffer))
+        (streamed-text ""))
+    (llm-request-plz-json-array
+     (llm-vertex--chat-url provider)
+     :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
+     :data (llm-vertex--chat-request prompt)
+     :on-element (lambda (element)
+                   (when-let ((response (llm-vertex--get-chat-response element)))
+                     (when (> (length response) 0)
+                       (setq streamed-text (concat streamed-text response))
+                       (llm-request-callback-in-buffer buf partial-callback response))))
+     :on-success (lambda (data)
+                   (llm-request-callback-in-buffer
+                    buf response-callback
+                    (llm-vertex--process-and-return
+                     provider prompt (if (> (length streamed-text) 0) streamed-text data))))
+     :on-error (lambda (_ data)
+                 (llm-request-callback-in-buffer buf error-callback 'error
+                                                 (llm-vertex--error-message data))))))
 
 ;; Token counts
 ;; https://cloud.google.com/vertex-ai/docs/generative-ai/get-token-count

@@ -121,21 +121,24 @@ If STREAMING-P is non-nil, use the streaming endpoint."
                                                                        (llm-vertex--error-message data))))))
 
 (cl-defmethod llm-chat-streaming ((provider llm-gemini) prompt partial-callback response-callback error-callback)
-  (let ((buf (current-buffer)))
-    (llm-request-plz-async (llm-gemini--chat-url provider t)
-                           :data (llm-gemini--chat-request prompt)
-                           :on-partial (lambda (partial)
-                                         (when-let ((response (llm-vertex--get-partial-chat-response partial)))
-                                           (when (> (length response) 0)
-                                             (llm-request-callback-in-buffer buf partial-callback response))))
-                           :on-success (lambda (data)
-                                         (llm-request-callback-in-buffer
-                                          buf response-callback
-                                          (llm-vertex--process-and-return
-                                           provider prompt data)))
-                           :on-error (lambda (_ data)
-                                       (llm-request-callback-in-buffer buf error-callback 'error
-                                                                       (llm-vertex--error-message data))))))
+  (let ((buf (current-buffer))
+        (streamed-text ""))
+    (llm-request-plz-json-array
+     (llm-gemini--chat-url provider t)
+     :data (llm-gemini--chat-request prompt)
+     :on-element (lambda (element)
+                   (when-let ((response (llm-vertex--get-chat-response element)))
+                     (when (> (length response) 0)
+                       (setq streamed-text (concat streamed-text response))
+                       (llm-request-callback-in-buffer buf partial-callback response))))
+     :on-success (lambda (data)
+                   (llm-request-callback-in-buffer
+                    buf response-callback
+                    (llm-vertex--process-and-return
+                     provider prompt (if (> (length streamed-text) 0) streamed-text data))))
+     :on-error (lambda (_ data)
+                 (llm-request-callback-in-buffer buf error-callback 'error
+                                                 (llm-vertex--error-message data))))))
 
 (defun llm-gemini--count-token-url (provider)
   "Return the URL for the count token call, using PROVIDER."
