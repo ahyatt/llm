@@ -193,6 +193,41 @@ This is required.
                                 :handler (lambda (resp)
                                            (funcall on-element (plz-response-body resp)))))))
 
+(cl-defun llm-request-plz-ndjson (url &key headers data on-error on-success
+                                      on-object timeout)
+  "Make a request to URL.
+
+HEADERS will be added in the Authorization header, in addition to
+standard json header. This is optional.
+
+DATA will be jsonified and sent as the request body.
+This is required.
+
+ON-SUCCESS will be called with the response body as a json
+object. This is optional in the case that ON-SUCCESS-DATA is set,
+and required otherwise.
+
+ON-OBJECT will be called with each new object received.
+
+ON-ERROR will be called with the error code and a response-body.
+This is required.
+"
+  (llm-request-plz-async url
+                         :headers headers
+                         :data data
+                         :on-error on-error
+                         ;; Have to use :on-success-raw because :on-success will try to
+                         ;; convert to JSON, and this already should be JSON.
+                         :on-success-raw (lambda (resp)
+                                           (funcall on-success (plz-response-body resp)))
+                         :timeout timeout
+                         :media-type
+                         (cons 'application/x-ndjson
+                               (plz-media-type:application/x-ndjson
+                                :handler (lambda (resp)
+                                           ;; I'd expect RESP to a plz response object
+                                           (funcall on-object resp))))))
+
 (cl-defun llm-request-plz-event-stream (url &key headers data on-error on-success
                                             event-stream-handlers timeout)
   "Make a request to URL.

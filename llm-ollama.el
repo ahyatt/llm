@@ -27,7 +27,7 @@
 
 (require 'cl-lib)
 (require 'llm)
-(require 'llm-request)
+(require 'llm-request-plz)
 (require 'llm-provider-utils)
 (require 'json)
 
@@ -84,25 +84,26 @@ PROVIDER is the llm-ollama provider."
 
 (cl-defmethod llm-embedding-async ((provider llm-ollama) string vector-callback error-callback)
   (let ((buf (current-buffer)))
-    (llm-request-async (llm-ollama--url provider "embeddings")
-                     :data (llm-ollama--embedding-request provider string)
-                     :on-success (lambda (data)
-                                   (llm-request-callback-in-buffer
-                                    buf vector-callback (llm-ollama--embedding-extract-response data)))
-                     :on-error (lambda (_ _)
-                                 ;; The problem with ollama is that it doesn't
-                                 ;; seem to have an error response.
-                                 (llm-request-callback-in-buffer
-                                  buf error-callback 'error "Unknown error calling ollama")))))
+    (llm-request-plz-async (llm-ollama--url provider "embeddings")
+                           :data (llm-ollama--embedding-request provider string)
+                           :on-success (lambda (data)
+                                         (llm-request-callback-in-buffer
+                                          buf vector-callback (llm-ollama--embedding-extract-response data)))
+                           :on-error (lambda (_ _)
+                                       ;; The problem with ollama is that it doesn't
+                                       ;; seem to have an error response.
+                                       (llm-request-callback-in-buffer
+                                        buf error-callback 'error "Unknown error calling ollama")))))
 
 (cl-defmethod llm-embedding ((provider llm-ollama) string)
   (llm-ollama--embedding-extract-response
-   (llm-request-sync (format "http://localhost:%d/api/embeddings" (or (llm-ollama-port provider) 11434))
-                     :data (llm-ollama--embedding-request provider string))))
+   (llm-request-plz-sync (format "http://localhost:%d/api/embeddings" (or (llm-ollama-port provider) 11434))
+                         :data (llm-ollama--embedding-request provider string))))
 
-(defun llm-ollama--chat-request (provider prompt)
+(defun llm-ollama--chat-request (provider prompt streaming)
   "From PROMPT, create the chat request data to send.
-PROVIDER is the llm-ollama provider to use."
+PROVIDER is the llm-ollama provider to use.
+STREAMING is a boolean to control whether to stream the response."
   (let (request-alist messages options)
     (setq messages
           (mapcar (lambda (interaction)
@@ -115,6 +116,7 @@ PROVIDER is the llm-ollama provider to use."
             messages))
     (push `("messages" . ,messages) request-alist)
     (push `("model" . ,(llm-ollama-chat-model provider)) request-alist)
+    (push `("stream" . ,(if streaming t :json-false)) request-alist)
     (when (llm-chat-prompt-temperature prompt)
       (push `("temperature" . ,(llm-chat-prompt-temperature prompt)) options))
     (when (llm-chat-prompt-max-tokens prompt)
@@ -122,88 +124,55 @@ PROVIDER is the llm-ollama provider to use."
     (when options (push `("options" . ,options) request-alist))
     request-alist))
 
-(defvar-local llm-ollama-current-response ""
-  "The response so far from the server.")
-
-(defvar-local llm-ollama-last-response 0
-  "The last response number we've read.")
-
-(defun llm-ollama--get-partial-chat-response (response)
-  "Return the text in the partial chat response from RESPONSE."
-  ;; To begin with, we should still be in the buffer with the actual response.
-  (let ((current-response llm-ollama-current-response)
-        (last-response llm-ollama-last-response))
-    (with-temp-buffer
-      (insert response)
-      ;; Responses in ollama are always one per line.
-      (let* ((end-pos (save-excursion (goto-char (point-max))
-                                      (when (search-backward-regexp
-                                             (rx (seq "done\":false}" line-end))
-                                             nil t)
-                                        (line-end-position)))))
-        (when end-pos
-          (let ((all-lines (seq-filter
-                            (lambda (line) (string-match-p (rx (seq string-start ?{)) line))
-                            (split-string (buffer-substring-no-properties 1 end-pos) "\n" t))))
-            (setq
-             current-response
-             (concat current-response
-                     (mapconcat
-                      (lambda (line) (assoc-default 'content (assoc-default 'message (json-read-from-string line))))
-                      ;; Take from response output last-response to the end. This
-                      ;; counts only valid responses, so we need to throw out all
-                      ;; other lines that aren't valid JSON.
-                      (seq-subseq all-lines last-response) "")))
-            (setq last-response (length all-lines))))))
-    ;; If there is no new content, don't manipulate anything.
-    (when (> (length current-response) (length llm-ollama-current-response))
-      (setq llm-ollama-last-response last-response)
-      (setq llm-ollama-current-response current-response))
-    current-response))
-
-(defun llm-ollama--get-final-response (response)
-  "Return the final post-streaming json output from RESPONSE."
-  (with-temp-buffer
-    (insert response)
-    ;; Find the last json object in the buffer.
-    (goto-char (point-max))
-    (search-backward "{" nil t)
-    (json-read)))
+(defun llm-ollama--get-response (response)
+  "Return the response from the parsed json RESPONSE."
+  (assoc-default 'content (assoc-default 'message response)))
 
 (cl-defmethod llm-chat ((provider llm-ollama) prompt)
   ;; We expect to be in a new buffer with the response, which we use to store
   ;; local variables. The temp buffer won't have the response, but that's fine,
   ;; we really just need it for the local variables.
   (with-temp-buffer
-    (let ((output (llm-request-sync-raw-output 
-                   (llm-ollama--url provider "chat")
-                   :data (llm-ollama--chat-request provider prompt)
-                   ;; ollama is run on a user's machine, and it can take a while.
-                   :timeout llm-ollama-chat-timeout)))
-      (setf (llm-chat-prompt-interactions prompt)
-	        (append (llm-chat-prompt-interactions prompt)
-                    (list (make-llm-chat-prompt-interaction
-                           :role 'assistant
-                           :content (assoc-default 'context (llm-ollama--get-final-response output))))))
-      (llm-ollama--get-partial-chat-response output))))
+    (let ((output (llm-ollama--get-response
+                   (llm-request-plz-sync-raw-output 
+                    (llm-ollama--url provider "chat")
+                    :data (llm-ollama--chat-request provider prompt nil)
+                    ;; ollama is run on a user's machine, and it can take a while.
+                    :timeout llm-ollama-chat-timeout))))
+      (llm-provider-utils-append-to-prompt prompt output)
+      output)))
+
+(cl-defmethod llm-chat-async ((provider llm-ollama) prompt response-callback error-callback)
+  (let ((buf (current-buffer)))
+    (llm-request-plz-async (llm-ollama--url provider "chat")
+      :data (llm-ollama--chat-request provider prompt nil)
+      :timeout llm-ollama-chat-timeout
+      :on-success (lambda (data)
+                    (let ((output (llm-ollama--get-response data)))
+                      (llm-provider-utils-append-to-prompt prompt data)
+                      (llm-request-plz-callback-in-buffer buf response-callback output)))
+      :on-error (lambda (_ data)
+                  (let ((errdata (cdr (assoc 'error data))))
+                    (llm-request-plz-callback-in-buffer buf error-callback 'error
+                             (format "Problem calling Ollama: %s message: %s"
+                                     (cdr (assoc 'type errdata))
+                                     (cdr (assoc 'message errdata)))))))))
 
 (cl-defmethod llm-chat-streaming ((provider llm-ollama) prompt partial-callback response-callback error-callback)
-  (let ((buf (current-buffer)))
-    (llm-request-async (llm-ollama--url provider "chat")
-      :data (llm-ollama--chat-request provider prompt)
-      :on-success-raw (lambda (response)
-                        (setf (llm-chat-prompt-interactions prompt)
-                              (append (llm-chat-prompt-interactions prompt)
-                                      (list
-                                       (make-llm-chat-prompt-interaction
-                                        :role 'assistant
-                                        :content (llm-ollama--get-partial-chat-response response)))))
-                        (llm-request-callback-in-buffer
-                         buf response-callback
-                         (llm-ollama--get-partial-chat-response response)))
-      :on-partial (lambda (data)
-                    (when-let ((response (llm-ollama--get-partial-chat-response data)))
-                      (llm-request-callback-in-buffer buf partial-callback response)))
+  (let ((buf (current-buffer))
+        (response-text ""))
+    (llm-request-plz-ndjson
+     (llm-ollama--url provider "chat")
+      :data (llm-ollama--chat-request provider prompt t)
+      :on-success (lambda (response)
+                    (llm-provider-utils-append-to-prompt prompt response-text)
+                    (llm-request-callback-in-buffer
+                     buf response-callback
+                     response-text))
+      :on-object (lambda (data)
+                   (when-let ((response (llm-ollama--get-response data)))
+                     (setq response-text (concat response-text response))
+                     (llm-request-callback-in-buffer buf partial-callback response-text)))
       :on-error (lambda (_ _)
                   ;; The problem with ollama is that it doesn't
                   ;; seem to have an error response.
