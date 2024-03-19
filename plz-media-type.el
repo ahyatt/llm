@@ -76,6 +76,10 @@
 (cl-defgeneric plz-media-type-process (media-type process chunk)
   "Process the CHUNK according to MEDIA-TYPE using PROCESS.")
 
+(cl-defmethod plz-media-type-else ((_ (eql nil)) error)
+  "Transform the ERROR into a format suitable for MEDIA-TYPE."
+  error)
+
 (defun plz-media-type-parse (header)
   "Parse the Content-Type HEADER.
 
@@ -348,19 +352,27 @@ be `hash-table', `alist' (the default) or `plist'."
     (t . ,(plz-media-type:application/octet-stream)))
   "Alist from media type to content type.")
 
-(defun plz-media-type--handle-sync-error (media-types error)
-  "Handle the synchronous ERROR of type `plz-http-error' with MEDIA-TYPES."
+(defun plz-media-type--handle-sync-http-error (error media-types)
+  "Handle the synchronous HTTP ERROR using MEDIA-TYPES."
   (let* ((msg (cadr error))
          (plzerror (caddr error)))
     (signal (car error)
-            (let ((response (plz-error-response plzerror)))
-              (if-let (media-type (plz-media-type--of-response media-types response))
-                  (list msg (with-temp-buffer
-                              (when-let (body (plz-response-body response))
-                                (insert body)
-                                (goto-char (point-min)))
-                              (plz-media-type-else media-type plzerror)))
-                (cdr error))))))
+            (cond
+             ((plz-error-response plzerror)
+              (let ((response (plz-error-response plzerror)))
+                (if-let (media-type (plz-media-type--of-response media-types response))
+                    (list msg (with-temp-buffer
+                                (when-let (body (plz-response-body response))
+                                  (insert body)
+                                  (goto-char (point-min)))
+                                (plz-media-type-else media-type plzerror)))
+                  (cdr error))))))))
+
+(defun plz-media-type--handle-sync-error (error media-types)
+  "Handle the synchronous ERROR using MEDIA-TYPES."
+  (if (eq 'plz-http-error (car error))
+      (plz-media-type--handle-sync-http-error error media-types)
+    (signal (car error) (cdr error))))
 
 (cl-defun plz-media-type-request
     (method
@@ -498,7 +510,7 @@ not.
                   ((processp result)
                    result)
                   (t (user-error "Unexpected response: %s" result))))
-        (plz-error (plz-media-type--handle-sync-error media-types error)))
+        (plz-error (plz-media-type--handle-sync-error error media-types)))
     (apply #'plz (append (list method url) rest))))
 
 ;;;; Footer

@@ -119,19 +119,19 @@ STREAM is a boolean indicating whether the response should be streamed."
      ;; We ignore many types of messages; these might become important if Claude
      ;; sends a few different alternate contents, but for now they don't do
      ;; that.
-     `(("message_start" . ,(lambda (_)))
-       ("content_block_start" . ,(lambda (_)))
-       ("ping" . ,(lambda (_)))
-       ("message_stop" . ,(lambda (_)))
-       ("content_block_stop" . ,(lambda (_)))
-       ("content_block_delta" .
+     `((message_start . ,(lambda (_)))
+       (content_block_start . ,(lambda (_)))
+       (ping . ,(lambda (_)))
+       (message_stop . ,(lambda (_)))
+       (content_block_stop . ,(lambda (_)))
+       (content_block_delta .
         ,(lambda (data)
            (setq in-flight-message
                  (concat in-flight-message
                          (let* ((json (json-parse-string data :object-type 'alist))
                                 (delta (assoc-default 'delta json))
                                 (type (assoc-default 'type delta)))
-                           (when (equal type "text_delta")
+                           (when (eql type 'text_delta)
                              (assoc-default 'text delta)))))
            (llm-request-plz-callback-in-buffer
             buf

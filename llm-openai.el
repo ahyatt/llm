@@ -303,13 +303,13 @@ RESPONSE can be nil if the response is complete."
      :headers (llm-openai--headers provider)
      :data (llm-openai--chat-request (llm-openai-chat-model provider) prompt t)
      :event-stream-handlers
-     `(("message" . ,(lambda (data)
+     `((message . ,(lambda (data)
                        (when (not (equal data "[DONE]"))
                          (when-let ((response (llm-openai--get-partial-chat-response
                                                (json-read-from-string data))))
                            (when (stringp response)
                              (llm-request-plz-callback-in-buffer buf partial-callback response))))))
-       ("error" . ,(lambda (data)
+       (error . ,(lambda (data)
                      (llm-request-plz-callback-in-buffer
                       buf error-callback 'error data))))
      :on-error (lambda (_ data)
