@@ -33,7 +33,6 @@
 
 (require 'cl-lib)
 (require 'eieio)
-(require 'pcase)
 (require 'plz)
 (require 'plz-media-type)
 (require 'rx)
@@ -61,9 +60,9 @@
    (type
     :accessor plz-event-source-event-type
     :initarg :type
-    :initform "message"
+    :initform 'message
     :documentation "The event type."
-    :type string))
+    :type symbol))
   "The server sent event class.")
 
 ;; Parser
@@ -145,8 +144,8 @@
                                        last-event-id)
                       :origin (buffer-name)
                       :type (if (string-blank-p event-type-buffer)
-                                "message"
-                              event-type-buffer))))
+                                'message
+                              (intern event-type-buffer)))))
           (setf data-buffer ""
                 event-type-buffer "")
           (setf events (cons event events))
@@ -339,7 +338,7 @@
   "Open a connection to the URL of the event SOURCE."
   (with-slots (buffer errors options ready-state parser) source
     (with-current-buffer (get-buffer-create buffer)
-      (let ((event (plz-event-source-event :type "open")))
+      (let ((event (plz-event-source-event :type 'open)))
         (setf ready-state 'connecting)
         (setf parser (plz-event-source-parser
                       :buffer buffer
@@ -351,7 +350,7 @@
 (cl-defmethod plz-event-source-close ((source plz-buffer-event-source))
   "Close the connection of the event SOURCE."
   (with-slots (buffer ready-state) source
-    (let ((event (plz-event-source-event :type "close")))
+    (let ((event (plz-event-source-event :type 'close)))
       (setf ready-state 'closed)
       (plz-event-source-dispatch-event source event)
       source)))
@@ -414,7 +413,7 @@
 (cl-defmethod plz-media-type-else ((_ plz-media-type:text/event-stream) error)
   "Transform the ERROR into a format suitable for MEDIA-TYPE."
   (let* ((source plz-event-source--current)
-         (event (plz-event-source-event :type "error" :data error)))
+         (event (plz-event-source-event :type 'error :data error)))
     (plz-event-source-close source)
     (plz-event-source-dispatch-event source event)
     error))
@@ -433,11 +432,11 @@
                                   (let ((type (car pair))
                                         (handler (cdr pair)))
                                     (cond
-                                     ((equal "open" type)
+                                     ((equal 'open type)
                                       (cons type (lambda (source event)
                                                    (setf (oref event data) response)
                                                    (funcall handler source event))))
-                                     ((equal "close" type)
+                                     ((equal 'close type)
                                       (cons type (lambda (source event)
                                                    (setf (oref event data) response)
                                                    (funcall handler source event))))
