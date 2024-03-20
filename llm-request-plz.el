@@ -184,14 +184,12 @@ This is required.
                          :on-error on-error
                          ;; Have to use :on-success-raw because :on-success will try to
                          ;; convert to JSON, and this already should be JSON.
-                         :on-success-raw (lambda (resp)
-                                           (funcall on-success (plz-response-body resp)))
+                         :on-success-raw on-success
                          :timeout timeout
                          :media-type
-                         (cons 'application/json-array
+                         (cons 'application/json
                                (plz-media-type:application/json-array
-                                :handler (lambda (resp)
-                                           (funcall on-element (plz-response-body resp)))))))
+                                :handler on-element))))
 
 (cl-defun llm-request-plz-ndjson (url &key headers data on-error on-success
                                       on-object timeout)
@@ -224,9 +222,7 @@ This is required.
                          :media-type
                          (cons 'application/x-ndjson
                                (plz-media-type:application/x-ndjson
-                                :handler (lambda (resp)
-                                           ;; I'd expect RESP to a plz response object
-                                           (funcall on-object resp))))))
+                                :handler on-object))))
 
 (cl-defun llm-request-plz-event-stream (url &key headers data on-error on-success
                                             event-stream-handlers timeout)

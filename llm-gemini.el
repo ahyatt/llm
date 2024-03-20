@@ -130,12 +130,12 @@ If STREAMING-P is non-nil, use the streaming endpoint."
                    (when-let ((response (llm-vertex--get-chat-response element)))
                      (when (> (length response) 0)
                        (setq streamed-text (concat streamed-text response))
-                       (llm-request-callback-in-buffer buf partial-callback response))))
+                       (llm-request-callback-in-buffer buf partial-callback streamed-text))))
      :on-success (lambda (data)
                    (llm-request-callback-in-buffer
                     buf response-callback
                     (llm-vertex--process-and-return
-                     provider prompt (if (> (length streamed-text) 0) streamed-text data))))
+                     provider prompt streamed-text)))
      :on-error (lambda (_ data)
                  (llm-request-callback-in-buffer buf error-callback 'error
                                                  (llm-vertex--error-message data))))))
