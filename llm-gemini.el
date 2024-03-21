@@ -103,8 +103,9 @@ If STREAMING-P is non-nil, use the streaming endpoint."
 (cl-defmethod llm-chat ((provider llm-gemini) prompt)
   (llm-vertex--process-and-return
    provider prompt
-   (llm-request-plz-sync (llm-gemini--chat-url provider nil)
-                         :data (llm-gemini--chat-request prompt))))
+   (llm-vertex--get-chat-response
+    (llm-request-plz-sync (llm-gemini--chat-url provider nil)
+                          :data (llm-gemini--chat-request prompt)))))
 
 (cl-defmethod llm-chat-async ((provider llm-gemini) prompt response-callback error-callback)
   (let ((buf (current-buffer)))
@@ -115,27 +116,33 @@ If STREAMING-P is non-nil, use the streaming endpoint."
                                           buf response-callback
                                           (llm-vertex--process-and-return
                                            provider prompt
-                                           data)))
+                                           (llm-vertex--get-chat-response data))))
                            :on-error (lambda (_ data)
                                        (llm-request-callback-in-buffer buf error-callback 'error
                                                                        (llm-vertex--error-message data))))))
 
 (cl-defmethod llm-chat-streaming ((provider llm-gemini) prompt partial-callback response-callback error-callback)
   (let ((buf (current-buffer))
-        (streamed-text ""))
+        (streamed-text "")
+        (function-call nil))
     (llm-request-plz-json-array
      (llm-gemini--chat-url provider t)
      :data (llm-gemini--chat-request prompt)
      :on-element (lambda (element)
                    (when-let ((response (llm-vertex--get-chat-response element)))
-                     (when (> (length response) 0)
-                       (setq streamed-text (concat streamed-text response))
-                       (llm-request-callback-in-buffer buf partial-callback streamed-text))))
+                     (if (stringp response)
+                         (when (> (length response) 0)
+                           (setq streamed-text (concat streamed-text response))
+                           (llm-request-callback-in-buffer buf partial-callback streamed-text))
+                       (setq function-call response))))
      :on-success (lambda (data)
                    (llm-request-callback-in-buffer
                     buf response-callback
                     (llm-vertex--process-and-return
-                     provider prompt streamed-text)))
+                     provider prompt (or function-call
+                                         (if (> (length streamed-text) 0)
+                                             streamed-text
+                                           (llm-vertex--get-chat-response data))))))
      :on-error (lambda (_ data)
                  (llm-request-callback-in-buffer buf error-callback 'error
                                                  (llm-vertex--error-message data))))))
