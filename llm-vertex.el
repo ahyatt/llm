@@ -316,7 +316,7 @@ If STREAMING is non-nil, use the URL for the streaming API."
         (streamed-text "")
         (function-call nil))
     (llm-request-plz-json-array
-     (llm-vertex--chat-url provider)
+     (llm-vertex--chat-url provider t)
      :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
      :data (llm-vertex--chat-request prompt)
      :on-element (lambda (element)
