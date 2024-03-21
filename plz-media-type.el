@@ -246,17 +246,33 @@ be `hash-table', `alist' (the default) or `plist'."
 
 (defun plz-media-type:application/json-array--parse-next (media-type)
   "Parse a single line of the newline delimited JSON MEDIA-TYPE."
-  (cond ((looking-at "\\[")
-         (delete-char 1))
-        ((looking-at "[ ,\n\r]")
-         (delete-char 1))
-        ((looking-at "\\]")
-         (delete-char 1))
-        ((not (eobp))
-         (ignore-errors
-           (let ((begin (point)))
-             (prog1 (plz-media-type--parse-json-object media-type)
-               (delete-region begin (point))))))))
+  (let ((begin (point)))
+    (cond ((looking-at "\\[")
+           (forward-char 1)
+           (cons :array-start (buffer-substring begin (point))))
+          ((looking-at ",")
+           (forward-char 1)
+           (cons :comma (buffer-substring begin (point))))
+          ((looking-at "\n")
+           (forward-char 1)
+           (cons :line-feed (buffer-substring begin (point))))
+          ((looking-at "\r")
+           (forward-char 1)
+           (cons :carriage-return (buffer-substring begin (point))))
+          ((looking-at "\\]")
+           (forward-char 1)
+           (cons :array-end (buffer-substring begin (point))))
+          ((not (eobp))
+           (condition-case nil
+               (cons :array-element (plz-media-type--parse-json-object media-type))
+             (json-error))))))
+
+(defun plz-media-type:application/json-array--consume-next (media-type)
+  "Parse a single line of the newline delimited JSON MEDIA-TYPE."
+  (let ((begin (point)))
+    (prog1 (plz-media-type:application/json-array--parse-next media-type)
+      (delete-region begin (point))
+      (setq-local plz-media-type--position (point)))))
 
 (defun plz-media-type:application/json-array--parse-stream (media-type)
   "Parse all lines of the newline delimited JSON MEDIA-TYPE in the PROCESS buffer."
@@ -264,24 +280,25 @@ be `hash-table', `alist' (the default) or `plist'."
     (unless plz-media-type--position
       (setq-local plz-media-type--position (point)))
     (goto-char plz-media-type--position)
-    (let ((object (plz-media-type:application/json-array--parse-next media-type)))
-      (setq-local plz-media-type--position (point))
-      (while object
-        (setq-local plz-media-type--position (point))
-        (when (functionp handler)
-          (funcall handler object))
-        (setq object (plz-media-type:application/json-array--parse-next media-type))))))
+    (when-let (result (plz-media-type:application/json-array--consume-next media-type))
+      (while result
+        (when (and (equal :array-element (car result))
+                   (functionp handler))
+          (funcall handler (cdr result)))
+        (setq result (plz-media-type:application/json-array--consume-next media-type))))))
 
 (cl-defmethod plz-media-type-process ((media-type plz-media-type:application/json-array) process chunk)
   "Process the CHUNK according to MEDIA-TYPE using PROCESS."
   (ignore media-type)
   (cl-call-next-method media-type process chunk)
-  (plz-media-type:application/json-array--parse-stream media-type))
+  (plz-media-type:application/json-array--parse-stream media-type)
+  (set-marker (process-mark process) (point-max)))
 
 (cl-defmethod plz-media-type-then ((media-type plz-media-type:application/json-array) response)
   "Transform the RESPONSE into a format suitable for MEDIA-TYPE."
   (ignore media-type)
   (plz-media-type:application/json-array--parse-stream media-type)
+  (setf (plz-response-body response) nil)
   response)
 
 ;; Content Type: application/x-ndjson
