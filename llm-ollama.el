@@ -97,7 +97,7 @@ PROVIDER is the llm-ollama provider."
 
 (cl-defmethod llm-embedding ((provider llm-ollama) string)
   (llm-ollama--embedding-extract-response
-   (llm-request-sync (format "http://localhost:%d/api/embeddings" (or (llm-ollama-port provider) 11434))
+   (llm-request-sync (llm-ollama--url provider "embeddings")
                      :data (llm-ollama--embedding-request provider string))))
 
 (defun llm-ollama--chat-request (provider prompt)
