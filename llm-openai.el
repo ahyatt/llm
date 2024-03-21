@@ -265,7 +265,7 @@ them from 1 to however many are sent.")
         (last-response llm-openai-last-response))
     (with-temp-buffer
       (insert response)
-      (let* ((complete-rx (rx (seq "finish_reason\":" (1+ (or ?\[ ?\] alpha)) "}]}" line-end)))
+      (let* ((complete-rx (rx (seq line-start "data: ")))
              (end-pos (save-excursion (goto-char (point-max))
                                       (when (search-backward-regexp
                                              complete-rx
@@ -273,7 +273,9 @@ them from 1 to however many are sent.")
                                         (line-end-position)))))
         (when end-pos
           (let* ((all-lines (seq-filter
-                             (lambda (line) (string-match-p complete-rx line))
+                             (lambda (line) (and (string-match-p complete-rx line)
+                                                      (not (string-match-p (rx (seq line-start "data: [DONE]"))
+                                                       line))))
                              (split-string (buffer-substring-no-properties 1 end-pos) "\n")))
                  (processed-lines
                   (mapcar (lambda (line)
