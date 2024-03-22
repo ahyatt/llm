@@ -149,10 +149,17 @@ the buffer is turned into JSON and passed to ON-SUCCESS."
     :headers (append headers
                      '(("Content-Type" . "application/json")))
     :then (lambda (response)
-            (when on-success-raw
-              (funcall on-success-raw response))
-            (when on-success
-              (funcall on-success (json-read-from-string response))))
+            ;; Media types can return a response object sometimes, otherwise it
+            ;; is a string.  This is normal, since this is dependent on the
+            ;; `:as' argument.
+            (let ((response (if (plz-response-p response)
+                                (plz-response-body response)
+                              response)))
+              (when on-success-raw
+                (funcall on-success-raw response))
+              (when on-success
+                (funcall on-success (when (and response (> (length response) 0))
+                                      (json-read-from-string response))))))
     :else (lambda (error)
             (when on-error
               (llm-request-plz--handle-error error on-error)))
