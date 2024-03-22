@@ -341,7 +341,7 @@ default is 1.  Delays can help avoid rate limiting."
         (delay (or delay 1)))
     (llm-tester-log "\n%s\nTesting for %s\n%s\n"
                     separator (type-of provider) separator)
-    (when (member 'embedding (llm-capabilities provider))
+    (when (member 'embeddings (llm-capabilities provider))
       (llm-tester-embedding-sync provider)
       (sleep-for delay)
       (llm-tester-embedding-async provider)
