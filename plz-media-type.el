@@ -24,7 +24,41 @@
 
 ;;; Commentary:
 
-;; This file handles content type.
+;; This library provides enhanced handling of MIME types for HTTP
+;; requests within Emacs.  It utilizes the 'plz' library for
+;; networking calls, extending it to process responses based on the
+;; Content-Type header.  This library defines various classes and
+;; methods for parsing and processing standard MIME types, including
+;; JSON, XML, HTML, and binary data.  It allows for extensible
+;; processing of additional types through subclassing.
+
+;;; Examples:
+
+;; Non-streaming requests
+;; ======================
+
+;; Make a syncrounous HTTP request and use the default media type
+;; association list to decode the body of the HTTP response.
+
+;; (plz-media-type-request
+;;   'get "https://httpbin.org/json"
+;;   :as `(media-types ,plz-media-types))
+
+
+;; Streaming requests
+;; ==================
+
+;; Make a syncrounous HTTP request to an endpoint that returns newline
+;; delimited JSON objects. The handler will be called 5 times, each
+;; time with the parse JSON object.
+
+;; (plz-media-type-request
+;;   'get "https://httpbin.org/stream/5"
+;;   :as `(media-types
+;;         ((application/json
+;;           . ,(plz-media-type:application/x-ndjson
+;;               :handler (lambda (object)
+;;                          (message "%s" object)))))))
 
 ;;; Code:
 
@@ -47,7 +81,11 @@
     :documentation "The parameters of the media type."
     :initarg :parameters
     :initform nil
-    :subtype list)))
+    :subtype list))
+  "A class that hold information about the type, subtype and
+parameters of a media type.  It is meant to be sub-classed to
+handle the processing of different media types and supports the
+processing of streaming and non-streaming HTTP responses.")
 
 (defun plz-media-type-charset (media-type)
   "Return the character set of the MEDIA-TYPE."
@@ -174,7 +212,11 @@ CHUNK is a part of the HTTP body."
 
 (defclass plz-media-type:application/octet-stream (plz-media-type)
   ((type :initform 'application)
-   (subtype :initform 'octet-stream)))
+   (subtype :initform 'octet-stream))
+  "A media type class that handles the processing of octet stream
+HTTP responses.  The media type sets the body slot of the
+plz-response struct to the unmodified value of the HTTP response
+body.  It is used as the default media type processor.")
 
 (cl-defmethod plz-media-type-else ((media-type plz-media-type:application/octet-stream) error)
   "Transform the ERROR into a format suitable for MEDIA-TYPE."
@@ -221,7 +263,15 @@ defaults to `nil`."
 be `hash-table', `alist' (the default) or `plist'."
     :initarg :object-type
     :initform 'alist
-    :type symbol)))
+    :type symbol))
+  "A media type class that handles the processing of HTTP responses
+in the JSON format.  The HTTP response is processed in a
+non-streaming way.  After the response has been received, the
+body of the plz-response struct is set to the result of parsing
+the HTTP response body with the `json-parse-buffer' function.
+The arguments to the `json-parse-buffer' can be customized by
+making an instance of this class and setting its slots
+accordingly.")
 
 (defun plz-media-type--parse-json-object (media-type)
   "Parse the JSON object in the current buffer according to MEDIA-TYPE."
@@ -242,7 +292,15 @@ be `hash-table', `alist' (the default) or `plist'."
   ((handler
     :documentation "A function that will be called for each object in the JSON array."
     :initarg :handler
-    :type (or function symbol))))
+    :type (or function symbol)))
+  "A media type class that handles the processing of HTTP responses
+in a JSON format that assumes that the object at the top level is
+an array.  The HTTP response is processed in a streaming way.
+Each object in the top level array will be parsed with the
+`json-parse-buffer' function.  The function in the :handler slot
+will be called each time a new object arrives.  The body slot of
+the plz-response struct passed to the THEN and ELSE callbacks
+will always be set to nil.")
 
 (defun plz-media-type:application/json-array--parse-next (media-type)
   "Parse a single line of the newline delimited JSON MEDIA-TYPE."
@@ -309,7 +367,15 @@ be `hash-table', `alist' (the default) or `plist'."
     :documentation "A function that will be called for each line that contains a JSON object."
     :initarg :handler
     :initform nil
-    :type (or function null symbol))))
+    :type (or function null symbol)))
+  "A media type class that handles the processing of HTTP responses
+in a JSON format that assumes that the object at the top level is
+an array.  The HTTP response is processed in a streaming way.
+Each object in the top level array will be parsed with the
+`json-parse-buffer' function.  The function in the :handler slot
+will be called each time a new object arrives.  The body slot of
+the plz-response struct passed to the THEN and ELSE callbacks
+will always be set to nil.")
 
 (defconst plz-media-type:application/x-ndjson--line-regexp
   (rx (* not-newline) (or "\r\n" "\n" "\r"))
@@ -342,12 +408,19 @@ be `hash-table', `alist' (the default) or `plist'."
 (cl-defmethod plz-media-type-then ((media-type plz-media-type:application/x-ndjson) response)
   "Transform the RESPONSE into a format suitable for MEDIA-TYPE."
   (plz-media-type:application/x-ndjson--parse-stream media-type)
+  (setf (plz-response-body response) nil)
   response)
 
 ;; Content Type: application/xml
 
 (defclass plz-media-type:application/xml (plz-media-type:application/octet-stream)
-  ((subtype :initform 'xml)))
+  ((subtype :initform 'xml))
+  "A media type class that handles the processing of HTTP responses
+in the XML format.  The HTTP response is processed in a
+non-streaming way.  After the response has been received, the
+body of the plz-response struct is set to the result of parsing
+the HTTP response body with the `libxml-parse-html-region'
+function.")
 
 (cl-defmethod plz-media-type-then ((media-type plz-media-type:application/xml) response)
   "Transform the RESPONSE into a format suitable for MEDIA-TYPE."
@@ -359,7 +432,13 @@ be `hash-table', `alist' (the default) or `plist'."
 
 (defclass plz-media-type:text/html (plz-media-type:application/xml)
   ((type :initform 'text)
-   (subtype :initform 'xml)))
+   (subtype :initform 'xml))
+    "A media type class that handles the processing of HTTP responses
+in the HTML format.  The HTTP response is processed in a
+non-streaming way.  After the response has been received, the
+body of the plz-response struct is set to the result of parsing
+the HTTP response body with the `libxml-parse-html-region'
+function.")
 
 (defvar plz-media-types
   `((application/json . ,(plz-media-type:application/json))
@@ -435,11 +514,26 @@ It may be:
   non-existent file; if it exists, it will not be overwritten,
   and an error will be signaled.
 
-- `(stream :through PROCESS-FILTER)' to asynchronously stream the
-  HTTP response.  PROCESS-FILTER is an Emacs process filter
-  function, and must accept two arguments: the curl process
-  sending the request and a chunk of the HTTP body, which was
-  just received.
+- `(media-types MEDIA-TYPES)' to handle the processing of the
+  response based on the Content-Type header.  MEDIA-TYPES is an
+  association list from a content type symbol to an instance of a
+  `plz-media-type' class.  The `plz-media-types' variable is
+  bound to an association list and can be used to handle some
+  commonly used formats such as JSON, HTML, XML.  This list can
+  be used as a basis and is meant to be extended by users.  If no
+  media type was found for a content type, it will be handled by
+  the default octet stream media type.  When this option is used,
+  the THEN callback will always receive a plz-response struct as
+  argument, and the ELSE callback always a plz-error struct.  The
+  plz-response struct will always have the status and header
+  slots set.  The body slot depends on the media type
+  implementation.  In the case for JSON, HTML, XML it will
+  contain the decoded response body.  When receiving JSON for
+  example, it will be an Emacs Lisp association list.  For
+  streaming responses like text/event-stream it will be set to
+  nil, and the events of the server sent events specification
+  will be dispatched to the handlers registered with the media
+  type instance.
 
 - A function, which is called in the response buffer with it
   narrowed to the response body (suitable for, e.g. `json-read').
