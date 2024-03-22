@@ -322,12 +322,15 @@ If STREAMING is non-nil, use the URL for the streaming API."
      :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
      :data (llm-vertex--chat-request prompt)
      :on-element (lambda (element)
-                   (when-let ((response (llm-vertex--get-chat-response element)))
-                     (if (stringp response)
-                         (when (> (length response) 0)
-                           (setq streamed-text (concat streamed-text response))
-                           (llm-request-callback-in-buffer buf partial-callback streamed-text))
-                       (setq function-call response))))
+                   (if (alist-get 'error element)
+                       (llm-request-callback-in-buffer buf error-callback 'error
+                                                       (llm-vertex--error-message element))
+                     (when-let ((response (llm-vertex--get-chat-response element)))
+                       (if (stringp response)
+                           (when (> (length response) 0)
+                             (setq streamed-text (concat streamed-text response))
+                             (llm-request-callback-in-buffer buf partial-callback streamed-text))
+                         (setq function-call response)))))
      :on-success (lambda (data)
                    (llm-request-callback-in-buffer
                     buf response-callback
@@ -335,10 +338,7 @@ If STREAMING is non-nil, use the URL for the streaming API."
                      provider prompt (or function-call
                                          (if (> (length streamed-text) 0)
                                              streamed-text
-                                           (llm-vertex--get-chat-response data))))))
-     :on-error (lambda (_ data)
-                 (llm-request-callback-in-buffer buf error-callback 'error
-                                                 (llm-vertex--error-message data))))))
+                                           (llm-vertex--get-chat-response data)))))))))
 
 ;; Token counts
 ;; https://cloud.google.com/vertex-ai/docs/generative-ai/get-token-count
