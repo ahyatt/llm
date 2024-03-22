@@ -96,14 +96,17 @@ MODEL is the embedding model to use, or nil to use the default.."
   ;; It isn't always the case that a key is needed for Open AI compatible APIs.
   )
 
-(defun llm-openai--headers (provider)
-  "From PROVIDER, return the headers to use for a request.
-This is just the key, if it exists."
+(cl-defgeneric llm-openai--headers (provider)
+  "Return the headers to use for a request from PROVIDER.")
+
+(cl-defmethod llm-openai--headers ((provider llm-openai))
   (when (llm-openai-key provider)
     `(("Authorization" . ,(format "Bearer %s" (llm-openai-key provider))))))
 
+(cl-defgeneric llm-openai--url (provider command)
+  "Return the URL for COMMAND for PROVIDER.")
+
 (cl-defmethod llm-openai--url ((_ llm-openai) command)
-  "Return the URL for COMMAND for PROVIDER."
   (concat "https://api.openai.com/v1/" command))
 
 (cl-defmethod llm-openai--url ((provider llm-openai-compatible) command)
