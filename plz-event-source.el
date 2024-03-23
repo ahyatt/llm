@@ -405,7 +405,16 @@
    (events :documentation "Association list from event type to handler."
            :initarg :events
            :initform nil
-           :type list)))
+           :type list))
+  "A media type class that handles the processing of HTTP responses
+in the server sent events format.  The HTTP response is processed
+in a streaming way.  The :events slot of the class can be set to
+an association list from event type symbol to a handler function.
+Whenever a new event is parsed and emitted the handler for the
+corresponding event type will be called with two arguments, an
+instance of the underlying event source class and an event.  The
+body slot of the plz-response struct passed to the THEN and ELSE
+callbacks will always be set to nil.")
 
 (defvar-local plz-event-source--current nil
   "The event source of the current buffer.")

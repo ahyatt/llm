@@ -27,7 +27,7 @@
 (require 'rx)
 (require 'url-http)
 
-(defcustom llm-request-plz-timeout 60
+(defcustom llm-request-plz-timeout (* 2 60)
   "The number of seconds to wait for a response from a HTTP server.
 
 Request timings are depending on the request. Requests that need
@@ -101,19 +101,24 @@ code and the HTTP body of the error response.
 
 For Curl errors, ON-ERROR will be called with the exit code of
 the curl process and an error message."
-  (cond ((plz-error-response error)
-         (let ((response (plz-error-response error)))
-           (funcall on-error
-                    (plz-response-status response)
-                    (plz-response-body response))))
+  (cond ((plz-media-type-filter-error-p error)
+         (let ((cause (plz-media-type-filter-error-cause error))
+               (response (plz-error-response error)))
+           ;; TODO: What do we want to pass to callers here?
+           (funcall on-error 'filter-error cause)))
         ((plz-error-curl-error error)
          (let ((curl-error (plz-error-curl-error error)))
            (funcall on-error
                     (car curl-error)
                     (cdr curl-error))))
+        ((plz-error-response error)
+         (when-let ((response (plz-error-response error))
+                    (status (plz-response-status response))
+                    (body (plz-response-body response)))
+           (funcall on-error status body)))
         (t (user-error "Unexpected error: %s" error))))
 
-(cl-defun llm-request-plz-async (url &key headers data on-success on-success-raw media-type
+(cl-defun llm-request-plz-async (url &key headers data on-success media-type
                                      on-error timeout)
   "Make a request to URL.
 Nothing will be returned.
@@ -131,30 +136,21 @@ and required otherwise.
 ON-ERROR will be called with the error code and a response-body.
 This is required.
 
-MEDIA-TYPE is a required argument that sets a media type, useful
-for streaming formats.  It is expected that this is only used by
-other methods in this file.
-
-ON-SUCCESS-RAW, if set, will be called in the buffer with the
-response body, and expect the response content. This is an
-optional argument, and mostly useful for streaming.  If not set,
-the buffer is turned into JSON and passed to ON-SUCCESS."
-  (unless media-type
-    (error "MEDIA-TYPE is required in llm-request-plz-async"))
+MEDIA-TYPE is an optional argument that adds or overrides a media
+type, useful for streaming formats.  It is expected that this is
+only used by other methods in this file."
   (plz-media-type-request
     'post url
-    :as `(media-types ,(cons media-type plz-media-types))
+    :as `(media-types ,(if media-type
+                           (cons media-type plz-media-types)
+                         plz-media-types))
     :body (when data
             (encode-coding-string (json-encode data) 'utf-8))
     :headers (append headers
                      '(("Content-Type" . "application/json")))
     :then (lambda (response)
-            (let ((response (plz-response-body response)))
-              (when on-success-raw
-                (funcall on-success-raw response))
-              (when on-success
-                (funcall on-success (when (and response (> (length response) 0))
-                                      (json-read-from-string response))))))
+            (when on-success
+              (funcall on-success (plz-response-body response))))
     :else (lambda (error)
             (when on-error
               (llm-request-plz--handle-error error on-error)))
@@ -184,9 +180,7 @@ This is required.
                          :headers headers
                          :data data
                          :on-error on-error
-                         ;; Have to use :on-success-raw because :on-success will try to
-                         ;; convert to JSON, and this already should be JSON.
-                         :on-success-raw on-success
+                         :on-success on-success
                          :timeout timeout
                          :media-type
                          (cons 'application/json
@@ -216,10 +210,7 @@ This is required.
                          :headers headers
                          :data data
                          :on-error on-error
-                         ;; Have to use :on-success-raw because :on-success will try to
-                         ;; convert to JSON, and this already should be JSON.
-                         :on-success-raw (lambda (resp)
-                                           (funcall on-success (plz-response-body resp)))
+                         :on-success on-success
                          :timeout timeout
                          :media-type
                          (cons 'application/x-ndjson

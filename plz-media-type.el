@@ -4,6 +4,10 @@
 
 ;; Author: r0man <roman@burningswell.com>
 ;; Maintainer: r0man <roman@burningswell.com>
+;; URL: https://github.com/r0man/plz-media-type.el
+;; Version: 0.1-pre
+;; Package-Requires: ((emacs "26.3"))
+;; Keywords: comm, network, http
 
 ;; This file is part of GNU Emacs.
 
@@ -24,7 +28,13 @@
 
 ;;; Commentary:
 
-;; This file handles content type.
+;; This library provides enhanced handling of MIME types for HTTP
+;; requests within Emacs.  It utilizes the 'plz' library for
+;; networking calls, extending it to process responses based on the
+;; Content-Type header.  This library defines various classes and
+;; methods for parsing and processing standard MIME types, including
+;; JSON, XML, HTML, and binary data.  It allows for extensible
+;; processing of additional types through subclassing.
 
 ;;; Code:
 
@@ -33,6 +43,13 @@
 (require 'cl-lib)
 (require 'eieio)
 (require 'plz)
+
+(define-error 'plz-media-type-filter-error
+              "plz-media-type: Error in process filter"
+              'plz-error)
+
+(cl-defstruct (plz-media-type-filter-error (:include plz-error))
+  cause)
 
 (defclass plz-media-type ()
   ((type
@@ -47,7 +64,11 @@
     :documentation "The parameters of the media type."
     :initarg :parameters
     :initform nil
-    :subtype list)))
+    :subtype list))
+  "A class that hold information about the type, subtype and
+parameters of a media type.  It is meant to be sub-classed to
+handle the processing of different media types and supports the
+processing of streaming and non-streaming HTTP responses.")
 
 (defun plz-media-type-charset (media-type)
   "Return the character set of the MEDIA-TYPE."
@@ -158,15 +179,18 @@ CHUNK is a part of the HTTP body."
                        (media-type (plz-media-type--of-response media-types response))
                        (coding-system (plz-media-type-coding-system media-type)))
                   (setq-local plz-media-type--current media-type)
+                  (setq-local plz-media-type--response
+                              (make-plz-response
+                               :headers (plz-response-headers response)
+                               :status (plz-response-status response)
+                               :version (plz-response-version response)))
                   (when-let (body (plz-response-body response))
                     (when (> (length body) 0)
                       (setf (plz-response-body response)
                             (decode-coding-string body coding-system))
                       (delete-region body-start (point-max))
                       (set-marker (process-mark process) (point))
-                      (plz-media-type-process media-type process response)))
-                  (setf (plz-response-body response) nil)
-                  (setq-local plz-media-type--response response))))))
+                      (plz-media-type-process media-type process response))))))))
         (when moving
           (goto-char (process-mark process)))))))
 
@@ -174,13 +198,17 @@ CHUNK is a part of the HTTP body."
 
 (defclass plz-media-type:application/octet-stream (plz-media-type)
   ((type :initform 'application)
-   (subtype :initform 'octet-stream)))
+   (subtype :initform 'octet-stream))
+  "Media type class that handles the processing of octet stream
+HTTP responses.  The media type sets the body slot of the
+plz-response structure to the unmodified value of the HTTP response
+body.  It is used as the default media type processor.")
 
 (cl-defmethod plz-media-type-else ((media-type plz-media-type:application/octet-stream) error)
   "Transform the ERROR into a format suitable for MEDIA-TYPE."
-  (let ((response (plz-error-response error)))
-    (setf (plz-error-response error) (plz-media-type-then media-type response))
-    error))
+  (when-let (response (plz-error-response error))
+    (setf (plz-error-response error) (plz-media-type-then media-type response)))
+  error)
 
 (cl-defmethod plz-media-type-then ((media-type plz-media-type:application/octet-stream) response)
   "Transform the RESPONSE into a format suitable for MEDIA-TYPE."
@@ -221,7 +249,15 @@ defaults to `nil`."
 be `hash-table', `alist' (the default) or `plist'."
     :initarg :object-type
     :initform 'alist
-    :type symbol)))
+    :type symbol))
+  "Media type class that handles the processing of HTTP responses
+in the JSON format.  The HTTP response is processed in a
+non-streaming way.  After the response has been received, the
+body of the plz-response structure is set to the result of parsing
+the HTTP response body with the `json-parse-buffer' function.
+The arguments to the `json-parse-buffer' can be customized by
+making an instance of this class and setting its slots
+accordingly.")
 
 (defun plz-media-type--parse-json-object (media-type)
   "Parse the JSON object in the current buffer according to MEDIA-TYPE."
@@ -240,9 +276,17 @@ be `hash-table', `alist' (the default) or `plist'."
 
 (defclass plz-media-type:application/json-array (plz-media-type:application/json)
   ((handler
-    :documentation "A function that will be called for each object in the JSON array."
+    :documentation "Function that will be called for each object in the JSON array."
     :initarg :handler
-    :type (or function symbol))))
+    :type (or function symbol)))
+  "Media type class that handles the processing of HTTP responses
+in a JSON format that assumes that the object at the top level is
+an array.  The HTTP response is processed in a streaming way.
+Each object in the top level array will be parsed with the
+`json-parse-buffer' function.  The function in the :handler slot
+will be called each time a new object arrives.  The body slot of
+the plz-response structure passed to the THEN and ELSE callbacks
+will always be set to nil.")
 
 (defun plz-media-type:application/json-array--parse-next (media-type)
   "Parse a single line of the newline delimited JSON MEDIA-TYPE."
@@ -306,10 +350,18 @@ be `hash-table', `alist' (the default) or `plist'."
 (defclass plz-media-type:application/x-ndjson (plz-media-type:application/json)
   ((subtype :initform 'x-ndjson)
    (handler
-    :documentation "A function that will be called for each line that contains a JSON object."
+    :documentation "Function that will be called for each line that contains a JSON object."
     :initarg :handler
     :initform nil
-    :type (or function null symbol))))
+    :type (or function null symbol)))
+  "Media type class that handles the processing of HTTP responses
+in a JSON format that assumes that the object at the top level is
+an array.  The HTTP response is processed in a streaming way.
+Each object in the top level array will be parsed with the
+`json-parse-buffer' function.  The function in the :handler slot
+will be called each time a new object arrives.  The body slot of
+the plz-response structure passed to the THEN and ELSE callbacks
+will always be set to nil.")
 
 (defconst plz-media-type:application/x-ndjson--line-regexp
   (rx (* not-newline) (or "\r\n" "\n" "\r"))
@@ -342,24 +394,38 @@ be `hash-table', `alist' (the default) or `plist'."
 (cl-defmethod plz-media-type-then ((media-type plz-media-type:application/x-ndjson) response)
   "Transform the RESPONSE into a format suitable for MEDIA-TYPE."
   (plz-media-type:application/x-ndjson--parse-stream media-type)
+  (setf (plz-response-body response) nil)
   response)
 
 ;; Content Type: application/xml
 
 (defclass plz-media-type:application/xml (plz-media-type:application/octet-stream)
-  ((subtype :initform 'xml)))
+  ((subtype :initform 'xml))
+  "Media type class that handles the processing of HTTP responses
+in the XML format.  The HTTP response is processed in a
+non-streaming way.  After the response has been received, the
+body of the plz-response structure is set to the result of parsing
+the HTTP response body with the `libxml-parse-html-region'
+function.")
 
 (cl-defmethod plz-media-type-then ((media-type plz-media-type:application/xml) response)
   "Transform the RESPONSE into a format suitable for MEDIA-TYPE."
   (with-slots (array-type false-object null-object object-type) media-type
-    (setf (plz-response-body response) (libxml-parse-html-region))
+    (setf (plz-response-body response)
+          (libxml-parse-html-region (point-min) (point-max) nil))
     response))
 
 ;; Content Type: text/html
 
 (defclass plz-media-type:text/html (plz-media-type:application/xml)
   ((type :initform 'text)
-   (subtype :initform 'xml)))
+   (subtype :initform 'xml))
+  "Media type class that handles the processing of HTTP responses
+in the HTML format.  The HTTP response is processed in a
+non-streaming way.  After the response has been received, the
+body of the plz-response structure is set to the result of parsing
+the HTTP response body with the `libxml-parse-html-region'
+function.")
 
 (defvar plz-media-types
   `((application/json . ,(plz-media-type:application/json))
@@ -367,7 +433,7 @@ be `hash-table', `alist' (the default) or `plist'."
     (application/xml . ,(plz-media-type:application/xml))
     (text/html . ,(plz-media-type:text/html))
     (t . ,(plz-media-type:application/octet-stream)))
-  "Alist from media type to content type.")
+  "Association list from media type to content type.")
 
 (defun plz-media-type--handle-sync-http-error (error media-types)
   "Handle the synchronous HTTP ERROR using MEDIA-TYPES."
@@ -387,9 +453,15 @@ be `hash-table', `alist' (the default) or `plist'."
 
 (defun plz-media-type--handle-sync-error (error media-types)
   "Handle the synchronous ERROR using MEDIA-TYPES."
-  (if (eq 'plz-http-error (car error))
-      (plz-media-type--handle-sync-http-error error media-types)
-    (signal (car error) (cdr error))))
+  (cond
+   ((plz-media-type-filter-error-p error)
+    (signal 'plz-media-type-filter-error
+            (list (plz-media-type-filter-error-message error)
+                  (plz-media-type-filter-error-response error)
+                  (plz-media-type-filter-error-cause error))))
+   ((eq 'plz-http-error (car error))
+    (plz-media-type--handle-sync-http-error error media-types))
+   (t (signal (car error) (cdr error)))))
 
 (cl-defun plz-media-type-request
     (method
@@ -435,11 +507,26 @@ It may be:
   non-existent file; if it exists, it will not be overwritten,
   and an error will be signaled.
 
-- `(stream :through PROCESS-FILTER)' to asynchronously stream the
-  HTTP response.  PROCESS-FILTER is an Emacs process filter
-  function, and must accept two arguments: the curl process
-  sending the request and a chunk of the HTTP body, which was
-  just received.
+- `(media-types MEDIA-TYPES)' to handle the processing of the
+  response based on the Content-Type header.  MEDIA-TYPES is an
+  association list from a content type symbol to an instance of a
+  `plz-media-type' class.  The `plz-media-types' variable is
+  bound to an association list and can be used to handle some
+  commonly used formats such as JSON, HTML, XML.  This list can
+  be used as a basis and is meant to be extended by users.  If no
+  media type was found for a content type, it will be handled by
+  the default octet stream media type.  When this option is used,
+  the THEN callback will always receive a plz-response structure as
+  argument, and the ELSE callback always a plz-error structure.  The
+  plz-response structure will always have the status and header
+  slots set.  The body slot depends on the media type
+  implementation.  In the case for JSON, HTML, XML it will
+  contain the decoded response body.  When receiving JSON for
+  example, it will be an Emacs Lisp association list.  For
+  streaming responses like text/event-stream it will be set to
+  nil, and the events of the server sent events specification
+  will be dispatched to the handlers registered with the media
+  type instance.
 
 - A function, which is called in the response buffer with it
   narrowed to the response body (suitable for, e.g. `json-read').
@@ -493,51 +580,64 @@ not.
   (if-let (media-types (pcase as
                          (`(media-types ,media-types)
                           media-types)))
-      (condition-case error
-          (let* ((buffer)
-                 (plz-curl-default-args (cons "--no-buffer" plz-curl-default-args))
-                 (result (plz method url
-                           :as 'buffer
-                           :body body
-                           :body-type body-type
-                           :connect-timeout connect-timeout
-                           :decode decode
-                           :else (lambda (error)
-                                   (setq buffer (current-buffer))
-                                   (when (or (functionp else) (symbolp else))
-                                     (funcall else (plz-media-type-else
-                                                    plz-media-type--current
-                                                    error))))
-                           :finally (lambda ()
-                                      (unwind-protect
-                                          (when (functionp finally)
-                                            (funcall finally))
-                                        (when (buffer-live-p buffer)
-                                          (kill-buffer buffer))))
-                           :headers headers
-                           :noquery noquery
-                           :process-filter (lambda (process chunk)
-                                             (plz-media-type-process-filter process media-types chunk))
-                           :timeout timeout
-                           :then (if (symbolp then)
-                                     then
-                                   (lambda (_)
+      (let ((buffer) (filter-error))
+        (condition-case error
+            (let* ((plz-curl-default-args (cons "--no-buffer" plz-curl-default-args))
+                   (result (plz method url
+                             :as 'buffer
+                             :body body
+                             :body-type body-type
+                             :connect-timeout connect-timeout
+                             :decode decode
+                             :else (lambda (error)
                                      (setq buffer (current-buffer))
-                                     (when (or (functionp then) (symbolp then))
-                                       (funcall then (plz-media-type-then
-                                                      plz-media-type--current
-                                                      plz-media-type--response))))))))
-            (cond ((bufferp result)
-                   (unwind-protect
-                       (with-current-buffer result
-                         (plz-media-type-then plz-media-type--current plz-media-type--response))
-                     (when (buffer-live-p result)
-                       (kill-buffer result))))
-                  ((processp result)
-                   result)
-                  (t (user-error "Unexpected response: %s" result))))
-        ;; TODO: How to kill the buffer for sync requests that raise an error?
-        (plz-error (plz-media-type--handle-sync-error error media-types)))
+                                     (when (or (functionp else) (symbolp else))
+                                       (funcall else (or filter-error
+                                                         (plz-media-type-else
+                                                          plz-media-type--current
+                                                          error)))))
+                             :finally (lambda ()
+                                        (unwind-protect
+                                            (when (functionp finally)
+                                              (funcall finally))
+                                          (when (buffer-live-p buffer)
+                                            (kill-buffer buffer))))
+                             :headers headers
+                             :noquery noquery
+                             :process-filter (lambda (process chunk)
+                                               (condition-case cause
+                                                   (plz-media-type-process-filter process media-types chunk)
+                                                 (error
+                                                  (let ((buffer (process-buffer process)))
+                                                    (setq filter-error
+                                                          (make-plz-media-type-filter-error
+                                                           :cause cause
+                                                           :message (format "error in process filter: %S" cause)
+                                                           :response (when (buffer-live-p buffer)
+                                                                       (with-current-buffer buffer
+                                                                         plz-media-type--response))))
+                                                    (delete-process process)))))
+                             :timeout timeout
+                             :then (if (symbolp then)
+                                       then
+                                     (lambda (_)
+                                       (setq buffer (current-buffer))
+                                       (when (or (functionp then) (symbolp then))
+                                         (funcall then (plz-media-type-then
+                                                        plz-media-type--current
+                                                        plz-media-type--response))))))))
+              (cond ((bufferp result)
+                     (unwind-protect
+                         (with-current-buffer result
+                           (plz-media-type-then plz-media-type--current plz-media-type--response))
+                       (when (buffer-live-p result)
+                         (kill-buffer result))))
+                    ((processp result)
+                     result)
+                    (t (user-error "Unexpected response: %s" result))))
+          ;; TODO: How to kill the buffer for sync requests that raise an error?
+          (plz-error
+           (plz-media-type--handle-sync-error (or filter-error error) media-types))))
     (apply #'plz (append (list method url) rest))))
 
 ;;;; Footer

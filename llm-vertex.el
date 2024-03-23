@@ -130,7 +130,6 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
      (llm-vertex--embedding-url provider)
      :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
      :data `(("instances" . [(("content" . ,string))]))
-     :media-type '(application/json)
      :on-success (lambda (data)
                    (llm-request-callback-in-buffer
                     buf vector-callback (llm-vertex--embedding-extract-response data)))
@@ -302,7 +301,6 @@ If STREAMING is non-nil, use the URL for the streaming API."
      (llm-vertex--chat-url provider)
      :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
      :data (llm-vertex--chat-request prompt)
-     :media-type '(application/json)
      :on-success (lambda (data)
                    (llm-request-callback-in-buffer
                     buf response-callback
@@ -322,12 +320,15 @@ If STREAMING is non-nil, use the URL for the streaming API."
      :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
      :data (llm-vertex--chat-request prompt)
      :on-element (lambda (element)
-                   (when-let ((response (llm-vertex--get-chat-response element)))
-                     (if (stringp response)
-                         (when (> (length response) 0)
-                           (setq streamed-text (concat streamed-text response))
-                           (llm-request-callback-in-buffer buf partial-callback streamed-text))
-                       (setq function-call response))))
+                   (if (alist-get 'error element)
+                       (llm-request-callback-in-buffer buf error-callback 'error
+                                                       (llm-vertex--error-message element))
+                     (when-let ((response (llm-vertex--get-chat-response element)))
+                       (if (stringp response)
+                           (when (> (length response) 0)
+                             (setq streamed-text (concat streamed-text response))
+                             (llm-request-callback-in-buffer buf partial-callback streamed-text))
+                         (setq function-call response)))))
      :on-success (lambda (data)
                    (llm-request-callback-in-buffer
                     buf response-callback
