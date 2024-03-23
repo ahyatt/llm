@@ -149,13 +149,15 @@ the buffer is turned into JSON and passed to ON-SUCCESS."
             (lambda (_ on-success on-error)
               ;; No matter what, we need to stop listening for changes.
               (remove-hook 'after-change-functions #'llm-request--handle-new-content t)
-              (let ((code (url-http-parse-response)))
-                (if (eq code 200)
-                    (if on-success-raw
-                        (funcall on-success-raw (llm-request--content))
-                      (funcall on-success (json-read-from-string (llm-request--content))))
-                  (funcall on-error code (ignore-errors
-                                           (json-read-from-string (llm-request--content)))))))
+              (condition-case error
+                  (let ((code (url-http-parse-response)))
+                    (if (eq code 200)
+                        (if on-success-raw
+                            (funcall on-success-raw (llm-request--content))
+                          (funcall on-success (json-read-from-string (llm-request--content))))
+                      (funcall on-error code (ignore-errors
+                                               (json-read-from-string (llm-request--content))))))
+                (error (funcall on-error (car error) (error-message-string error)))))
             (list on-success on-error)
             t)))
       (when (and buffer on-partial)

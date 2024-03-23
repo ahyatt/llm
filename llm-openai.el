@@ -77,10 +77,12 @@ MODEL is the embedding model to use, or nil to use the default.."
 
 (defun llm-openai--error-message (err-response)
   "Return a user-visible error message from ERR-RESPONSE."
-  (let ((errdata (cdr (assoc 'error err-response))))
-    (format "Problem calling Open AI: %s message: %s"
-            (cdr (assoc 'type errdata))
-            (cdr (assoc 'message errdata)))))
+  (if (stringp err-response)
+      err-response
+    (let ((errdata (cdr (assoc 'error err-response))))
+      (format "Open AI returned error: %s message: %s"
+              (cdr (assoc 'type errdata))
+              (cdr (assoc 'message errdata))))))
 
 (defun llm-openai--handle-response (response extractor)
   "If RESPONSE is an error, throw it, else call EXTRACTOR."
@@ -96,14 +98,17 @@ MODEL is the embedding model to use, or nil to use the default.."
   ;; It isn't always the case that a key is needed for Open AI compatible APIs.
   )
 
-(defun llm-openai--headers (provider)
-  "From PROVIDER, return the headers to use for a request.
-This is just the key, if it exists."
+(cl-defgeneric llm-openai--headers (provider)
+  "Return the headers to use for a request from PROVIDER.")
+
+(cl-defmethod llm-openai--headers ((provider llm-openai))
   (when (llm-openai-key provider)
     `(("Authorization" . ,(format "Bearer %s" (llm-openai-key provider))))))
 
+(cl-defgeneric llm-openai--url (provider command)
+  "Return the URL for COMMAND for PROVIDER.")
+
 (cl-defmethod llm-openai--url ((_ llm-openai) command)
-  "Return the URL for COMMAND for PROVIDER."
   (concat "https://api.openai.com/v1/" command))
 
 (cl-defmethod llm-openai--url ((provider llm-openai-compatible) command)
@@ -238,9 +243,7 @@ PROMPT is the prompt that needs to be updated with the response."
      :on-error (lambda (_ data)
                  (let ((errdata (cdr (assoc 'error data))))
                    (llm-request-plz-callback-in-buffer buf error-callback 'error
-                                                       (format "Problem calling Open AI: %s message: %s"
-                                                               (cdr (assoc 'type errdata))
-                                                               (cdr (assoc 'message errdata)))))))))
+                                                       (llm-openai--error-message data)))))))
 
 (cl-defmethod llm-chat ((provider llm-openai) prompt)
   (llm-openai--check-key provider)
