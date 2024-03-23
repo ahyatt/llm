@@ -27,7 +27,7 @@
 (require 'rx)
 (require 'url-http)
 
-(defcustom llm-request-plz-timeout 60
+(defcustom llm-request-plz-timeout (* 2 60)
   "The number of seconds to wait for a response from a HTTP server.
 
 Request timings are depending on the request. Requests that need
