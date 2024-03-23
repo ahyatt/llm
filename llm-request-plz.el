@@ -94,28 +94,23 @@ TIMEOUT is the number of seconds to wait for a response."
                                    :timeout timeout))
 
 (defun llm-request-plz--handle-error (error on-error)
-  "Handle the ERROR with the ON-ERROR callback.
-
-For HTTP errors, ON-ERROR will be called with the HTTP status
-code and the HTTP body of the error response.
-
-For Curl errors, ON-ERROR will be called with the exit code of
-the curl process and an error message."
+  "Handle the ERROR with the ON-ERROR callback."
   (cond ((plz-media-type-filter-error-p error)
          (let ((cause (plz-media-type-filter-error-cause error))
                (response (plz-error-response error)))
-           ;; TODO: What do we want to pass to callers here?
-           (funcall on-error 'filter-error cause)))
+           (funcall on-error 'error
+                    (format "Error with cause: %s, response: %s" cause response))))
         ((plz-error-curl-error error)
          (let ((curl-error (plz-error-curl-error error)))
-           (funcall on-error
-                    (car curl-error)
-                    (cdr curl-error))))
+           (funcall on-error 'error
+                    (format "curl error code %d: %s"
+                            (car curl-error)
+                            (cdr curl-error)))))
         ((plz-error-response error)
          (when-let ((response (plz-error-response error))
                     (status (plz-response-status response))
                     (body (plz-response-body response)))
-           (funcall on-error status body)))
+           (funcall on-error 'error body)))
         (t (user-error "Unexpected error: %s" error))))
 
 (cl-defun llm-request-plz-async (url &key headers data on-success media-type

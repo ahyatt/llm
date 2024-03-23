@@ -241,9 +241,8 @@ PROMPT is the prompt that needs to be updated with the response."
                     (llm-openai--process-and-return
                      provider prompt data error-callback)))
      :on-error (lambda (_ data)
-                 (let ((errdata (cdr (assoc 'error data))))
-                   (llm-request-plz-callback-in-buffer buf error-callback 'error
-                                                       (llm-openai--error-message data)))))))
+                 (llm-request-plz-callback-in-buffer buf error-callback 'error
+                                                       (llm-openai--error-message data))))))
 
 (cl-defmethod llm-chat ((provider llm-openai) prompt)
   (llm-openai--check-key provider)
@@ -317,13 +316,9 @@ RESPONSE can be nil if the response is complete."
                      (llm-request-plz-callback-in-buffer
                       buf error-callback 'error data))))
      :on-error (lambda (_ data)
-                 (let ((errdata
-                        (cdr (assoc 'error data))))
-                   (llm-request-plz-callback-in-buffer
+                 (llm-request-plz-callback-in-buffer
                     buf error-callback 'error
-                    (format "Problem calling Open AI: %s message: %s"
-                            (cdr (assoc 'type errdata))
-                            (cdr (assoc 'message errdata))))))
+                    (llm-openai--error-message data)))
      :on-success (lambda (_)
                    (llm-request-plz-callback-in-buffer
                     buf

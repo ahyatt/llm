@@ -82,6 +82,10 @@ PROVIDER is the llm-ollama provider."
   "Return the embedding from the server RESPONSE."
   (assoc-default 'embedding response))
 
+(defun llm-ollama--error-message (data)
+  "Return the error message from DATA."
+  (if (stringp data) data (assoc-default 'error data)))
+
 (cl-defmethod llm-embedding-async ((provider llm-ollama) string vector-callback error-callback)
   (let ((buf (current-buffer)))
     (llm-request-plz-async (llm-ollama--url provider "embeddings")
@@ -89,11 +93,10 @@ PROVIDER is the llm-ollama provider."
                            :on-success (lambda (data)
                                          (llm-request-callback-in-buffer
                                           buf vector-callback (llm-ollama--embedding-extract-response data)))
-                           :on-error (lambda (_ _)
-                                       ;; The problem with ollama is that it doesn't
-                                       ;; seem to have an error response.
+                           :on-error (lambda (type err)
                                        (llm-request-callback-in-buffer
-                                        buf error-callback 'error "Unknown error calling ollama")))))
+                                        buf error-callback type
+                                        (llm-ollama--error-message))))))
 
 (cl-defmethod llm-embedding ((provider llm-ollama) string)
   (llm-ollama--embedding-extract-response
@@ -153,10 +156,9 @@ STREAMING is a boolean to control whether to stream the response."
                      (llm-provider-utils-append-to-prompt prompt response)
                      (llm-request-plz-callback-in-buffer buf response-callback response)))
      :on-error (lambda (code data)
-                 (let ((error-message (cdr (assoc 'error data))))
-                   (llm-request-plz-callback-in-buffer buf error-callback 'error
-                                                       (format "Problem calling Ollama: %s message: %s"
-                                                               code error-message)))))))
+                 (llm-request-plz-callback-in-buffer
+                  buf error-callback 'error
+                  (llm-ollama--error-message data))))))
 
 (cl-defmethod llm-chat-streaming ((provider llm-ollama) prompt partial-callback response-callback error-callback)
   (let ((buf (current-buffer))
@@ -173,10 +175,9 @@ STREAMING is a boolean to control whether to stream the response."
                    (when-let ((response (llm-ollama--get-response data)))
                      (setq response-text (concat response-text response))
                      (llm-request-callback-in-buffer buf partial-callback response-text)))
-      :on-error (lambda (_ _)
-                  ;; The problem with ollama is that it doesn't
-                  ;; seem to have an error response.
-                  (llm-request-callback-in-buffer buf error-callback 'error "Unknown error calling ollama")))))
+      :on-error (lambda (type msg)
+                  (llm-request-callback-in-buffer buf error-callback type
+                                                  (llm-ollama--error-message msg))))))
 
 (cl-defmethod llm-name ((provider llm-ollama))
   (llm-ollama-chat-model provider))
