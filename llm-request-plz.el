@@ -101,16 +101,21 @@ code and the HTTP body of the error response.
 
 For Curl errors, ON-ERROR will be called with the exit code of
 the curl process and an error message."
-  (cond ((plz-error-response error)
-         (let ((response (plz-error-response error)))
-           (funcall on-error
-                    (plz-response-status response)
-                    (plz-response-body response))))
+  (cond ((plz-media-type-filter-error-p error)
+         (let ((cause (plz-media-type-filter-error-cause error))
+               (response (plz-error-response error)))
+           ;; TODO: What do we want to pass to callers here?
+           (funcall on-error 'filter-error cause)))
         ((plz-error-curl-error error)
          (let ((curl-error (plz-error-curl-error error)))
            (funcall on-error
                     (car curl-error)
                     (cdr curl-error))))
+        ((plz-error-response error)
+         (when-let ((response (plz-error-response error))
+                    (status (plz-response-status response))
+                    (body (plz-response-body response)))
+           (funcall on-error status body)))
         (t (user-error "Unexpected error: %s" error))))
 
 (cl-defun llm-request-plz-async (url &key headers data on-success media-type
