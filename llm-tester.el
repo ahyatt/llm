@@ -333,8 +333,43 @@ of by calling the `describe_function' function."
     (llm-tester-log "SUCCESS: Provider %s cancelled an async request" (type-of provider))
     (llm-cancel-request chat-async-request)))
 
-(defun llm-tester-all (provider &optional delay)
+(defun llm-tester-bad-provider (provider)
+  "When PROVIDER is bad in a some way, test error handling."
+  (let ((error-callback
+         (lambda (type message)
+           (cond
+            ((not (symbolp type))
+             (llm-tester-log "ERROR: Provider %s returned an error with a non-symbol type %s with message %s" (type-of provider) type message))
+            ((not (stringp message))
+             (llm-tester-log "ERROR: Provider %s returned an error with a non-string message %s with type %s" (type-of provider) message type))
+            (t
+             (llm-tester-log "SUCCESS: Provider %s returned an error of type %s with message %s" (type-of provider) type message)))))
+        (success-callback
+         (lambda (_)
+           (llm-tester-log "ERROR: Provider %s returned a response when it should have been an error" (type-of provider)))))
+    (condition-case nil
+        (progn
+          (when (member 'embeddings (llm-capabilities provider))
+            (llm-tester-log "Testing bad provider %s for correct error handling for embeddings" provider)
+            (llm-embedding-async
+             provider "This is a test."
+             success-callback
+             error-callback))
+          (llm-tester-log "Testing bad provider %s for correct error handling for chat" provider)
+          (llm-chat-async
+           provider
+           (llm-make-simple-chat-prompt "This is a test")
+           success-callback
+           error-callback))
+      (error (llm-tester-log "ERROR: Provider %s threw an error when it should have been caught" (type-of provider))))))
+
+(defun llm-tester-all (provider &optional bad-variants delay)
   "Test all llm functionality for PROVIDER.
+
+BAD-VARIANTS are a list of providers that are expected to be
+unable to be successfully called for anything (embeddings, chat,
+etc).
+
 DELAY is the number of seconds to wait between tests.  The
 default is 1.  Delays can help avoid rate limiting."
   (let ((separator (string-pad "" 30 ?=))
@@ -370,6 +405,9 @@ default is 1.  Delays can help avoid rate limiting."
       (llm-tester-function-calling-conversation-sync provider)
       (sleep-for delay)
       (llm-tester-function-calling-conversation-async provider)
+      (sleep-for delay))
+    (dolist (bad-variant bad-variants)
+      (llm-tester-bad-provider bad-variant)
       (sleep-for delay))
     (sleep-for 10)
     (llm-tester-log "%s\nEnd of testing for %s\n\n"

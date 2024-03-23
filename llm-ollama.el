@@ -207,7 +207,7 @@ PROVIDER is the llm-ollama provider to use."
       :on-error (lambda (_ _)
                   ;; The problem with ollama is that it doesn't
                   ;; seem to have an error response.
-                  (llm-request-callback-in-buffer buf error-callback "Unknown error calling ollama")))))
+                  (llm-request-callback-in-buffer buf error-callback 'error "Unknown error calling ollama")))))
 
 (cl-defmethod llm-name ((provider llm-ollama))
   (llm-ollama-chat-model provider))

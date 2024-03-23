@@ -77,10 +77,12 @@ MODEL is the embedding model to use, or nil to use the default.."
 
 (defun llm-openai--error-message (err-response)
   "Return a user-visible error message from ERR-RESPONSE."
-  (let ((errdata (cdr (assoc 'error err-response))))
-    (format "Problem calling Open AI: %s message: %s"
-            (cdr (assoc 'type errdata))
-            (cdr (assoc 'message errdata)))))
+  (if (stringp err-response)
+      err-response
+    (let ((errdata (cdr (assoc 'error err-response))))
+      (format "Open AI returned error: %s message: %s"
+              (cdr (assoc 'type errdata))
+              (cdr (assoc 'message errdata))))))
 
 (defun llm-openai--handle-response (response extractor)
   "If RESPONSE is an error, throw it, else call EXTRACTOR."
@@ -228,20 +230,18 @@ PROMPT is the prompt that needs to be updated with the response."
 (cl-defmethod llm-chat-async ((provider llm-openai) prompt response-callback error-callback)
   (llm-openai--check-key provider)
   (let ((buf (current-buffer)))
-    (llm-request-async (llm-openai--url provider "chat/completions")
-      :headers (llm-openai--headers provider)
-      :data (llm-openai--chat-request (llm-openai-chat-model provider) prompt)
-      :on-success (lambda (data)
-                    (llm-request-callback-in-buffer
-                       buf response-callback
-                       (llm-openai--process-and-return
-                        provider prompt data error-callback)))
-      :on-error (lambda (_ data)
-                  (let ((errdata (cdr (assoc 'error data))))
-                    (llm-request-callback-in-buffer buf error-callback 'error
-                             (format "Problem calling Open AI: %s message: %s"
-                                     (cdr (assoc 'type errdata))
-                                     (cdr (assoc 'message errdata)))))))))
+    (llm-request-async
+     (llm-openai--url provider "chat/completions")
+     :headers (llm-openai--headers provider)
+     :data (llm-openai--chat-request (llm-openai-chat-model provider) prompt)
+     :on-success (lambda (data)
+                   (llm-request-callback-in-buffer
+                    buf response-callback
+                    (llm-openai--process-and-return
+                     provider prompt data error-callback)))
+     :on-error (lambda (_ data)
+                 (llm-request-callback-in-buffer buf error-callback 'error
+                                                 (llm-openai--error-message data))))))
 
 (cl-defmethod llm-chat ((provider llm-openai) prompt)
   (llm-openai--check-key provider)
@@ -338,7 +338,7 @@ them from 1 to however many are sent.")
                             ((name . ,(plist-get plist :name))
                              (arguments . ,(plist-get plist :arguments))))))
                        current-response))
-        current-response)))
+      current-response)))
 
 (cl-defmethod llm-chat-streaming ((provider llm-openai) prompt partial-callback
                                   response-callback error-callback)
@@ -348,12 +348,9 @@ them from 1 to however many are sent.")
                        :headers (llm-openai--headers provider)
                        :data (llm-openai--chat-request (llm-openai-chat-model provider) prompt t)
                        :on-error (lambda (_ data)
-                                   (let ((errdata (cdr (assoc 'error data))))
-                                     (llm-request-callback-in-buffer
+                                   (llm-request-callback-in-buffer
                                       buf error-callback 'error
-                                      (format "Problem calling Open AI: %s message: %s"
-                                              (cdr (assoc 'type errdata))
-                                              (cdr (assoc 'message errdata))))))
+                                      (llm-openai--error-message data)))
                        :on-partial (lambda (data)
                                      (when-let ((response (llm-openai--get-partial-chat-response data)))
                                        ;; We only send partial text updates, not
