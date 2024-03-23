@@ -116,7 +116,6 @@ This is just the key, if it exists."
   (llm-openai--check-key provider)
   (let ((buf (current-buffer)))
     (llm-request-plz-async (llm-openai--url provider "embeddings")
-                           :media-type '(application/json)
                            :headers (llm-openai--headers provider)
                            :data (llm-openai--embedding-request (llm-openai-embedding-model provider) string)
                            :on-success (lambda (data)
@@ -229,7 +228,6 @@ PROMPT is the prompt that needs to be updated with the response."
   (let ((buf (current-buffer)))
     (llm-request-plz-async
      (llm-openai--url provider "chat/completions")
-     :media-type '(application/json)
      :headers (llm-openai--headers provider)
      :data (llm-openai--chat-request (llm-openai-chat-model provider) prompt)
      :on-success (lambda (data)

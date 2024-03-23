@@ -65,7 +65,6 @@ You can get this at https://makersuite.google.com/app/apikey."
   (let ((buf (current-buffer)))
     (llm-request-plz-async (llm-gemini--embedding-url provider)
                            :data (llm-gemini--embedding-request provider string)
-                           :media-type '(application/json)
                            :on-success (lambda (data)
                                          (llm-request-callback-in-buffer
                                           buf vector-callback (llm-gemini--embedding-response-handler data)))
@@ -112,7 +111,6 @@ If STREAMING-P is non-nil, use the streaming endpoint."
   (let ((buf (current-buffer)))
     (llm-request-plz-async (llm-gemini--chat-url provider nil)
                            :data (llm-gemini--chat-request prompt)
-                           :media-type '(application/json)
                            :on-success (lambda (data)
                                          (llm-request-callback-in-buffer
                                           buf response-callback

@@ -130,7 +130,6 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
      (llm-vertex--embedding-url provider)
      :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
      :data `(("instances" . [(("content" . ,string))]))
-     :media-type '(application/json)
      :on-success (lambda (data)
                    (llm-request-callback-in-buffer
                     buf vector-callback (llm-vertex--embedding-extract-response data)))
@@ -302,7 +301,6 @@ If STREAMING is non-nil, use the URL for the streaming API."
      (llm-vertex--chat-url provider)
      :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
      :data (llm-vertex--chat-request prompt)
-     :media-type '(application/json)
      :on-success (lambda (data)
                    (llm-request-callback-in-buffer
                     buf response-callback

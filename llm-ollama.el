@@ -86,7 +86,6 @@ PROVIDER is the llm-ollama provider."
   (let ((buf (current-buffer)))
     (llm-request-plz-async (llm-ollama--url provider "embeddings")
                            :data (llm-ollama--embedding-request provider string)
-                           :media-type '(application/json)
                            :on-success (lambda (data)
                                          (llm-request-callback-in-buffer
                                           buf vector-callback (llm-ollama--embedding-extract-response data)))
@@ -148,7 +147,6 @@ STREAMING is a boolean to control whether to stream the response."
     (llm-request-plz-async
      (llm-ollama--url provider "chat")
      :data (llm-ollama--chat-request provider prompt nil)
-     :media-type '(application/json)
      :timeout llm-ollama-chat-timeout
      :on-success (lambda (data)
                    (let ((output (llm-ollama--get-response data)))
