@@ -116,6 +116,7 @@ This is just the key, if it exists."
   (llm-openai--check-key provider)
   (let ((buf (current-buffer)))
     (llm-request-plz-async (llm-openai--url provider "embeddings")
+                           :media-type '(application/json)
                            :headers (llm-openai--headers provider)
                            :data (llm-openai--embedding-request (llm-openai-embedding-model provider) string)
                            :on-success (lambda (data)
@@ -226,20 +227,22 @@ PROMPT is the prompt that needs to be updated with the response."
 (cl-defmethod llm-chat-async ((provider llm-openai) prompt response-callback error-callback)
   (llm-openai--check-key provider)
   (let ((buf (current-buffer)))
-    (llm-request-plz-async (llm-openai--url provider "chat/completions")
-      :headers (llm-openai--headers provider)
-      :data (llm-openai--chat-request (llm-openai-chat-model provider) prompt)
-      :on-success (lambda (data)
-                    (llm-request-plz-callback-in-buffer
-                       buf response-callback
-                       (llm-openai--process-and-return
-                        provider prompt data error-callback)))
-      :on-error (lambda (_ data)
-                  (let ((errdata (cdr (assoc 'error data))))
-                    (llm-request-plz-callback-in-buffer buf error-callback 'error
-                             (format "Problem calling Open AI: %s message: %s"
-                                     (cdr (assoc 'type errdata))
-                                     (cdr (assoc 'message errdata)))))))))
+    (llm-request-plz-async
+     (llm-openai--url provider "chat/completions")
+     :media-type '(application/json)
+     :headers (llm-openai--headers provider)
+     :data (llm-openai--chat-request (llm-openai-chat-model provider) prompt)
+     :on-success (lambda (data)
+                   (llm-request-plz-callback-in-buffer
+                    buf response-callback
+                    (llm-openai--process-and-return
+                     provider prompt data error-callback)))
+     :on-error (lambda (_ data)
+                 (let ((errdata (cdr (assoc 'error data))))
+                   (llm-request-plz-callback-in-buffer buf error-callback 'error
+                                                       (format "Problem calling Open AI: %s message: %s"
+                                                               (cdr (assoc 'type errdata))
+                                                               (cdr (assoc 'message errdata)))))))))
 
 (cl-defmethod llm-chat ((provider llm-openai) prompt)
   (llm-openai--check-key provider)

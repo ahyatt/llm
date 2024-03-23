@@ -86,6 +86,7 @@ PROVIDER is the llm-ollama provider."
   (let ((buf (current-buffer)))
     (llm-request-plz-async (llm-ollama--url provider "embeddings")
                            :data (llm-ollama--embedding-request provider string)
+                           :media-type '(application/json)
                            :on-success (lambda (data)
                                          (llm-request-callback-in-buffer
                                           buf vector-callback (llm-ollama--embedding-extract-response data)))
@@ -144,19 +145,21 @@ STREAMING is a boolean to control whether to stream the response."
 
 (cl-defmethod llm-chat-async ((provider llm-ollama) prompt response-callback error-callback)
   (let ((buf (current-buffer)))
-    (llm-request-plz-async (llm-ollama--url provider "chat")
-      :data (llm-ollama--chat-request provider prompt nil)
-      :timeout llm-ollama-chat-timeout
-      :on-success (lambda (data)
-                    (let ((output (llm-ollama--get-response data)))
-                      (llm-provider-utils-append-to-prompt prompt data)
-                      (llm-request-plz-callback-in-buffer buf response-callback output)))
-      :on-error (lambda (_ data)
-                  (let ((errdata (cdr (assoc 'error data))))
-                    (llm-request-plz-callback-in-buffer buf error-callback 'error
-                             (format "Problem calling Ollama: %s message: %s"
-                                     (cdr (assoc 'type errdata))
-                                     (cdr (assoc 'message errdata)))))))))
+    (llm-request-plz-async
+     (llm-ollama--url provider "chat")
+     :data (llm-ollama--chat-request provider prompt nil)
+     :media-type '(application/json)
+     :timeout llm-ollama-chat-timeout
+     :on-success (lambda (data)
+                   (let ((output (llm-ollama--get-response data)))
+                     (llm-provider-utils-append-to-prompt prompt data)
+                     (llm-request-plz-callback-in-buffer buf response-callback output)))
+     :on-error (lambda (_ data)
+                 (let ((errdata (cdr (assoc 'error data))))
+                   (llm-request-plz-callback-in-buffer buf error-callback 'error
+                                                       (format "Problem calling Ollama: %s message: %s"
+                                                               (cdr (assoc 'type errdata))
+                                                               (cdr (assoc 'message errdata)))))))))
 
 (cl-defmethod llm-chat-streaming ((provider llm-ollama) prompt partial-callback response-callback error-callback)
   (let ((buf (current-buffer))

@@ -131,7 +131,7 @@ and required otherwise.
 ON-ERROR will be called with the error code and a response-body.
 This is required.
 
-MEDIA-TYPE is an optional argument that sets a media type, useful
+MEDIA-TYPE is a required argument that sets a media type, useful
 for streaming formats.  It is expected that this is only used by
 other methods in this file.
 
@@ -139,22 +139,17 @@ ON-SUCCESS-RAW, if set, will be called in the buffer with the
 response body, and expect the response content. This is an
 optional argument, and mostly useful for streaming.  If not set,
 the buffer is turned into JSON and passed to ON-SUCCESS."
+  (unless media-type
+    (error "MEDIA-TYPE is required in llm-request-plz-async"))
   (plz-media-type-request
     'post url
-    :as (if media-type
-            `(media-types ,(cons media-type plz-media-types))
-            'string)
+    :as `(media-types ,(cons media-type plz-media-types))
     :body (when data
             (encode-coding-string (json-encode data) 'utf-8))
     :headers (append headers
                      '(("Content-Type" . "application/json")))
     :then (lambda (response)
-            ;; Media types can return a response object sometimes, otherwise it
-            ;; is a string.  This is normal, since this is dependent on the
-            ;; `:as' argument.
-            (let ((response (if (plz-response-p response)
-                                (plz-response-body response)
-                              response)))
+            (let ((response (plz-response-body response)))
               (when on-success-raw
                 (funcall on-success-raw response))
               (when on-success
