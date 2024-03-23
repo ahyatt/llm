@@ -338,7 +338,10 @@ If STREAMING is non-nil, use the URL for the streaming API."
                      provider prompt (or function-call
                                          (if (> (length streamed-text) 0)
                                              streamed-text
-                                           (llm-vertex--get-chat-response data)))))))))
+                                           (llm-vertex--get-chat-response data))))))
+     :on-error (lambda (_ data)
+                 (llm-request-callback-in-buffer buf error-callback 'error
+                                                 (llm-vertex--error-message data))))))
 
 ;; Token counts
 ;; https://cloud.google.com/vertex-ai/docs/generative-ai/get-token-count
