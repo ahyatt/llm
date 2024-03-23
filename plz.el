@@ -755,6 +755,7 @@ argument passed to `plz--sentinel', which see."
         (pcase-exhaustive status
           ((or 0 "finished\n")
            ;; Curl exited normally: check HTTP status code.
+           (widen)
            (goto-char (point-min))
            (plz--skip-proxy-headers)
            (while (plz--skip-redirect-headers))
