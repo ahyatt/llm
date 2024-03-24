@@ -204,19 +204,22 @@ HTTP responses.  The media type sets the body slot of the
 plz-response structure to the unmodified value of the HTTP response
 body.  It is used as the default media type processor.")
 
-(cl-defmethod plz-media-type-else ((media-type plz-media-type:application/octet-stream) error)
+(cl-defmethod plz-media-type-else
+  ((media-type plz-media-type:application/octet-stream) error)
   "Transform the ERROR into a format suitable for MEDIA-TYPE."
   (when-let (response (plz-error-response error))
     (setf (plz-error-response error) (plz-media-type-then media-type response)))
   error)
 
-(cl-defmethod plz-media-type-then ((media-type plz-media-type:application/octet-stream) response)
+(cl-defmethod plz-media-type-then
+  ((media-type plz-media-type:application/octet-stream) response)
   "Transform the RESPONSE into a format suitable for MEDIA-TYPE."
   (ignore media-type)
   (setf (plz-response-body response) (buffer-string))
   response)
 
-(cl-defmethod plz-media-type-process ((media-type plz-media-type:application/octet-stream) process chunk)
+(cl-defmethod plz-media-type-process
+  ((media-type plz-media-type:application/octet-stream) process chunk)
   "Process the CHUNK according to MEDIA-TYPE using PROCESS."
   (ignore media-type)
   (save-excursion
@@ -267,7 +270,8 @@ accordingly.")
                        :null-object null-object
                        :object-type object-type)) )
 
-(cl-defmethod plz-media-type-then ((media-type plz-media-type:application/json) response)
+(cl-defmethod plz-media-type-then
+  ((media-type plz-media-type:application/json) response)
   "Transform the RESPONSE into a format suitable for MEDIA-TYPE."
   (setf (plz-response-body response) (plz-media-type--parse-json-object media-type))
   response)
@@ -331,14 +335,16 @@ will always be set to nil.")
           (funcall handler (cdr result)))
         (setq result (plz-media-type:application/json-array--consume-next media-type))))))
 
-(cl-defmethod plz-media-type-process ((media-type plz-media-type:application/json-array) process chunk)
+(cl-defmethod plz-media-type-process
+  ((media-type plz-media-type:application/json-array) process chunk)
   "Process the CHUNK according to MEDIA-TYPE using PROCESS."
   (ignore media-type)
   (cl-call-next-method media-type process chunk)
   (plz-media-type:application/json-array--parse-stream media-type)
   (set-marker (process-mark process) (point-max)))
 
-(cl-defmethod plz-media-type-then ((media-type plz-media-type:application/json-array) response)
+(cl-defmethod plz-media-type-then
+  ((media-type plz-media-type:application/json-array) response)
   "Transform the RESPONSE into a format suitable for MEDIA-TYPE."
   (ignore media-type)
   (plz-media-type:application/json-array--parse-stream media-type)
@@ -386,12 +392,14 @@ will always be set to nil.")
           (funcall handler object))
         (setq object (plz-media-type:application/x-ndjson--parse-line media-type))))))
 
-(cl-defmethod plz-media-type-process ((media-type plz-media-type:application/x-ndjson) process chunk)
+(cl-defmethod plz-media-type-process
+  ((media-type plz-media-type:application/x-ndjson) process chunk)
   "Process the CHUNK according to MEDIA-TYPE using PROCESS."
   (cl-call-next-method media-type process chunk)
   (plz-media-type:application/x-ndjson--parse-stream media-type))
 
-(cl-defmethod plz-media-type-then ((media-type plz-media-type:application/x-ndjson) response)
+(cl-defmethod plz-media-type-then
+  ((media-type plz-media-type:application/x-ndjson) response)
   "Transform the RESPONSE into a format suitable for MEDIA-TYPE."
   (plz-media-type:application/x-ndjson--parse-stream media-type)
   (setf (plz-response-body response) nil)
@@ -408,7 +416,8 @@ body of the plz-response structure is set to the result of parsing
 the HTTP response body with the `libxml-parse-html-region'
 function.")
 
-(cl-defmethod plz-media-type-then ((media-type plz-media-type:application/xml) response)
+(cl-defmethod plz-media-type-then
+  ((media-type plz-media-type:application/xml) response)
   "Transform the RESPONSE into a format suitable for MEDIA-TYPE."
   (with-slots (array-type false-object null-object object-type) media-type
     (setf (plz-response-body response)
