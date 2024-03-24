@@ -27,12 +27,13 @@
 (require 'rx)
 (require 'url-http)
 
-(defcustom llm-request-plz-timeout (* 2 60)
+(defcustom llm-request-plz-timeout nil
   "The number of seconds to wait for a response from a HTTP server.
 
-Request timings are depending on the request. Requests that need
+When set to nil, don't timeout while receiving a response.
+Request timings are depending on the request.  Requests that need
 more output may take more time, and there is other processing
-besides just token generation that can take a while. Sometimes
+besides just token generation that can take a while.  Sometimes
 the LLM can get stuck, and you don't want it to take too long.
 This should be balanced to be good enough for hard requests but
 not very long so that we can end stuck requests."
