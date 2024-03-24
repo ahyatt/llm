@@ -487,6 +487,9 @@ methods."
             (kill-buffer-query-functions nil))
     (kill-buffer buf)))
 
+(cl-defmethod llm-cancel-request ((proc process))
+  (delete-process proc))
+
 (cl-defgeneric llm-name (_)
   "Return the name of the model in PROVIDER.
 This is expected to be suitable for short labels. For example, if
