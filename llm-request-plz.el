@@ -39,6 +39,11 @@ not very long so that we can end stuck requests."
   :type 'integer
   :group 'llm)
 
+(defcustom llm-request-plz-connect-timeout 10
+  "The number of seconds to wait for a connection to a HTTP server."
+  :type 'integer
+  :group 'llm)
+
 (defun llm-request-success (status)
   "Return non-nil if STATUS is a successful HTTP status code."
   (<= 200 status 299))
@@ -59,6 +64,7 @@ TIMEOUT is the number of seconds to wait for a response."
         :as `(media-types ,plz-media-types)
         :body (when data
                 (encode-coding-string (json-encode data) 'utf-8))
+        :connect-timeout llm-request-plz-connect-timeout
         :headers (append headers '(("Content-Type" . "application/json")))
         :timeout (or timeout llm-request-plz-timeout))))
         (if (llm-request-success (plz-response-status resp))
@@ -141,6 +147,7 @@ only used by other methods in this file."
                          plz-media-types))
     :body (when data
             (encode-coding-string (json-encode data) 'utf-8))
+    :connect-timeout llm-request-plz-connect-timeout
     :headers (append headers
                      '(("Content-Type" . "application/json")))
     :then (lambda (response)
