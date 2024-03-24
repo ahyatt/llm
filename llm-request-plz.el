@@ -27,15 +27,21 @@
 (require 'rx)
 (require 'url-http)
 
-(defcustom llm-request-plz-timeout (* 2 60)
+(defcustom llm-request-plz-timeout nil
   "The number of seconds to wait for a response from a HTTP server.
 
-Request timings are depending on the request. Requests that need
+When set to nil, don't timeout while receiving a response.
+Request timings are depending on the request.  Requests that need
 more output may take more time, and there is other processing
-besides just token generation that can take a while. Sometimes
+besides just token generation that can take a while.  Sometimes
 the LLM can get stuck, and you don't want it to take too long.
 This should be balanced to be good enough for hard requests but
 not very long so that we can end stuck requests."
+  :type 'integer
+  :group 'llm)
+
+(defcustom llm-request-plz-connect-timeout 10
+  "The number of seconds to wait for a connection to a HTTP server."
   :type 'integer
   :group 'llm)
 
@@ -59,6 +65,7 @@ TIMEOUT is the number of seconds to wait for a response."
         :as `(media-types ,plz-media-types)
         :body (when data
                 (encode-coding-string (json-encode data) 'utf-8))
+        :connect-timeout llm-request-plz-connect-timeout
         :headers (append headers '(("Content-Type" . "application/json")))
         :timeout (or timeout llm-request-plz-timeout))))
         (if (llm-request-success (plz-response-status resp))
@@ -141,6 +148,7 @@ only used by other methods in this file."
                          plz-media-types))
     :body (when data
             (encode-coding-string (json-encode data) 'utf-8))
+    :connect-timeout llm-request-plz-connect-timeout
     :headers (append headers
                      '(("Content-Type" . "application/json")))
     :then (lambda (response)
