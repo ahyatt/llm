@@ -4,6 +4,10 @@
 
 ;; Author: r0man <roman@burningswell.com>
 ;; Maintainer: r0man <roman@burningswell.com>
+;; URL: https://github.com/r0man/plz-event-source.el
+;; Version: 0.1-pre
+;; Package-Requires: ((emacs "26.3"))
+;; Keywords: comm, network, http
 
 ;; This file is part of GNU Emacs.
 
@@ -458,7 +462,9 @@ callbacks will always be set to nil.")
 (cl-defmethod plz-media-type-then ((media-type plz-media-type:text/event-stream) response)
   "Transform the RESPONSE into a format suitable for MEDIA-TYPE."
   (plz-event-source-close plz-event-source--current)
-  (cl-call-next-method media-type response))
+  (cl-call-next-method media-type response)
+  (setf (plz-response-body response) nil)
+  response)
 
 (provide 'plz-event-source)
 ;;; plz-event-source.el ends here
