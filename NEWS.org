@@ -1,5 +1,6 @@
 * Version 0.12.2
 - Send connection issues to error callbacks, and fix an error handling issue in Ollama.
+- Fix issue where, in some cases, streaming does not work the first time attempted.
 * Version 0.12.1
 - Fix issue in =llm-ollama= with not using provider host for sync embeddings.
 - Fix issue in =llm-openai= where were incompatible with some Open AI-compatible backends due to assumptions about inconsequential JSON details.

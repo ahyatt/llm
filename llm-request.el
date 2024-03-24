@@ -135,18 +135,24 @@ response body, and expect the response content. This is an
 optional argument, and mostly useful for streaming.  If not set,
 the buffer is turned into JSON and passed to ON-SUCCESS."
   (let ((url-request-method "POST")
-        ;; This is necessary for streaming, otherwise we get gzip'd data that is
-        ;; unparseable until the end. The responses should be small enough that
-        ;; this should not be any big loss.
-        (url-mime-encoding-string "identity")
         (url-request-extra-headers
          (append headers '(("Content-Type" . "application/json"))))
-        (url-request-data (encode-coding-string (json-encode data) 'utf-8)))
+        (url-request-data (encode-coding-string (json-encode data) 'utf-8))
+        (old-mime-encoding url-mime-encoding-string))
+    ;; This is necessary for streaming, otherwise we get gzip'd data that is
+    ;; unparseable until the end. The responses should be small enough that this
+    ;; should not be any big loss.  We can't use let-binding here, since the use
+    ;; of this variable happens asynchronously, so not enclosed by the
+    ;; let-binding.
+    (setq url-mime-encoding-string "identity")
     (let ((buffer
            (url-retrieve
             url
             ;; For some reason the closure you'd expect did not work here.
             (lambda (_ on-success on-error)
+              ;; Restore the old mime encoding.  This may cause race conditions
+              ;; if we try to stream two things at around the same time.
+              (setq url-mime-encoding-string old-mime-encoding)
               ;; No matter what, we need to stop listening for changes.
               (remove-hook 'after-change-functions #'llm-request--handle-new-content t)
               (condition-case error
