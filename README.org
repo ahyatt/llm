@@ -128,7 +128,7 @@ Conversations can take place by repeatedly calling ~llm-chat~ and its variants. 
 ** Caution about ~llm-chat-prompt-interactions~
 The interactions in a prompt may be modified by conversation or by the conversion of the context and examples to what the LLM understands.  Different providers require different things from the interactions.  Some can handle system prompts, some cannot.  Some may have richer APIs for examples and context, some not.  Do not attempt to read or manipulate ~llm-chat-prompt-interactions~ after initially setting it up for the first time, because you are likely to make changes that only work for some providers.
 ** Function calling
-*Note: function calling functionality is currently alpha quality.  If you want to use function calling, please watch the =llm= [discussion](https://github.com/ahyatt/llm/discussions) section for any announcements about changes.*
+*Note: function calling functionality is currently alpha quality.  If you want to use function calling, please watch the =llm= [[https://github.com/ahyatt/llm/discussions][discussions]] for any announcements about changes.*
 
 Function calling is a way to give the LLM a list of functions it can call, and have it call the functions for you.  The standard interaction has the following steps:
 1. The client sends the LLM a prompt with functions it can call.
