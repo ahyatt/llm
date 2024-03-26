@@ -75,19 +75,10 @@ MODEL is the embedding model to use, or nil to use the default.."
   "Return the embedding from the server RESPONSE."
   (cdr (assoc 'embedding (aref (cdr (assoc 'data response)) 0))))
 
-(defun llm-openai--error-message (err-response)
-  "Return a user-visible error message from ERR-RESPONSE."
-  (if (stringp err-response)
-      err-response
-    (let ((errdata (cdr (assoc 'error err-response))))
-      (format "Open AI returned error: %s message: %s"
-              (cdr (assoc 'type errdata))
-              (cdr (assoc 'message errdata))))))
-
 (defun llm-openai--handle-response (response extractor)
   "If RESPONSE is an error, throw it, else call EXTRACTOR."
-  (if (cdr (assoc 'error response))
-      (error (llm-openai--error-message response))
+  (if-let ((err-msg (llm-openai--error-message response)))
+      (error err-msg)
     (funcall extractor response)))
 
 (cl-defmethod llm-openai--check-key ((provider llm-openai))
@@ -116,6 +107,19 @@ MODEL is the embedding model to use, or nil to use the default.."
   (concat (llm-openai-compatible-url provider)
           (unless (string-suffix-p "/" (llm-openai-compatible-url provider))
             "/") command))
+
+(cl-defgeneric llm-openai--error-message (provider err-response)
+  "Return a user-visible error message from ERR-RESPONSE.
+If ERR-RESPONSE is not an error, return nil.")
+
+(cl-defmethod llm-openai--error-message ((_ llm-openai) err-response)
+  (if (stringp err-response)
+      err-response
+    (let ((errdata (assoc-default 'error err-response)))
+      (when errdata
+        (format "Open AI returned error: %s message: %s"
+                (cdr (assoc 'type errdata))
+                (cdr (assoc 'message errdata)))))))
 
 (cl-defmethod llm-embedding-async ((provider llm-openai) string vector-callback error-callback)
   (llm-openai--check-key provider)  
@@ -215,10 +219,10 @@ This function adds the response to the prompt, executes any
 functions, and returns the value that the client should get back.
 
 PROMPT is the prompt that needs to be updated with the response."
-  (if (and (consp response) (cdr (assoc 'error response)))
+  (if-let ((err-msg (llm-openai--error-message response)))
       (progn
         (when error-callback
-          (funcall error-callback 'error (llm-openai--error-message response)))
+          (funcall error-callback 'error err-msg))
         response)
     ;; When it isn't an error
     (llm-provider-utils-process-result
