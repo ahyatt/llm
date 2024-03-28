@@ -22,7 +22,88 @@
 ;;; Code:
 
 (require 'llm)
+(require 'llm-request)
 (require 'seq)
+
+(cl-defstruct llm-standard-provider
+  "A struct indicating that this is a standard provider.
+This is for dispatch purposes, so this contains no actual data.")
+
+(cl-defgeneric llm-provider-request-prelude (provider)
+  "Execute any prelude code necessary before running a request.")
+
+(cl-defmethod llm-provider-request-prelude ((_ llm-standard-provider))
+  "Do nothing for the standard provider."
+  nil)
+
+(cl-defgeneric llm-provider-embedding-url (provider)
+  "Return the URL for embeddings for the PROVIDER.")
+
+(cl-defgeneric llm-provider-chat-url (provider)
+  "Return the URL for chat for the PROVIDER.")
+
+(cl-defgeneric llm-provider-headers (provider)
+  "Return the headers for the PROVIDER.")
+
+(cl-defmethod llm-provider-header ((_ llm-standard-provider))
+  "By default, the standard provider has no headers."
+  nil)
+
+(cl-defgeneric llm-provider-embedding-request (provider string)
+  "Return the request for the PROVIDER for STRING.")
+
+(cl-defgeneric llm-provider-chat-request (provider prompt)
+  "Return the request for the PROVIDER for PROMPT.")
+
+(cl-defgeneric llm-provider-embedding-extract-error (provider response)
+  "Return an error message from RESPONSE for the PROVIDER.
+
+RESPONSE is a parsed JSON object.
+
+Return nil if there is no error.")
+
+(cl-defmethod llm-provider-embedding-extract-error ((_ llm-standard-provider) _)
+  "By default, the standard provider has no error extractor."
+  nil)
+
+(cl-defgeneric llm-provider-embedding-extract-result (provider response)
+  "Return the result from RESPONSE for the PROVIDER.")
+
+(cl-defgeneric llm-provider-chat-extract-result (provider response)
+  "Return the result from RESPONSE for the PROVIDER.")
+
+(cl-defmethod llm-embedding ((provider llm-standard-provider) string)
+  (llm-provider-request-prelude provider)
+  (let ((response (llm-request-sync (llm-provider-embedding-url provider)
+                                    :headers (llm-provider-headers provider)
+                                    :data (llm-provider-embedding-request provider string))))
+    (if-let ((err-msg (llm-provider-embedding-extract-error provider response)))
+        (error err-msg)
+      (llm-provider-embedding-extract-result provider response))))
+
+(cl-defmethod llm-embedding-async ((provider llm-standard-provider) string vector-callback error-callback)
+  (llm-provider-request-prelude provider)
+  (let ((buf (current-buffer)))
+    (llm-request-async
+     (llm-provider-embedding-url provider)
+     :headers (llm-provider-headers provider)
+     :data (llm-provider-embedding-request provider string)
+     :on-success (lambda (data)
+                   (if-let ((err-msg (llm-provider-embedding-extract-error provider data)))
+                       (llm-request-callback-in-buffer
+                        buf error-callback 'error
+                        err-msg)
+                     (llm-request-callback-in-buffer
+                      buf vector-callback
+                      (llm-provider-embedding-extract-result provider data))))
+     :on-error (lambda (_ data)
+                 (llm-request-callback-in-buffer
+                  buf error-callback 'error
+                  (if (stringp data)
+                      data
+                    (or (llm-provider-embedding-extract-error
+                         provider data)
+			            "Unknown error")))))))
 
 (defun llm-provider-utils-get-system-prompt (prompt &optional example-prelude)
   "From PROMPT, turn the context and examples into a string.
@@ -89,7 +170,7 @@ things.  Providers should probably issue a warning when using this."
     (setf (llm-chat-prompt-interactions prompt)
           (list (make-llm-chat-prompt-interaction
                  :role 'user
-                 :content 
+                 :content
                  (concat (or history-prelude "Previous interactions:") "\n\n"
                          (mapconcat (lambda (interaction)
                                       (format "%s: %s" (pcase (llm-chat-prompt-interaction-role interaction)

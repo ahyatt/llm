@@ -45,7 +45,7 @@
   :type 'integer
   :group 'llm-ollama)
 
-(cl-defstruct llm-ollama
+(cl-defstruct (llm-ollama :include llm-standard-provider)
   "A structure for holding information needed by Ollama's API.
 
 SCHEME is the http scheme to use, a string. It is optional and
@@ -72,33 +72,18 @@ EMBEDDING-MODEL is the model to use for embeddings.  It is required."
   (format "%s://%s:%d/api/%s" (llm-ollama-scheme provider )(llm-ollama-host provider)
           (llm-ollama-port provider) method))
 
-(defun llm-ollama--embedding-request (provider string)
+(cl-defmethod llm-provider-embedding-url ((provider llm-ollama))
+  (llm-ollama--url provider "embeddings"))
+
+(cl-defmethod llm-provider-embedding-request ((provider llm-ollama) string)
   "Return the request to the server for the embedding of STRING.
 PROVIDER is the llm-ollama provider."
   `(("prompt" . ,string)
     ("model" . ,(llm-ollama-embedding-model provider))))
 
-(defun llm-ollama--embedding-extract-response (response)
+(cl-defmethod llm-provider-embedding-extract-result ((_ llm-ollama) response)
   "Return the embedding from the server RESPONSE."
   (assoc-default 'embedding response))
-
-(cl-defmethod llm-embedding-async ((provider llm-ollama) string vector-callback error-callback)
-  (let ((buf (current-buffer)))
-    (llm-request-async (llm-ollama--url provider "embeddings")
-                     :data (llm-ollama--embedding-request provider string)
-                     :on-success (lambda (data)
-                                   (llm-request-callback-in-buffer
-                                    buf vector-callback (llm-ollama--embedding-extract-response data)))
-                     :on-error (lambda (_ _)
-                                 ;; The problem with ollama is that it doesn't
-                                 ;; seem to have an error response.
-                                 (llm-request-callback-in-buffer
-                                  buf error-callback 'error "Unknown error calling ollama")))))
-
-(cl-defmethod llm-embedding ((provider llm-ollama) string)
-  (llm-ollama--embedding-extract-response
-   (llm-request-sync (llm-ollama--url provider "embeddings")
-                     :data (llm-ollama--embedding-request provider string))))
 
 (defun llm-ollama--chat-request (provider prompt)
   "From PROMPT, create the chat request data to send.

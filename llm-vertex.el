@@ -64,7 +64,11 @@ for more specialized uses."
   :type 'string
   :group 'llm-vertex)
 
-(cl-defstruct llm-vertex
+(cl-defstruct (llm-google (:include llm-standard-provider))
+  "A base class for functionality that is common to both Vertex and
+Gemini.")
+
+(cl-defstruct (llm-vertex (:include llm-google))
   "A struct representing a Vertex AI client.
 
 KEY is the temporary API key for the Vertex AI. It is required to
@@ -81,7 +85,7 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
   (chat-model llm-vertex-default-chat-model)
   key-gentime)
 
-(defun llm-vertex-refresh-key (provider)
+(cl-defmethod llm-provider-request-prelude ((provider llm-vertex))
   "Refresh the key in the vertex PROVIDER, if needed."
   (unless (and (llm-vertex-key provider)
                (> (* 60 60)
@@ -94,56 +98,31 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
       (setf (llm-vertex-key provider) (encode-coding-string result 'utf-8)))
     (setf (llm-vertex-key-gentime provider) (current-time))))
 
-(cl-defmethod llm-nonfree-message-info ((provider llm-vertex))
+(cl-defmethod llm-nonfree-message-info ((provider llm-google))
   (ignore provider)
   (cons "Google Cloud Vertex" "https://policies.google.com/terms/generative-ai"))
 
-(defun llm-vertex--embedding-url (provider)
-  "From the PROVIDER, return the URL to use for embeddings"
+(cl-defmethod llm-provider-embedding-url ((provider llm-vertex))
   (format "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:predict"
-                             llm-vertex-gcloud-region
-                             (llm-vertex-project provider)
-                             llm-vertex-gcloud-region
-                             (or (llm-vertex-embedding-model provider) "textembedding-gecko")))
+          llm-vertex-gcloud-region
+          (llm-vertex-project provider)
+          llm-vertex-gcloud-region
+          (or (llm-vertex-embedding-model provider) "textembedding-gecko")))
 
-(defun llm-vertex--embedding-extract-response (response)
-  "Return the embedding contained in RESPONSE."
-  (cdr (assoc 'values (cdr (assoc 'embeddings (aref (cdr (assoc 'predictions response)) 0))))))
+(cl-defmethod llm-provider-embedding-extract-result ((_ llm-vertex) response)
+  (assoc-default 'values (assoc-default 'embeddings (aref (assoc-default 'predictions response) 0))))
 
-(defun llm-vertex--error-message (err-response)
-  "Return a user-visible error message from ERR-RESPONSE."
-  (let ((err (assoc-default 'error err-response)))
+(cl-defmethod llm-provider-embedding-extract-error ((_ llm-google) err-response)
+  (when-let ((err (assoc-default 'error err-response)))
     (format "Problem calling GCloud Vertex AI: status: %s message: %s"
             (assoc-default 'code err)
             (assoc-default 'message err))))
 
-(defun llm-vertex--handle-response (response extractor)
-  "If RESPONSE is an errorp, throw it, else call EXTRACTOR."
-  (if (assoc 'error response)
-      (error (llm-vertex--error-message response))
-    (funcall extractor response)))
+(cl-defmethod llm-provider-embedding-request ((provider llm-vertex) string)
+  `(("instances" . [(("content" . ,string))])))
 
-(cl-defmethod llm-embedding-async ((provider llm-vertex) string vector-callback error-callback)
-  (llm-vertex-refresh-key provider)
-  (let ((buf (current-buffer)))
-    (llm-request-async (llm-vertex--embedding-url provider)
-                     :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
-                     :data `(("instances" . [(("content" . ,string))]))
-                     :on-success (lambda (data)
-                                   (llm-request-callback-in-buffer
-                                    buf vector-callback (llm-vertex--embedding-extract-response data)))
-                     :on-error (lambda (_ data)
-                                 (llm-request-callback-in-buffer
-                                  buf error-callback
-                                  'error (llm-vertex--error-message data))))))
-
-(cl-defmethod llm-embedding ((provider llm-vertex) string)
-  (llm-vertex-refresh-key provider)
-  (llm-vertex--handle-response
-   (llm-request-sync (llm-vertex--embedding-url provider)
-                     :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
-                     :data `(("instances" . [(("content" . ,string))])))
-   #'llm-vertex--embedding-extract-response))
+(cl-defmethod llm-provider-headers ((provider llm-vertex))
+  `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider)))))
 
 (defun llm-vertex--get-chat-response (response)
   "Return the actual response from the RESPONSE struct returned.

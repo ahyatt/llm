@@ -33,45 +33,25 @@
 (require 'llm-provider-utils)
 (require 'json)
 
-(cl-defstruct llm-gemini
+(cl-defstruct (llm-gemini (:include llm-google))
   "A struct representing a Gemini client.
 
 KEY is the API key for the client.
 You can get this at https://makersuite.google.com/app/apikey."
   key (embedding-model "embedding-001") (chat-model "gemini-pro"))
 
-(defun llm-gemini--embedding-url (provider)
+(cl-defmethod llm-provider-embedding-url ((provider llm-gemini))
   "Return the URL for the EMBEDDING request for STRING from PROVIDER."
   (format "https://generativelanguage.googleapis.com/v1beta/models/%s:embedContent?key=%s"
           (llm-gemini-embedding-model provider)
           (llm-gemini-key provider)))
 
-(defun llm-gemini--embedding-request (provider string)
-  "Return the embedding request for STRING, using PROVIDER."
+(cl-defmethod llm-provider-embedding-request ((provider llm-gemini) string)
   `((model . ,(llm-gemini-embedding-model provider))
     (content . ((parts . (((text . ,string))))))))
 
-(defun llm-gemini--embedding-response-handler (response)
-  "Handle the embedding RESPONSE from Gemini."
+(cl-defmethod llm-provider-embedding-extract-result (response)
   (assoc-default 'values (assoc-default 'embedding response)))
-
-(cl-defmethod llm-embedding ((provider llm-gemini) string)
-  (llm-vertex--handle-response
-   (llm-request-sync (llm-gemini--embedding-url provider)
-                     :data (llm-gemini--embedding-request provider string))
-   #'llm-gemini--embedding-response-handler))
-
-(cl-defmethod llm-embedding-async ((provider llm-gemini) string vector-callback error-callback)
-  (let ((buf (current-buffer)))
-    (llm-request-async (llm-gemini--embedding-url provider)
-                       :data (llm-gemini--embedding-request provider string)
-                       :on-success (lambda (data)
-                                     (llm-request-callback-in-buffer
-                                      buf vector-callback (llm-gemini--embedding-response-handler data)))
-                       :on-error (lambda (_ data)
-                                   (llm-request-callback-in-buffer
-                                    buf error-callback
-                                    'error (llm-vertex--error-message data))))))
 
 ;; from https://ai.google.dev/tutorials/rest_quickstart
 (defun llm-gemini--chat-url (provider streaming-p)

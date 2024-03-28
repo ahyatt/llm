@@ -40,7 +40,7 @@
   :type 'string
   :group 'llm-openai)
 
-(cl-defstruct llm-openai
+(cl-defstruct (llm-openai (:include llm-standard-provider))
   "A structure for holding information needed by Open AI's API.
 
 KEY is the API key for Open AI, which is required.
@@ -65,21 +65,16 @@ https://api.example.com/v1/chat, then URL should be
   (ignore provider)
   (cons "Open AI" "https://openai.com/policies/terms-of-use"))
 
-(defun llm-openai--embedding-request (model string)
+(cl-defmethod llm-provider-embedding-request ((provider llm-openai) string)
   "Return the request to the server for the embedding of STRING.
 MODEL is the embedding model to use, or nil to use the default.."
   `(("input" . ,string)
-    ("model" . ,(or model "text-embedding-3-small"))))
+    ("model" . ,(or (llm-openai-embedding-model provider)
+                    "text-embedding-3-small"))))
 
-(defun llm-openai--embedding-extract-response (response)
+(cl-defmethod llm-provider-embedding-extract-result ((_ llm-openai) response)
   "Return the embedding from the server RESPONSE."
-  (cdr (assoc 'embedding (aref (cdr (assoc 'data response)) 0))))
-
-(defun llm-openai--handle-response (response extractor)
-  "If RESPONSE is an error, throw it, else call EXTRACTOR."
-  (if-let ((err-msg (llm-openai--error-message response)))
-      (error err-msg)
-    (funcall extractor response)))
+  (assoc-default 'embedding (aref (assoc-default 'data response) 0)))
 
 (cl-defmethod llm-openai--check-key ((provider llm-openai))
   (unless (llm-openai-key provider)
@@ -89,6 +84,9 @@ MODEL is the embedding model to use, or nil to use the default.."
   ;; It isn't always the case that a key is needed for Open AI compatible APIs.
   )
 
+(cl-defmethod llm-provider-request-prelude ((provider llm-openai))
+  (llm-openai--check-key provider))
+
 (cl-defgeneric llm-openai--headers (provider)
   "Return the headers to use for a request from PROVIDER.")
 
@@ -96,11 +94,17 @@ MODEL is the embedding model to use, or nil to use the default.."
   (when (llm-openai-key provider)
     `(("Authorization" . ,(format "Bearer %s" (llm-openai-key provider))))))
 
+(cl-defmethod llm-provider-headers ((provider llm-openai))
+  (llm-openai--headers provider))
+
 (cl-defgeneric llm-openai--url (provider command)
   "Return the URL for COMMAND for PROVIDER.")
 
 (cl-defmethod llm-openai--url ((_ llm-openai) command)
   (concat "https://api.openai.com/v1/" command))
+
+(cl-defmethod llm-provider-embedding-url ((provider llm-openai))
+  (llm-openai--url provider "embeddings"))
 
 (cl-defmethod llm-openai--url ((provider llm-openai-compatible) command)
   "Return the URL for COMMAND for PROVIDER."
@@ -108,40 +112,12 @@ MODEL is the embedding model to use, or nil to use the default.."
           (unless (string-suffix-p "/" (llm-openai-compatible-url provider))
             "/") command))
 
-(cl-defgeneric llm-openai--error-message (provider err-response)
-  "Return a user-visible error message from ERR-RESPONSE.
-If ERR-RESPONSE is not an error, return nil.")
-
-(cl-defmethod llm-openai--error-message ((_ llm-openai) err-response)
-  (if (stringp err-response)
-      err-response
-    (let ((errdata (assoc-default 'error err-response)))
+(cl-defmethod llm-provider-embedding-error-extractor ((_ llm-openai) err-response)
+  (let ((errdata (assoc-default 'error err-response)))
       (when errdata
         (format "Open AI returned error: %s message: %s"
                 (cdr (assoc 'type errdata))
-                (cdr (assoc 'message errdata)))))))
-
-(cl-defmethod llm-embedding-async ((provider llm-openai) string vector-callback error-callback)
-  (llm-openai--check-key provider)  
-  (let ((buf (current-buffer)))
-    (llm-request-async (llm-openai--url provider "embeddings")
-                       :headers (llm-openai--headers provider)
-                       :data (llm-openai--embedding-request (llm-openai-embedding-model provider) string)
-                       :on-success (lambda (data)
-                                     (llm-request-callback-in-buffer
-                                      buf vector-callback (llm-openai--embedding-extract-response data)))
-                       :on-error (lambda (_ data) 
-                                   (llm-request-callback-in-buffer
-                                    buf error-callback 'error
-                                    (llm-openai--error-message data))))))
-
-(cl-defmethod llm-embedding ((provider llm-openai) string)
-  (llm-openai--check-key provider)
-  (llm-openai--handle-response
-   (llm-request-sync (llm-openai--url provider "embeddings")
-               :headers (llm-openai--headers provider)
-               :data (llm-openai--embedding-request (llm-openai-embedding-model provider) string))
-   #'llm-openai--embedding-extract-response))
+                (cdr (assoc 'message errdata))))))
 
 (defun llm-openai--chat-request (model prompt &optional streaming)
   "From PROMPT, create the chat request data to send.
