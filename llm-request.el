@@ -174,16 +174,5 @@ the buffer is turned into JSON and passed to ON-SUCCESS."
                     nil t)))
       buffer)))
 
-;; This is a useful method for getting out of the request buffer when it's time
-;; to make callbacks.
-(defun llm-request-callback-in-buffer (buf f &rest args)
-  "Run F with ARSG in the context of BUF.
-But if BUF has been killed, use a temporary buffer instead.
-If F is nil, nothing is done."
-  (when f
-    (if (buffer-live-p buf)
-        (with-current-buffer buf (apply f args))
-      (with-temp-buffer (apply f args)))))
-
 (provide 'llm-request)
 ;;; llm-request.el ends here
