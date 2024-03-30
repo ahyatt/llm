@@ -85,18 +85,10 @@ If STREAMING-P is non-nil, use the streaming endpoint."
                         c))
           (cl-call-next-method)))
 
-(defun llm-gemini--count-token-url (provider)
-  "Return the URL for the count token call, using PROVIDER."
+(cl-defmethod llm-google-count-token-url ((provider llm-gemini))
   (format "https://generativelanguage.googleapis.com/v1beta/models/%s:countTokens?key=%s"
           (llm-gemini-chat-model provider)
           (llm-gemini-key provider)))
-
-(cl-defmethod llm-count-tokens ((provider llm-gemini) string)
-  (llm-vertex--handle-response
-   (llm-request-sync (llm-gemini--count-token-url provider)
-                     :data (llm-vertex--to-count-token-request
-                            (llm-provider-chat-request (llm-make-simple-chat-prompt string nil))))
-   #'llm-vertex--count-tokens-extract-response))
 
 (cl-defmethod llm-name ((_ llm-gemini))
   "Return the name of PROVIDER."

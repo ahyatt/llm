@@ -31,20 +31,16 @@
 (require 'rx)
 
 ;; Models defined at https://docs.anthropic.com/claude/docs/models-overview
-(cl-defstruct llm-claude
+(cl-defstruct (llm-claude (:include llm-standard-provider))
   (key nil :read-only t)
   (chat-model "claude-3-opus-20240229" :read-only t))
 
-(defun llm-claude-check-key (provider)
+(cl-defmethod llm-provider-prelude ((provider llm-claude))
   "Check if the API key is valid, error if not."
   (unless (llm-claude-key provider)
     (error "No API key provided for Claude")))
 
-(defun llm-claude-request (provider prompt stream)
-  "Return the request (as an elisp JSON-convertable object).
-PROVIDER contains the model name.
-PROMPT is a `llm-chat-prompt' struct.
-STREAM is a boolean indicating whether the response should be streamed."
+(cl-defmethod llm-provider-chat-request ((provider llm-claude) prompt stream)
   (let ((request `(("model" . ,(llm-claude-chat-model provider))
                    ("stream" . ,(if stream t :json-false))
                    ;; Claude requires max_tokens
@@ -61,15 +57,14 @@ STREAM is a boolean indicating whether the response should be streamed."
       (push `("temperature" . ,(llm-chat-prompt-temperature prompt)) request))
     request))
 
-(defun llm-claude-get-response (response)
-  "Return the content of the response from the returned value."
+(cl-defmethod llm-provider-chat-extract-result ((_ llm-claude) response)
   (let ((content (aref (assoc-default 'content response) 0)))
     (if (equal (assoc-default 'type content) "text")
         (assoc-default 'text content)
       (format "Unsupported non-text response: %s" content))))
 
 ;; see https://docs.anthropic.com/claude/reference/messages-streaming
-(defun llm-claude-get-partial-response (response)
+(cl-defmethod llm-provider-extract-partial-response ((_ llm-claude) response)
   "Return the partial response from text RESPONSE."
   (let ((regex (rx (seq "\"text\":" (0+ whitespace)
                         (group-n 1 ?\" (0+ anychar) ?\") (0+ whitespace) ?} (0+ whitespace) ?}))))
@@ -90,73 +85,15 @@ STREAM is a boolean indicating whether the response should be streamed."
                        (warn "Could not parse streaming response: %s" line)))
                    (nreverse matched-lines) "")))))
 
-(cl-defmethod llm-chat ((provider llm-claude) prompt)
-  (llm-claude-check-key provider)
-  (let ((content (llm-claude-get-response
-                  (llm-request-sync "https://api.anthropic.com/v1/messages"
-                                    :headers `(("x-api-key" . ,(llm-claude-key provider))
-                                               ("anthropic-version" . "2023-06-01"))
-                                    :data (llm-claude-request provider prompt nil)))))
-    (llm-provider-utils-append-to-prompt prompt content)
-    content))
+(cl-defmethod llm-provider-headers ((provider llm-claude))
+  `(("x-api-key" . ,(llm-claude-key provider))
+    ("anthropic-version" . "2023-06-01")))
 
-(cl-defmethod llm-chat-async ((provider llm-claude) prompt response-callback error-callback)
-  (llm-claude-check-key provider)
-  (let ((buf (current-buffer)))
-    (llm-request-async "https://api.anthropic.com/v1/messages"
-                       :headers `(("x-api-key" . ,(llm-claude-key provider))
-                                  ("anthropic-version" . "2023-06-01"))
-                       :data (llm-claude-request provider prompt nil)
-                       :on-success
-                       (lambda (response)
-                         (let ((content (llm-claude-get-response response)))
-                           (llm-provider-utils-append-to-prompt prompt content)
-                           (llm-request-callback-in-buffer
-                            buf
-                            response-callback
-                            content)))
-                       :on-error
-                       (lambda (_ msg)
-                         (message "Error: %s" msg)
-                         (let ((error (assoc-default 'error msg)))
-                           (llm-request-callback-in-buffer
-                            buf error-callback
-                            'error
-                            (format "%s: %s" (assoc-default 'type error)
-                                    (assoc-default 'message error))))))))
+(cl-defmethod llm-provider-extact-error ((_ llm-claude) response)
+  (assoc-default 'error response))
 
-(cl-defmethod llm-chat-streaming ((provider llm-claude) prompt partial-callback
-                                  response-callback error-callback)
-  (llm-claude-check-key provider)
-  (let ((buf (current-buffer)))
-    (llm-request-async "https://api.anthropic.com/v1/messages"
-                       :headers `(("x-api-key" . ,(llm-claude-key provider))
-                                  ("anthropic-version" . "2023-06-01"))
-                       :data (llm-claude-request provider prompt t)
-                       :on-partial
-                       (lambda (data)
-                         (llm-request-callback-in-buffer
-                          buf
-                          partial-callback
-                          (llm-claude-get-partial-response data)))
-                       :on-success-raw
-                       (lambda (response)
-                         (let ((content
-                                (llm-claude-get-partial-response response)))
-                           (llm-provider-utils-append-to-prompt prompt content)
-                           (llm-request-callback-in-buffer
-                            buf
-                            response-callback
-                            content)))
-                       :on-error
-                       (lambda (_ msg)
-                         (message "Error: %s" msg)
-                         (let ((error (assoc-default 'error msg)))
-                           (llm-request-callback-in-buffer
-                            buf error-callback
-                            'error
-                            (format "%s: %s" (assoc-default 'type error)
-                                    (assoc-default 'message error))))))))
+(cl-defmethod llm-provider-chat-url ((_ llm-claude))
+  "https://api.anthropic.com/v1/messages")
 
 ;; See https://docs.anthropic.com/claude/docs/models-overview
 (cl-defmethod llm-chat-token-limit ((provider llm-claude))

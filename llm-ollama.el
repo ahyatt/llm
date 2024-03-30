@@ -45,7 +45,7 @@
   :type 'integer
   :group 'llm-ollama)
 
-(cl-defstruct (llm-ollama :include llm-standard-provider)
+(cl-defstruct (llm-ollama (:include llm-standard-provider))
   "A structure for holding information needed by Ollama's API.
 
 SCHEME is the http scheme to use, a string. It is optional and
@@ -75,6 +75,9 @@ EMBEDDING-MODEL is the model to use for embeddings.  It is required."
 (cl-defmethod llm-provider-embedding-url ((provider llm-ollama))
   (llm-ollama--url provider "embeddings"))
 
+(cl-defmethod llm-provider-chat-url ((provider llm-ollama))
+  (llm-ollama--url provider "chat"))
+
 (cl-defmethod llm-provider-embedding-request ((provider llm-ollama) string)
   "Return the request to the server for the embedding of STRING.
 PROVIDER is the llm-ollama provider."
@@ -85,9 +88,7 @@ PROVIDER is the llm-ollama provider."
   "Return the embedding from the server RESPONSE."
   (assoc-default 'embedding response))
 
-(defun llm-ollama--chat-request (provider prompt)
-  "From PROMPT, create the chat request data to send.
-PROVIDER is the llm-ollama provider to use."
+(cl-defmethod llm-provider-chat-request ((provider llm-ollama) prompt _)
   (let (request-alist messages options)
     (setq messages
           (mapcar (lambda (interaction)
@@ -113,7 +114,7 @@ PROVIDER is the llm-ollama provider to use."
 (defvar-local llm-ollama-last-response 0
   "The last response number we've read.")
 
-(defun llm-ollama--get-partial-chat-response (response)
+(cl-defmethod llm-provider-extract-partial-response ((_ llm-ollama) response)
   "Return the text in the partial chat response from RESPONSE."
   ;; To begin with, we should still be in the buffer with the actual response.
   (let ((current-response llm-ollama-current-response)
@@ -161,8 +162,8 @@ PROVIDER is the llm-ollama provider to use."
   ;; we really just need it for the local variables.
   (with-temp-buffer
     (let ((output (llm-request-sync-raw-output 
-                   (llm-ollama--url provider "chat")
-                   :data (llm-ollama--chat-request provider prompt)
+                   (llm-provider-chat-url provider)
+                   :data (llm-provider-chat-request provider prompt t)
                    ;; ollama is run on a user's machine, and it can take a while.
                    :timeout llm-ollama-chat-timeout)))
       (setf (llm-chat-prompt-interactions prompt)
@@ -170,29 +171,10 @@ PROVIDER is the llm-ollama provider to use."
                     (list (make-llm-chat-prompt-interaction
                            :role 'assistant
                            :content (assoc-default 'context (llm-ollama--get-final-response output))))))
-      (llm-ollama--get-partial-chat-response output))))
+      (llm-provider-extract-partial-response provider output))))
 
-(cl-defmethod llm-chat-streaming ((provider llm-ollama) prompt partial-callback response-callback error-callback)
-  (let ((buf (current-buffer)))
-    (llm-request-async (llm-ollama--url provider "chat")
-      :data (llm-ollama--chat-request provider prompt)
-      :on-success-raw (lambda (response)
-                        (setf (llm-chat-prompt-interactions prompt)
-                              (append (llm-chat-prompt-interactions prompt)
-                                      (list
-                                       (make-llm-chat-prompt-interaction
-                                        :role 'assistant
-                                        :content (llm-ollama--get-partial-chat-response response)))))
-                        (llm-request-callback-in-buffer
-                         buf response-callback
-                         (llm-ollama--get-partial-chat-response response)))
-      :on-partial (lambda (data)
-                    (when-let ((response (llm-ollama--get-partial-chat-response data)))
-                      (llm-request-callback-in-buffer buf partial-callback response)))
-      :on-error (lambda (_ _)
-                  ;; The problem with ollama is that it doesn't
-                  ;; seem to have an error response.
-                  (llm-request-callback-in-buffer buf error-callback 'error "Unknown error calling ollama")))))
+(cl-defmethod llm-chat-async ((provider llm-ollama) prompt response-callback error-callback)
+  (llm-chat-streaming provider prompt #'ignore response-callback error-callback))
 
 (cl-defmethod llm-name ((provider llm-ollama))
   (llm-ollama-chat-model provider))

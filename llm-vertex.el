@@ -261,16 +261,6 @@ If STREAMING is non-nil, use the URL for the streaming API."
 ;; Token counts
 ;; https://cloud.google.com/vertex-ai/docs/generative-ai/get-token-count
 
-(defun llm-vertex--count-token-url (provider)
-  "Return the URL to use for the Vertex API.
-PROVIDER is the llm provider.
-MODEL "
-  (format "https://%s-aiplatform.googleapis.com/v1beta1/projects/%s/locations/%s/publishers/google/models/%s:countTokens"
-          llm-vertex-gcloud-region
-          (llm-vertex-project provider)
-          llm-vertex-gcloud-region
-          (llm-vertex-chat-model provider)))
-
 (defun llm-vertex--to-count-token-request (request)
   "Return a version of REQUEST that is suitable for counting tokens."
   (seq-filter (lambda (c) (and (not (equal (car c) "parameters"))
@@ -280,15 +270,29 @@ MODEL "
   "Extract the token count from the response."
   (assoc-default 'totalTokens response))
 
-(cl-defmethod llm-count-tokens ((provider llm-vertex) string)
-  (llm-vertex-refresh-key provider)
-  (llm-vertex--handle-response
-   (llm-request-sync (llm-vertex--count-token-url provider)
-                     :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
-                     :data (llm-vertex--to-count-token-request
-                            (llm-vertex--chat-request
-                             (llm-make-simple-chat-prompt string))))
-   #'llm-vertex--count-tokens-extract-response))
+(cl-defgeneric llm-google-count-tokens-url (provider)
+  "The URL for PROVIDER to count tokens.")
+
+(cl-defmethod llm-google-count-tokens-url ((provider llm-vertex))
+  (format "https://%s-aiplatform.googleapis.com/v1beta1/projects/%s/locations/%s/publishers/google/models/%s:countTokens"
+          llm-vertex-gcloud-region
+          (llm-vertex-project provider)
+          llm-vertex-gcloud-region
+          (llm-vertex-chat-model provider)))
+
+(cl-defmethod llm-count-tokens ((provider llm-google) string)
+  (llm-provider-prelude provider)
+  (let ((response (llm-request-sync 
+                   (llm-google-count-tokens-url provider)
+                   :headers (llm-provider-headers provider)
+                   :data (llm-vertex--to-count-token-request
+                          (llm-provider-chat-request
+                           provider
+                           (llm-make-simple-chat-prompt string nil)
+                           nil)))))
+    (when-let ((err (llm-provider-error-extractor response)))
+      (error err))
+    (llm-vertex--count-tokens-extract-response response)))
 
 (cl-defmethod llm-name ((_ llm-vertex))
   "Gemini")

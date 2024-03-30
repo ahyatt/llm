@@ -125,6 +125,10 @@ CALLS are a list of `llm-provider-utils-function-call'.")
 (cl-defgeneric llm-provider-extract-streamed-function-calls (provider response)
   "Extract the result string from partial RESPONSE for the PROVIDER.")
 
+(cl-defmethod llm-provider-extract-streamed-function-calls ((_ llm-standard-provider) _)
+  "By default, there are no function calls."
+  nil)
+
 ;; Standard provider implementations of llm functionality
 
 (cl-defmethod llm-embedding ((provider llm-standard-provider) string)
