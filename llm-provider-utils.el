@@ -29,18 +29,14 @@
   "A struct indicating that this is a standard provider.
 This is for dispatch purposes, so this contains no actual data.")
 
+;; Methods necessary for both embedding and chat requests.
+
 (cl-defgeneric llm-provider-request-prelude (provider)
   "Execute any prelude code necessary before running a request.")
 
 (cl-defmethod llm-provider-request-prelude ((_ llm-standard-provider))
   "Do nothing for the standard provider."
   nil)
-
-(cl-defgeneric llm-provider-embedding-url (provider)
-  "Return the URL for embeddings for the PROVIDER.")
-
-(cl-defgeneric llm-provider-chat-url (provider)
-  "Return the URL for chat for the PROVIDER.")
 
 (cl-defgeneric llm-provider-headers (provider)
   "Return the headers for the PROVIDER.")
@@ -49,12 +45,12 @@ This is for dispatch purposes, so this contains no actual data.")
   "By default, the standard provider has no headers."
   nil)
 
+;; Methods for embeddings
+(cl-defgeneric llm-provider-embedding-url (provider)
+  "Return the URL for embeddings for the PROVIDER.")
+
 (cl-defgeneric llm-provider-embedding-request (provider string)
   "Return the request for the PROVIDER for STRING.")
-
-(cl-defgeneric llm-provider-chat-request (provider prompt streaming)
-  "Return the request for the PROVIDER for PROMPT.
-STREAMING is true if this is a streaming request.")
 
 (cl-defgeneric llm-provider-embedding-extract-error (provider response)
   "Return an error message from RESPONSE for the PROVIDER.
@@ -67,6 +63,25 @@ Return nil if there is no error.")
   "By default, the standard provider has no error extractor."
   nil)
 
+(cl-defgeneric llm-provider-embedding-extract-result (provider response)
+  "Return the result from RESPONSE for the PROVIDER.")
+
+;; Methods for chat
+
+(cl-defgeneric llm-provider-chat-url (provider)
+  "Return the URL for chat for the PROVIDER.")
+
+(cl-defgeneric llm-provider-chat-streaming-url (provider)
+  "Return the URL for streaming chat for the PROVIDER.")
+
+(cl-defmethod llm-provider-chat-streaming-url ((provider llm-standard-provider))
+  "By default, use the same URL as normal chat."
+  (llm-provider-chat-url provider))
+
+(cl-defgeneric llm-provider-chat-request (provider prompt streaming)
+  "Return the request for the PROVIDER for PROMPT.
+STREAMING is true if this is a streaming request.")
+
 (cl-defgeneric llm-provider-chat-extract-error (provider response)
   "Return an error message from RESPONSE for the PROVIDER.")
 
@@ -74,11 +89,23 @@ Return nil if there is no error.")
   "By default, the standard provider has no error extractor."
   nil)
 
-(cl-defgeneric llm-provider-embedding-extract-result (provider response)
-  "Return the result from RESPONSE for the PROVIDER.")
-
 (cl-defgeneric llm-provider-chat-extract-result (provider response)
   "Return the result from RESPONSE for the PROVIDER.")
+
+(cl-defgeneric llm-provider-append-to-prompt (provider prompt result func-results)
+  "Append RESULT to PROMPT for the PROVIDER.
+FUNC-RESULTS is a list of function results, if any.")
+
+(cl-defmethod llm-provider-append-to-prompt ((_ llm-standard-provider) prompt result
+                                             &optional func-results)
+  "By default, the standard provider appends to the prompt."
+  (llm-provider-utils-append-to-prompt prompt result func-results))
+
+(cl-defgeneric llm-provider-extract-partial-response (provider response)
+  "Extract the result string from partial RESPONSE for the PROVIDER.
+This should return the entire string so far.")
+
+;; Methods for chat function calling
 
 (cl-defgeneric llm-provider-extract-function-calls (provider response)
   "Return the function calls from RESPONSE for the PROVIDER.
@@ -95,22 +122,10 @@ function calls, return a list of
 This is the recording before the calls were executed.
 CALLS are a list of `llm-provider-utils-function-call'.")
 
-(cl-defgeneric llm-provider-append-to-prompt (provider prompt result func-results)
-  "Append RESULT to PROMPT for the PROVIDER.
-FUNC-RESULTS is a list of function results, if any.")
-
-(cl-defmethod llm-provider-append-to-prompt ((_ llm-standard-provider) prompt result
-                                             &optional func-results)
-  "By default, the standard provider appends to the prompt."
-  (llm-provider-utils-append-to-prompt prompt result func-results))
-
-(cl-defgeneric llm-provider-extract-partial-response (provider response)
-  "Extract the result string from partial RESPONSE for the PROVIDER.
-This should return the entire string so far.")
-
 (cl-defgeneric llm-provider-extract-streamed-function-calls (provider response)
-  "Extract the result string from partial RESPONSE for the PROVIDER.
-This should return the entire string so far.")
+  "Extract the result string from partial RESPONSE for the PROVIDER.")
+
+;; Standard provider implementations of llm functionality
 
 (cl-defmethod llm-embedding ((provider llm-standard-provider) string)
   (llm-provider-request-prelude provider)
@@ -133,11 +148,11 @@ This should return the entire string so far.")
                        (llm-request-callback-in-buffer
                         buf error-callback 'error
                         err-msg)
-                     (llm-request-callback-in-buffer
+                     (llm-provider-utils-callback-in-buffer
                       buf vector-callback
                       (llm-provider-embedding-extract-result provider data))))
      :on-error (lambda (_ data)
-                 (llm-request-callback-in-buffer
+                 (llm-provider-utils-callback-in-buffer
                   buf error-callback 'error
                   (if (stringp data)
                       data
@@ -153,9 +168,9 @@ This should return the entire string so far.")
     (if-let ((err-msg (llm-provider-chat-extract-error provider response)))
         (error err-msg)
       (llm-provider-utils-process-result provider prompt
-                                         (llm-provider-extract-function-calls
-                                          provider response)
                                          (llm-provider-chat-extract-result
+                                          provider response)
+                                         (llm-provider-extract-function-calls
                                           provider response)))))
 
 (cl-defmethod llm-chat-async ((provider llm-standard-provider) prompt success-callback
@@ -168,17 +183,17 @@ This should return the entire string so far.")
      :data (llm-provider-chat-request provider prompt nil)
      :on-success (lambda (data)
                    (if-let ((err-msg (llm-provider-chat-extract-error provider data)))
-                       (llm-request-callback-in-buffer
+                       (llm-provider-utils-callback-in-buffer
                         buf error-callback 'error
                         err-msg)
-                     (llm-request-callback-in-buffer
+                     (llm-provider-utils-callback-in-buffer
                       buf success-callback
                       (llm-provider-utils-process-result
                        provider prompt
-                       (llm-provider-extract-function-calls provider data)
-                       (llm-provider-chat-extract-result provider data))))
+                       (llm-provider-chat-extract-result provider data)
+                       (llm-provider-extract-function-calls provider data))))
      :on-error (lambda (_ data)
-                 (llm-request-callback-in-buffer
+                 (llm-provider-utils-callback-in-buffer
                   buf error-callback 'error
                   (if (stringp data)
                       data
@@ -198,18 +213,21 @@ This should return the entire string so far.")
      (lambda (data)
        ;; We won't have a result if this is a streaming function call,
        ;; so we don't call on-partial in that case.
-       (when-let ((result (llm-provider-extract-partial-response provider data)))	 
-         (llm-request-callback-in-buffer buf partial-callback result)))
+       (when-let ((result (llm-provider-extract-partial-response provider data)))
+	 ;; Let's not be so strict, a partial response empty string
+	 ;; should be equivalent to nil.
+	 (when (< (length result) 0)
+           (llm-provider-utils-callback-in-buffer buf partial-callback result))))
      :on-success-raw
      (lambda (data)
-       (llm-request-callback-in-buffer
+       (llm-provider-utils-callback-in-buffer
           buf response-callback
           (llm-provider-utils-process-result
            provider prompt
-           (llm-provider-extract-streamed-function-calls provider data)
-           (llm-provider-extract-partial-response provider data))))
+           (llm-provider-extract-partial-response provider data)
+           (llm-provider-extract-streamed-function-calls provider data))))
      :on-error (lambda (_ data)
-                 (llm-request-callback-in-buffer
+                 (llm-provider-utils-callback-in-buffer
                   buf error-callback 'error
                   (if (stringp data)
                       data
@@ -398,7 +416,7 @@ NAME is the function name.
 ARG is an alist of arguments to values."
   id name args)
 
-(defun llm-provider-utils-process-result (provider prompt funcalls text)
+(defun llm-provider-utils-process-result (provider prompt text funcalls)
   "Process the RESPONSE from the provider for PROMPT.
 This execute function calls if there are any, does any result
 appending to the prompt, and returns an appropriate response for
@@ -468,7 +486,7 @@ cons of functions called and their output."
 
 ;; This is a useful method for getting out of the request buffer when it's time
 ;; to make callbacks.
-(defun llm-request-utils-callback-in-buffer (buf f &rest args)
+(defun llm-provider-utils-callback-in-buffer (buf f &rest args)
   "Run F with ARSG in the context of BUF.
 But if BUF has been killed, use a temporary buffer instead.
 If F is nil, nothing is done."
@@ -476,7 +494,6 @@ If F is nil, nothing is done."
     (if (buffer-live-p buf)
         (with-current-buffer buf (apply f args))
       (with-temp-buffer (apply f args)))))
-
 
 (provide 'llm-provider-utils)
 ;;; llm-provider-utils.el ends here
