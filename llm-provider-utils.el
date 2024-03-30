@@ -41,7 +41,7 @@ This is for dispatch purposes, so this contains no actual data.")
 (cl-defgeneric llm-provider-headers (provider)
   "Return the headers for the PROVIDER.")
 
-(cl-defmethod llm-provider-header ((_ llm-standard-provider))
+(cl-defmethod llm-provider-headers ((_ llm-standard-provider))
   "By default, the standard provider has no headers."
   nil)
 
@@ -206,7 +206,7 @@ CALLS are a list of `llm-provider-utils-function-call'.")
   (llm-provider-request-prelude provider)
   (let ((buf (current-buffer)))
     (llm-request-async
-     (llm-provider-chat-url provider)
+     (llm-provider-chat-streaming-url provider)
      :headers (llm-provider-headers provider)
      :data (llm-provider-chat-request provider prompt t)
      :on-partial
@@ -216,7 +216,7 @@ CALLS are a list of `llm-provider-utils-function-call'.")
        (when-let ((result (llm-provider-extract-partial-response provider data)))
 	 ;; Let's not be so strict, a partial response empty string
 	 ;; should be equivalent to nil.
-	 (when (< (length result) 0)
+	 (when (> (length result) 0)
            (llm-provider-utils-callback-in-buffer buf partial-callback result))))
      :on-success-raw
      (lambda (data)
