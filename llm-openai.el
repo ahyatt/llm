@@ -165,14 +165,20 @@ STREAMING if non-nil, turn on response streaming."
   (assoc-default 'content
                  (assoc-default 'message (aref (cdr (assoc 'choices response)) 0))))
 
-(cl-defmethod llm-provider-chat-extract-function-calls ((_ llm-openai) response)
-  (assoc-default 'tool_calls
-                 (assoc-default 'message
-                                (aref (assoc-default 'choices response) 0))))
+(cl-defmethod llm-provider-extract-function-calls ((_ llm-openai) response)
+  (mapcar (lambda (call)
+            (let ((function (cdr (nth 2 call))))
+	      (make-llm-provider-utils-function-call
+                 :id (assoc-default 'id call)
+                 :name (assoc-default 'name function)
+                 :args (json-read-from-string (assoc-default 'arguments function)))))
+          (assoc-default 'tool_calls
+                         (assoc-default 'message
+                                        (aref (assoc-default 'choices response) 0)))))
 
 (cl-defmethod llm-provider-populate-function-calls ((provider llm-openai) prompt calls)
   (llm-provider-utils-append-to-prompt
-   provider prompt
+   prompt
    (mapcar (lambda (call)
              `((id . ,(llm-provider-utils-function-call-id call))
                (function (name . ,(llm-provider-utils-function-call-name call))
@@ -235,26 +241,39 @@ whether they have been parsed before or not."
     (when (>= (length current-response) (length llm-openai-current-response))
       (setq llm-openai-current-response current-response)
       (setq llm-openai-last-response last-response))
-    llm-openai-current-response))
+    (when (> (length llm-openai-current-response) 0)
+      llm-openai-current-response)))
 
 (cl-defmethod llm-provider-extract-streamed-function-calls ((_ llm-openai) response)
   "Return the function calls in the response from RESPONSE."
-  (mapcar (lambda (call)
-              (let ((function (cl-third call)))
-                (make-llm-provider-utils-function-call
-                 :id (assoc-default 'id call)
-                 :name (assoc-default 'name function)
-                 :args (json-read-from-string (assoc-default 'arguments function)))))
-          (seq-filter #'identity
-		      (mapcar (lambda (json)
-				(assoc-default 'tool_calls
-					       (assoc-default
-						'delta
-						(aref (assoc-default
-						       'choices
-						       (json-read-from-string json))
-						      0))))
-			      (llm-openai--get-unparsed-json response)))))
+  (let* ((pieces (mapcar (lambda (json)
+				                  (assoc-default 'tool_calls
+					                             (assoc-default
+						                          'delta
+						                          (aref (assoc-default
+						                                 'choices
+						                                 (json-read-from-string json))
+						                                0))))
+			                    (llm-openai--get-unparsed-json response)))
+         (cvec (make-vector (length (car pieces)) (make-llm-provider-utils-function-call))))
+    (cl-loop for piece in pieces do
+             (cl-loop for call in (append piece nil) do
+                      (let* ((index (assoc-default 'index call))
+                             (id (assoc-default 'id call))
+                             (function (assoc-default 'function call))
+                             (name (assoc-default 'name function))
+                             (arguments (assoc-default 'arguments function)))
+                        (when id
+                          (setf (llm-provider-utils-function-call-id (aref cvec index)) id))
+                        (when name
+                          (setf (llm-provider-utils-function-call-name (aref cvec index)) name))
+                        (setf (llm-provider-utils-function-call-args (aref cvec index))
+                              (concat (llm-provider-utils-function-call-args (aref cvec index))
+                                      arguments)))))
+            (cl-loop for call in (append cvec nil)
+                     do (setf (llm-provider-utils-function-call-args call)
+                              (json-read-from-string (llm-provider-utils-function-call-args call)))
+                     finally return cvec)))
 
 (cl-defmethod llm-name ((_ llm-openai))
   "Open AI")

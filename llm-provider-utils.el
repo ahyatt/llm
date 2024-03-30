@@ -198,8 +198,8 @@ This should return the entire string so far.")
      (lambda (data)
        ;; We won't have a result if this is a streaming function call,
        ;; so we don't call on-partial in that case.
-       (when-let ((result (llm-provider-extract-partial-response provider data)))
-           (llm-request-callback-in-buffer buf partial-callback result)))
+       (when-let ((result (llm-provider-extract-partial-response provider data)))	 
+         (llm-request-callback-in-buffer buf partial-callback result)))
      :on-success-raw
      (lambda (data)
        (llm-request-callback-in-buffer
@@ -415,6 +415,16 @@ be either FUNCALLS or TEXT."
     (llm-provider-append-to-prompt provider prompt text)
     text))
 
+(defun llm-provider-utils-populate-function-results (provider prompt func result)
+  "Append the RESULT of FUNC to PROMPT.
+FUNC is a `llm-provider-utils-function-call' struct."
+  (llm-provider-append-to-prompt
+   provider prompt result
+   (make-llm-chat-prompt-function-call-result
+    :call-id (llm-provider-utils-function-call-id func)
+    :function-name (llm-provider-utils-function-call-name func)
+    :result result)))
+
 (defun llm-provider-utils-execute-function-calls (provider prompt funcalls)
   "Execute FUNCALLS, a list of `llm-provider-utils-function-calls'.
 
@@ -429,7 +439,7 @@ function call, the result.
 This returns the response suitable for output to the client; a
 cons of functions called and their output."
   (llm-provider-populate-function-calls provider prompt funcalls)
-  (cl-loop for func in response collect
+  (cl-loop for func in funcalls collect
            (let* ((name (llm-provider-utils-function-call-name func))
                   (arguments (llm-provider-utils-function-call-args func))
                   (function (seq-find
@@ -444,7 +454,7 @@ cons of functions called and their output."
                                                                 arguments))))
                           (result (apply (llm-function-call-function function) args)))
                      (llm-provider-utils-populate-function-results
-                      prompt func result)
+		      provider prompt func result)
                      (llm--log
                       'api-funcall
                       :provider provider
