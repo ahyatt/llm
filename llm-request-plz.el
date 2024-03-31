@@ -250,7 +250,7 @@ This is required.
                          :timeout timeout
                          :media-type
                          (cons 'text/event-stream
-                                (plz-media-type:text/event-stream
+                                (plz-event-source:text/event-stream
                                  ;; Convert so that each event handler gets the body, not the
                                  ;; `plz-response' itself.
                                  :events (mapcar
