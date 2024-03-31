@@ -79,7 +79,7 @@ If STREAMING-P is non-nil, use the streaming endpoint."
                  (args . ,(llm-provider-utils-function-call-args fc))))))
            calls)))
 
-(cl-defmethod llm-provider-chat-request ((_ llm-gemini) prompt _)
+(cl-defmethod llm-provider-chat-request ((_ llm-gemini) _ _)
   (mapcar (lambda (c) (if (eq (car c) 'generation_config)
                           (cons 'generationConfig (cdr c))
                         c))

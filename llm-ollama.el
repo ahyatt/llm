@@ -156,6 +156,8 @@ PROVIDER is the llm-ollama provider."
     (search-backward "{" nil t)
     (json-read)))
 
+;; Ollama chat is a streaming API, so we need to handle it differently tha normal.
+
 (cl-defmethod llm-chat ((provider llm-ollama) prompt)
   ;; We expect to be in a new buffer with the response, which we use to store
   ;; local variables. The temp buffer won't have the response, but that's fine,

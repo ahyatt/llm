@@ -87,6 +87,7 @@ MODEL is the embedding model to use, or nil to use the default.."
 (cl-defmethod llm-provider-request-prelude ((provider llm-openai))
   (llm-openai--check-key provider))
 
+;; Obsolete, but we keep them here for backward compatibility.
 (cl-defgeneric llm-openai--headers (provider)
   "Return the headers to use for a request from PROVIDER.")
 
@@ -97,6 +98,7 @@ MODEL is the embedding model to use, or nil to use the default.."
 (cl-defmethod llm-provider-headers ((provider llm-openai))
   (llm-openai--headers provider))
 
+;; Obsolete, but we keep them here for backward compatibility.
 (cl-defgeneric llm-openai--url (provider command)
   "Return the URL for COMMAND for PROVIDER.")
 
@@ -176,7 +178,7 @@ STREAMING if non-nil, turn on response streaming."
                          (assoc-default 'message
                                         (aref (assoc-default 'choices response) 0)))))
 
-(cl-defmethod llm-provider-populate-function-calls ((provider llm-openai) prompt calls)
+(cl-defmethod llm-provider-populate-function-calls ((_ llm-openai) prompt calls)
   (llm-provider-utils-append-to-prompt
    prompt
    (mapcar (lambda (call)
