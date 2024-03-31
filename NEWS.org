@@ -1,3 +1,6 @@
+* Version 0.12.4
+- Refactor of providers to centralize embedding and chat logic.
+- Remove connection buffers after use.
 * Verson 0.12.3
 - Refactor of warn-non-nonfree methods.
 - Add non-free warnings for Gemini and Claude.

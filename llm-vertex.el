@@ -1,6 +1,6 @@
 ;;; llm-vertex.el --- LLM implementation of Google Cloud Vertex AI -*- lexical-binding: t; package-lint-main-file: "llm.el"; -*-
 
-;; Copyright (c) 2023  Free Software Foundation, Inc.
+;; Copyright (c) 2023  Free Foundation Software, Inc.
 
 ;; Author: Andrew Hyatt <ahyatt@gmail.com>
 ;; Homepage: https://github.com/ahyatt/llm
@@ -64,7 +64,11 @@ for more specialized uses."
   :type 'string
   :group 'llm-vertex)
 
-(cl-defstruct llm-vertex
+(cl-defstruct (llm-google (:include llm-standard-full-provider))
+  "A base class for functionality that is common to both Vertex and
+Gemini.")
+
+(cl-defstruct (llm-vertex (:include llm-google))
   "A struct representing a Vertex AI client.
 
 KEY is the temporary API key for the Vertex AI. It is required to
@@ -81,7 +85,9 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
   (chat-model llm-vertex-default-chat-model)
   key-gentime)
 
-(defun llm-vertex-refresh-key (provider)
+;; API reference: https://cloud.google.com/vertex-ai/docs/generative-ai/multimodal/send-chat-prompts-gemini#gemini-chat-samples-drest
+
+(cl-defmethod llm-provider-request-prelude ((provider llm-vertex))
   "Refresh the key in the vertex PROVIDER, if needed."
   (unless (and (llm-vertex-key provider)
                (> (* 60 60)
@@ -97,59 +103,35 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
 (cl-defmethod llm-nonfree-message-info ((_ llm-vertex))
   "https://policies.google.com/terms/generative-ai")
 
-(defun llm-vertex--embedding-url (provider)
-  "From the PROVIDER, return the URL to use for embeddings"
+(cl-defmethod llm-provider-embedding-url ((provider llm-vertex))
   (format "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:predict"
-                             llm-vertex-gcloud-region
-                             (llm-vertex-project provider)
-                             llm-vertex-gcloud-region
-                             (or (llm-vertex-embedding-model provider) "textembedding-gecko")))
+          llm-vertex-gcloud-region
+          (llm-vertex-project provider)
+          llm-vertex-gcloud-region
+          (or (llm-vertex-embedding-model provider) "textembedding-gecko")))
 
-(defun llm-vertex--embedding-extract-response (response)
-  "Return the embedding contained in RESPONSE."
-  (cdr (assoc 'values (cdr (assoc 'embeddings (aref (cdr (assoc 'predictions response)) 0))))))
+(cl-defmethod llm-provider-embedding-extract-result ((_ llm-vertex) response)
+  (assoc-default 'values (assoc-default 'embeddings (aref (assoc-default 'predictions response) 0))))
 
-(defun llm-vertex--error-message (err-response)
-  "Return a user-visible error message from ERR-RESPONSE."
-  (let ((err (assoc-default 'error err-response)))
+(cl-defmethod llm-provider-embedding-extract-error ((provider llm-google) err-response)
+  (llm-provider-chat-extract-error provider err-response))
+
+(cl-defmethod llm-provider-chat-extract-error ((_ llm-google) err-response)
+  (when-let ((err (assoc-default 'error err-response)))
     (format "Problem calling GCloud Vertex AI: status: %s message: %s"
             (assoc-default 'code err)
             (assoc-default 'message err))))
 
-(defun llm-vertex--handle-response (response extractor)
-  "If RESPONSE is an errorp, throw it, else call EXTRACTOR."
-  (if (assoc 'error response)
-      (error (llm-vertex--error-message response))
-    (funcall extractor response)))
+(cl-defmethod llm-provider-embedding-request ((provider llm-vertex) string)
+  `(("instances" . [(("content" . ,string))])))
 
-(cl-defmethod llm-embedding-async ((provider llm-vertex) string vector-callback error-callback)
-  (llm-vertex-refresh-key provider)
-  (let ((buf (current-buffer)))
-    (llm-request-async (llm-vertex--embedding-url provider)
-                     :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
-                     :data `(("instances" . [(("content" . ,string))]))
-                     :on-success (lambda (data)
-                                   (llm-request-callback-in-buffer
-                                    buf vector-callback (llm-vertex--embedding-extract-response data)))
-                     :on-error (lambda (_ data)
-                                 (llm-request-callback-in-buffer
-                                  buf error-callback
-                                  'error (llm-vertex--error-message data))))))
+(cl-defmethod llm-provider-headers ((provider llm-vertex))
+  `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider)))))
 
-(cl-defmethod llm-embedding ((provider llm-vertex) string)
-  (llm-vertex-refresh-key provider)
-  (llm-vertex--handle-response
-   (llm-request-sync (llm-vertex--embedding-url provider)
-                     :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
-                     :data `(("instances" . [(("content" . ,string))])))
-   #'llm-vertex--embedding-extract-response))
-
-(defun llm-vertex--get-chat-response (response)
-  "Return the actual response from the RESPONSE struct returned.
-This handles different kinds of models."
+(cl-defmethod llm-provider-chat-extract-result ((_ llm-google) response)
   (pcase (type-of response)
     ('vector (when (> (length response) 0)
-               (let ((parts (mapcar #'llm-vertex--get-chat-response response)))
+               (let ((parts (mapcar #'llm-provider-chat-extract-response response)))
                  (if (stringp (car parts))
                      (mapconcat #'identity parts "")
                    (car parts)))))
@@ -158,18 +140,29 @@ This handles different kinds of models."
                              'parts
                              (assoc-default 'content
                                             (aref (assoc-default 'candidates response) 0)))))
-                 (if parts
-                      (or (assoc-default 'text (aref parts 0))
-                         ;; Change function calling from almost Open AI's
-                         ;; standard format to exactly the format.
-                         (mapcar (lambda (call)
-                                   `(function . ,(mapcar (lambda (c) (if (eq (car c) 'args) (cons 'arguments (cdr c)) c))
-                                                         (cdar call))))
-                                 parts))
-                   ""))
+                 (when parts
+                   (assoc-default 'text (aref parts 0))))
              "NOTE: No response was sent back by the LLM, the prompt may have violated safety checks."))))
 
-(defun llm-vertex--get-partial-chat-response (response)
+(cl-defmethod llm-provider-extract-function-calls ((provider llm-google) response)
+  (if (vectorp response)
+      (llm-provider-extract-function-calls provider (aref response 0))
+    (mapcar (lambda (call)
+              (make-llm-provider-utils-function-call
+               :name (assoc-default 'name call)
+               :args (assoc-default 'args call)))
+            (mapcan (lambda (maybe-call)
+                      (when-let ((fc (assoc-default 'functionCall maybe-call)))
+			(list fc)))
+                    (assoc-default
+                     'parts (assoc-default
+                             'content
+                             (aref (assoc-default 'candidates response) 0)))))))
+
+(cl-defmethod llm-provider-extract-streamed-function-calls ((provider llm-google) response)
+  (llm-provider-extract-function-calls provider (json-read-from-string response)))
+
+(cl-defmethod llm-provider-extract-partial-response ((_ llm-google) response)
   "Return the partial response from as much of RESPONSE as we can parse."
   (with-temp-buffer
     (insert response)
@@ -182,9 +175,7 @@ This handles different kinds of models."
           (setq result (concat result (json-read-from-string (match-string 1))))))
       result)))
 
-(defun llm-vertex--chat-request (prompt)
-  "Return an alist with chat input for the streaming API.
-PROMPT contains the input to the call to the chat API."
+(cl-defmethod llm-provider-chat-request ((_ llm-google) prompt _)
   (llm-provider-utils-combine-to-user-prompt prompt llm-vertex-example-prelude)
   (append
    `((contents
@@ -239,17 +230,7 @@ nothing to add, in which case it is nil."
     (when params-alist
       `((generation_config . ,params-alist)))))
 
-(defun llm-vertex--normalize-function-calls (response)
-  "If RESPONSE has function calls, transform them to our common format."
-  (if (consp response)
-      (mapcar (lambda (f)
-                (make-llm-provider-utils-function-call
-                 :name (assoc-default 'name (cdr f))
-                 :args (assoc-default 'arguments (cdr f))))
-              response)
-    response))
-
-(cl-defmethod llm-provider-utils-populate-function-calls ((_ llm-vertex) prompt calls)
+(cl-defmethod llm-provider-populate-function-calls ((_ llm-vertex) prompt calls)
   (llm-provider-utils-append-to-prompt
    prompt
    ;; For Vertex there is just going to be one call
@@ -259,31 +240,6 @@ nothing to add, in which case it is nil."
                 ((name . ,(llm-provider-utils-function-call-name fc))
                  (args . ,(llm-provider-utils-function-call-args fc))))))
            calls)))
-
-(defun llm-vertex--process-and-return (provider prompt response &optional error-callback)
-  "Process RESPONSE from the PROVIDER.
-
-This returns the response to be given to the client.
-
-Any functions will be executed.
-
-The response will be added to PROMPT.
-
-Provider is the llm provider, for logging purposes.
-
-ERROR-CALLBACK is called when an error is detected."
-  (if (and (consp response)
-           (assoc-default 'error response))
-      (progn
-        (when error-callback
-          (funcall error-callback 'error (llm-vertex--error-message response)))
-        response))
-  (let ((return-val
-         (llm-provider-utils-process-result
-          provider prompt
-          (llm-vertex--normalize-function-calls
-           (llm-vertex--get-chat-response response)))))
-    return-val))
 
 (defun llm-vertex--chat-url (provider &optional streaming)
 "Return the correct url to use for PROVIDER.
@@ -295,62 +251,14 @@ If STREAMING is non-nil, use the URL for the streaming API."
           (llm-vertex-chat-model provider)
           (if streaming "streamGenerateContent" "generateContent")))
 
-;; API reference: https://cloud.google.com/vertex-ai/docs/generative-ai/multimodal/send-chat-prompts-gemini#gemini-chat-samples-drest
-(cl-defmethod llm-chat ((provider llm-vertex) prompt)
-  ;; Gemini just has a streaming response, but we can just call it synchronously.
-  (llm-vertex-refresh-key provider)
-  (llm-vertex--process-and-return
-     provider prompt
-     (llm-request-sync (llm-vertex--chat-url provider)
-                       :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
-                       :data (llm-vertex--chat-request prompt))))
+(cl-defmethod llm-provider-chat-url ((provider llm-vertex))
+  (llm-vertex--chat-url provider))
 
-(cl-defmethod llm-chat-async ((provider llm-vertex) prompt response-callback error-callback)
-  (llm-vertex-refresh-key provider)
-  (let ((buf (current-buffer)))
-    (llm-request-async (llm-vertex--chat-url provider)
-                       :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
-                       :data (llm-vertex--chat-request prompt)
-                       :on-success (lambda (data)
-                                     (llm-request-callback-in-buffer
-                                      buf response-callback
-                                      (llm-vertex--process-and-return
-                                       provider prompt data)))
-                       :on-error (lambda (_ data)
-                                   (llm-request-callback-in-buffer buf error-callback 'error
-                                                                   (llm-vertex--error-message data))))))
-
-(cl-defmethod llm-chat-streaming ((provider llm-vertex) prompt partial-callback response-callback error-callback)
-  (llm-vertex-refresh-key provider)
-  (let ((buf (current-buffer)))
-    (llm-request-async (llm-vertex--chat-url provider)
-                     :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
-                     :data (llm-vertex--chat-request prompt)
-                     :on-partial (lambda (partial)
-                                   (when-let ((response (llm-vertex--get-partial-chat-response partial)))
-                                     (when (> (length response) 0)
-                                       (llm-request-callback-in-buffer buf partial-callback response))))
-                     :on-success (lambda (data)
-                                   (llm-request-callback-in-buffer
-                                    buf response-callback
-                                    (llm-vertex--process-and-return
-                                     provider prompt data)))
-                     :on-error (lambda (_ data)
-                                 (llm-request-callback-in-buffer buf error-callback 'error
-                                                                 (llm-vertex--error-message data))))))
+(cl-defmethod llm-provider-chat-streaming-url ((provider llm-vertex))
+  (llm-vertex--chat-url provider t))
 
 ;; Token counts
 ;; https://cloud.google.com/vertex-ai/docs/generative-ai/get-token-count
-
-(defun llm-vertex--count-token-url (provider)
-  "Return the URL to use for the Vertex API.
-PROVIDER is the llm provider.
-MODEL "
-  (format "https://%s-aiplatform.googleapis.com/v1beta1/projects/%s/locations/%s/publishers/google/models/%s:countTokens"
-          llm-vertex-gcloud-region
-          (llm-vertex-project provider)
-          llm-vertex-gcloud-region
-          (llm-vertex-chat-model provider)))
 
 (defun llm-vertex--to-count-token-request (request)
   "Return a version of REQUEST that is suitable for counting tokens."
@@ -361,15 +269,29 @@ MODEL "
   "Extract the token count from the response."
   (assoc-default 'totalTokens response))
 
-(cl-defmethod llm-count-tokens ((provider llm-vertex) string)
-  (llm-vertex-refresh-key provider)
-  (llm-vertex--handle-response
-   (llm-request-sync (llm-vertex--count-token-url provider)
-                     :headers `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider))))
-                     :data (llm-vertex--to-count-token-request
-                            (llm-vertex--chat-request
-                             (llm-make-simple-chat-prompt string))))
-   #'llm-vertex--count-tokens-extract-response))
+(cl-defgeneric llm-google-count-tokens-url (provider)
+  "The URL for PROVIDER to count tokens.")
+
+(cl-defmethod llm-google-count-tokens-url ((provider llm-vertex))
+  (format "https://%s-aiplatform.googleapis.com/v1beta1/projects/%s/locations/%s/publishers/google/models/%s:countTokens"
+          llm-vertex-gcloud-region
+          (llm-vertex-project provider)
+          llm-vertex-gcloud-region
+          (llm-vertex-chat-model provider)))
+
+(cl-defmethod llm-count-tokens ((provider llm-google) string)
+  (llm-provider-request-prelude provider)
+  (let ((response (llm-request-sync 
+                   (llm-google-count-tokens-url provider)
+                   :headers (llm-provider-headers provider)
+                   :data (llm-vertex--to-count-token-request
+                          (llm-provider-chat-request
+                           provider
+                           (llm-make-simple-chat-prompt string)
+                           nil)))))
+    (when-let ((err (llm-provider-chat-extract-error provider response)))
+      (error err))
+    (llm-vertex--count-tokens-extract-response response)))
 
 (cl-defmethod llm-name ((_ llm-vertex))
   "Gemini")
