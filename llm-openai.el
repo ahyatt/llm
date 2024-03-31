@@ -128,7 +128,7 @@ MODEL is the embedding model to use, or nil to use the default.."
                        :on-error (lambda (_ data) 
                                    (llm-request-callback-in-buffer
                                     buf error-callback 'error
-                                    (llm-openai--error-message provider data))))))
+                                    (llm-openai--error-message data))))))
 
 (cl-defmethod llm-embedding ((provider llm-openai) string)
   (llm-openai--check-key provider)
