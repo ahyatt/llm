@@ -64,7 +64,7 @@ for more specialized uses."
   :type 'string
   :group 'llm-vertex)
 
-(cl-defstruct (llm-google (:include llm-standard-provider))
+(cl-defstruct (llm-google (:include llm-standard-full-provider))
   "A base class for functionality that is common to both Vertex and
 Gemini.")
 

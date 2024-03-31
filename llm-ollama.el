@@ -45,7 +45,7 @@
   :type 'integer
   :group 'llm-ollama)
 
-(cl-defstruct (llm-ollama (:include llm-standard-provider))
+(cl-defstruct (llm-ollama (:include llm-standard-full-provider))
   "A structure for holding information needed by Ollama's API.
 
 SCHEME is the http scheme to use, a string. It is optional and

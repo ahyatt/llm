@@ -27,7 +27,17 @@
 
 (cl-defstruct llm-standard-provider
   "A struct indicating that this is a standard provider.
-This is for dispatch purposes, so this contains no actual data.")
+This is for dispatch purposes, so this contains no actual data.
+
+This represents any provider, regardless of what it implements.
+
+This should not be used outside of this file.")
+
+(cl-defstruct (llm-standard-chat-provider (:include llm-standard-provider))
+  "A struct for indicating a provider that implements chat.")
+
+(cl-defstruct (llm-standard-full-provider (:include llm-standard-chat-provider))
+  "A struct for providers that implements chat and embeddings.")
 
 ;; Methods necessary for both embedding and chat requests.
 
@@ -59,7 +69,7 @@ RESPONSE is a parsed JSON object.
 
 Return nil if there is no error.")
 
-(cl-defmethod llm-provider-embedding-extract-error ((_ llm-standard-provider) _)
+(cl-defmethod llm-provider-embedding-extract-error ((_ llm-standard-full-provider) _)
   "By default, the standard provider has no error extractor."
   nil)
 
@@ -74,7 +84,7 @@ Return nil if there is no error.")
 (cl-defgeneric llm-provider-chat-streaming-url (provider)
   "Return the URL for streaming chat for the PROVIDER.")
 
-(cl-defmethod llm-provider-chat-streaming-url ((provider llm-standard-provider))
+(cl-defmethod llm-provider-chat-streaming-url ((provider llm-standard-chat-provider))
   "By default, use the same URL as normal chat."
   (llm-provider-chat-url provider))
 
@@ -85,7 +95,7 @@ STREAMING is true if this is a streaming request.")
 (cl-defgeneric llm-provider-chat-extract-error (provider response)
   "Return an error message from RESPONSE for the PROVIDER.")
 
-(cl-defmethod llm-provider-chat-extract-error ((_ llm-standard-provider) _)
+(cl-defmethod llm-provider-chat-extract-error ((_ llm-standard-chat-provider) _)
   "By default, the standard provider has no error extractor."
   nil)
 
@@ -96,7 +106,7 @@ STREAMING is true if this is a streaming request.")
   "Append RESULT to PROMPT for the PROVIDER.
 FUNC-RESULTS is a list of function results, if any.")
 
-(cl-defmethod llm-provider-append-to-prompt ((_ llm-standard-provider) prompt result
+(cl-defmethod llm-provider-append-to-prompt ((_ llm-standard-chat-provider) prompt result
                                              &optional func-results)
   "By default, the standard provider appends to the prompt."
   (llm-provider-utils-append-to-prompt prompt result func-results))
@@ -113,7 +123,7 @@ If there are no function calls, return nil.  If there are
 function calls, return a list of
 `llm-provider-utils-function-call'.")
 
-(cl-defmethod llm-provider-extract-function-calls ((_ llm-standard-provider) _)
+(cl-defmethod llm-provider-extract-function-calls ((_ llm-standard-chat-provider) _)
   "By default, the standard provider has no function call extractor."
   nil)
 
@@ -125,13 +135,13 @@ CALLS are a list of `llm-provider-utils-function-call'.")
 (cl-defgeneric llm-provider-extract-streamed-function-calls (provider response)
   "Extract the result string from partial RESPONSE for the PROVIDER.")
 
-(cl-defmethod llm-provider-extract-streamed-function-calls ((_ llm-standard-provider) _)
+(cl-defmethod llm-provider-extract-streamed-function-calls ((_ llm-standard-chat-provider) _)
   "By default, there are no function calls."
   nil)
 
 ;; Standard provider implementations of llm functionality
 
-(cl-defmethod llm-embedding ((provider llm-standard-provider) string)
+(cl-defmethod llm-embedding ((provider llm-standard-full-provider) string)
   (llm-provider-request-prelude provider)
   (let ((response (llm-request-sync (llm-provider-embedding-url provider)
                                     :headers (llm-provider-headers provider)
@@ -140,7 +150,7 @@ CALLS are a list of `llm-provider-utils-function-call'.")
         (error err-msg)
       (llm-provider-embedding-extract-result provider response))))
 
-(cl-defmethod llm-embedding-async ((provider llm-standard-provider) string vector-callback error-callback)
+(cl-defmethod llm-embedding-async ((provider llm-standard-full-provider) string vector-callback error-callback)
   (llm-provider-request-prelude provider)
   (let ((buf (current-buffer)))
     (llm-request-async
@@ -164,7 +174,7 @@ CALLS are a list of `llm-provider-utils-function-call'.")
                          provider data)
 			            "Unknown error")))))))
 
-(cl-defmethod llm-chat ((provider llm-standard-provider) prompt)
+(cl-defmethod llm-chat ((provider llm-standard-chat-provider) prompt)
   (llm-provider-request-prelude provider)
   (let ((response (llm-request-sync (llm-provider-chat-url provider)
                                     :headers (llm-provider-headers provider)
@@ -177,7 +187,7 @@ CALLS are a list of `llm-provider-utils-function-call'.")
                                          (llm-provider-extract-function-calls
                                           provider response)))))
 
-(cl-defmethod llm-chat-async ((provider llm-standard-provider) prompt success-callback
+(cl-defmethod llm-chat-async ((provider llm-standard-chat-provider) prompt success-callback
                               error-callback)
   (llm-provider-request-prelude provider)
   (let ((buf (current-buffer)))
@@ -205,7 +215,7 @@ CALLS are a list of `llm-provider-utils-function-call'.")
                          provider data))
                     "Unknown error")))))))
 
-(cl-defmethod llm-chat-streaming ((provider llm-standard-provider) prompt partial-callback
+(cl-defmethod llm-chat-streaming ((provider llm-standard-chat-provider) prompt partial-callback
                                   response-callback error-callback)
   (llm-provider-request-prelude provider)
   (let ((buf (current-buffer)))

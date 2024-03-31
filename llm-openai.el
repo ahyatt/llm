@@ -40,7 +40,7 @@
   :type 'string
   :group 'llm-openai)
 
-(cl-defstruct (llm-openai (:include llm-standard-provider))
+(cl-defstruct (llm-openai (:include llm-standard-full-provider))
   "A structure for holding information needed by Open AI's API.
 
 KEY is the API key for Open AI, which is required.
