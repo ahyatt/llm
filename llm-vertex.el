@@ -281,16 +281,16 @@ If STREAMING is non-nil, use the URL for the streaming API."
           (llm-vertex-chat-model provider)))
 
 (cl-defmethod llm-count-tokens ((provider llm-google) string)
-  (llm-provider-prelude provider)
+  (llm-provider-request-prelude provider)
   (let ((response (llm-request-sync 
                    (llm-google-count-tokens-url provider)
                    :headers (llm-provider-headers provider)
                    :data (llm-vertex--to-count-token-request
                           (llm-provider-chat-request
                            provider
-                           (llm-make-simple-chat-prompt string nil)
+                           (llm-make-simple-chat-prompt string)
                            nil)))))
-    (when-let ((err (llm-provider-error-extractor response)))
+    (when-let ((err (llm-provider-chat-extract-error response)))
       (error err))
     (llm-vertex--count-tokens-extract-response response)))
 
