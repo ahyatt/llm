@@ -61,9 +61,8 @@ https://api.example.com/v1/chat, then URL should be
 \"https://api.example.com/v1/\"."
   url)
 
-(cl-defmethod llm-nonfree-message-info ((provider llm-openai))
-  (ignore provider)
-  (cons "Open AI" "https://openai.com/policies/terms-of-use"))
+(cl-defmethod llm-nonfree-message-info ((_ llm-openai))
+  "https://openai.com/policies/terms-of-use")
 
 (defun llm-openai--embedding-request (model string)
   "Return the request to the server for the embedding of STRING.
@@ -133,7 +132,7 @@ If ERR-RESPONSE is not an error, return nil.")
                        :on-error (lambda (_ data) 
                                    (llm-request-callback-in-buffer
                                     buf error-callback 'error
-                                    (llm-openai--error-message data))))))
+                                    (llm-openai--error-message provider data))))))
 
 (cl-defmethod llm-embedding ((provider llm-openai) string)
   (llm-openai--check-key provider)
@@ -219,7 +218,7 @@ This function adds the response to the prompt, executes any
 functions, and returns the value that the client should get back.
 
 PROMPT is the prompt that needs to be updated with the response."
-  (if-let ((err-msg (llm-openai--error-message response)))
+  (if-let ((err-msg (llm-openai--error-message provider response)))
       (progn
         (when error-callback
           (funcall error-callback 'error err-msg))

@@ -94,9 +94,8 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
       (setf (llm-vertex-key provider) (encode-coding-string result 'utf-8)))
     (setf (llm-vertex-key-gentime provider) (current-time))))
 
-(cl-defmethod llm-nonfree-message-info ((provider llm-vertex))
-  (ignore provider)
-  (cons "Google Cloud Vertex" "https://policies.google.com/terms/generative-ai"))
+(cl-defmethod llm-nonfree-message-info ((_ llm-vertex))
+  "https://policies.google.com/terms/generative-ai")
 
 (defun llm-vertex--embedding-url (provider)
   "From the PROVIDER, return the URL to use for embeddings"

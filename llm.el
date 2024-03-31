@@ -207,8 +207,7 @@ ROLE default to `user', which should almost always be what is needed."
 
 (cl-defgeneric llm-nonfree-message-info (provider)
   "If PROVIDER is non-free, return info for a warning.
-This should be a cons of the name of the LLM, and the URL of the
-terms of service.
+This should be the string URL of the terms of service.
 
 If the LLM is free and has no restrictions on use, this should
 return nil.  Since this function already returns nil, there is no
@@ -237,7 +236,7 @@ conversation so far."
 (cl-defmethod llm-chat :before (provider _)
   "Issue a warning if the LLM is non-free."
   (when-let (info (llm-nonfree-message-info provider))
-    (llm--warn-on-nonfree (car info) (cdr info))))
+    (llm--warn-on-nonfree (llm-name provider) info)))
 
 (cl-defmethod llm-chat :around (provider prompt)
   "Log the input to llm-chat."
@@ -342,7 +341,7 @@ be passed to `llm-cancel-request'."
 (cl-defmethod llm-chat-streaming :before (provider _ _ _ _)
   "Issue a warning if the LLM is non-free."
   (when-let (info (llm-nonfree-message-info provider))
-    (llm--warn-on-nonfree (car info) (cdr info))))
+    (llm--warn-on-nonfree (llm-name provider) info)))
 
 (cl-defmethod llm-chat-streaming :around (provider prompt partial-callback response-callback error-callback)
   "Log the input to llm-chat-async."
@@ -402,7 +401,7 @@ be passed to `llm-cancel-request'."
 (cl-defmethod llm-chat-async :before (provider _ _ _)
   "Issue a warning if the LLM is non-free."
   (when-let (info (llm-nonfree-message-info provider))
-    (llm--warn-on-nonfree (car info) (cdr info))))
+    (llm--warn-on-nonfree (llm-name provider) info)))
 
 (cl-defgeneric llm-capabilities (provider)
   "Return a list of the capabilities of PROVIDER.
@@ -443,7 +442,7 @@ value that should be a reasonable lower bound."
 (cl-defmethod llm-embedding :before (provider _)
   "Issue a warning if the LLM is non-free."
   (when-let (info (llm-nonfree-message-info provider))
-    (llm--warn-on-nonfree (car info) (cdr info))))
+    (llm--warn-on-nonfree (llm-name provider) info)))
 
 (cl-defgeneric llm-embedding-async (provider string vector-callback error-callback)
   "Calculate a vector embedding of STRING from PROVIDER.
@@ -463,7 +462,7 @@ be passed to `llm-cancel-request'."
 (cl-defmethod llm-embedding-async :before (provider _ _ _)
   "Issue a warning if the LLM is non-free."
   (when-let (info (llm-nonfree-message-info provider))
-    (llm--warn-on-nonfree (car info) (cdr info))))
+    (llm--warn-on-nonfree (llm-name provider) info)))
 
 (cl-defgeneric llm-count-tokens (provider string)
   "Return the number of tokens in STRING from PROVIDER.

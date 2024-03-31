@@ -35,6 +35,9 @@
   (key nil :read-only t)
   (chat-model "claude-3-opus-20240229" :read-only t))
 
+(cl-defmethod llm-nonfree-message-info ((_ llm-claude))
+  "https://www.anthropic.com/legal/consumer-terms")
+
 (defun llm-claude-check-key (provider)
   "Check if the API key is valid, error if not."
   (unless (llm-claude-key provider)

@@ -40,6 +40,9 @@ KEY is the API key for the client.
 You can get this at https://makersuite.google.com/app/apikey."
   key (embedding-model "embedding-001") (chat-model "gemini-pro"))
 
+(cl-defmethod llm-nonfree-message-info ((_ llm-gemini))
+  "https://policies.google.com/terms/generative-ai")
+
 (defun llm-gemini--embedding-url (provider)
   "Return the URL for the EMBEDDING request for STRING from PROVIDER."
   (format "https://generativelanguage.googleapis.com/v1beta/models/%s:embedContent?key=%s"
