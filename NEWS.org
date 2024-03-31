@@ -1,8 +1,6 @@
-* Verson 0.12.4
+* Verson 0.12.3
 - Refactor of warn-non-nonfree methods.
 - Add non-free warnings for Gemini and Claude.
-* Version 0.12.3
-- Enable customization of error message handling for Open AI compatible providers, via =llm-openai--error-message=.
 * Version 0.12.2
 - Send connection issues to error callbacks, and fix an error handling issue in Ollama.
 - Fix issue where, in some cases, streaming does not work the first time attempted.
