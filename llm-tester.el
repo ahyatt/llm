@@ -145,7 +145,7 @@
        (llm-tester-log "SUCCESS: Provider %s provided a streamed response in %d parts:\n%s" (type-of provider) counter streamed)
        (when (and (member 'streaming (llm-capabilities provider))
                   (not (string= streamed text)))
-           (llm-tester-log "ERROR: Provider %s returned a streamed response that was not equal to the final response.  Streamed text %s" (type-of provider) streamed))
+           (llm-tester-log "ERROR: Provider %s returned a streamed response that was not equal to the final response.  Streamed text:\n%sFinal response:\n%s" (type-of provider) streamed text))
        (when (and (member 'streaming (llm-capabilities provider)) (= 0 counter))
            (llm-tester-log "WARNING: Provider %s returned no partial updates!" (type-of provider))))
      (lambda (type message)
