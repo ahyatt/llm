@@ -284,15 +284,16 @@ If there is an assistance response, do nothing."
                             (eq (llm-chat-prompt-interaction-role interaction) 'system))
                           (llm-chat-prompt-interactions prompt)))
           (system-content (llm-provider-utils-get-system-prompt prompt example-prelude)))
-      (if system-prompt
-          (setf (llm-chat-prompt-interaction-content system-prompt)
-                (concat (llm-chat-prompt-interaction-content system-prompt)
-                        "\n"
-                        system-content))
-        (push (make-llm-chat-prompt-interaction
-               :role 'system
-               :content system-content)
-              (llm-chat-prompt-interactions prompt))))))
+      (when (and system-content (> (length system-content) 0))
+	(if system-prompt
+            (setf (llm-chat-prompt-interaction-content system-prompt)
+                  (concat (llm-chat-prompt-interaction-content system-prompt)
+                          "\n"
+                          system-content))
+          (push (make-llm-chat-prompt-interaction
+		 :role 'system
+		 :content system-content)
+		(llm-chat-prompt-interactions prompt)))))))
 
 (defun llm-provider-utils-combine-to-user-prompt (prompt &optional example-prelude)
   "Add context and examples to a user prompt in PROMPT.
