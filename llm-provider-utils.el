@@ -164,7 +164,8 @@ CALLS are a list of `llm-provider-utils-function-call'.")
                         err-msg)
                      (llm-provider-utils-callback-in-buffer
                       buf vector-callback
-                      (llm-provider-embedding-extract-result provider data))))
+                      (llm-provider-embedding-extract-result provider data)))
+                   (kill-current-buffer))
      :on-error (lambda (_ data)
                  (llm-provider-utils-callback-in-buffer
                   buf error-callback 'error
@@ -172,7 +173,8 @@ CALLS are a list of `llm-provider-utils-function-call'.")
                       data
                     (or (llm-provider-embedding-extract-error
                          provider data)
-			            "Unknown error")))))))
+			            "Unknown error")))
+                 (kill-current-buffer)))))
 
 (cl-defmethod llm-chat ((provider llm-standard-chat-provider) prompt)
   (llm-provider-request-prelude provider)
@@ -206,6 +208,7 @@ CALLS are a list of `llm-provider-utils-function-call'.")
                        provider prompt
                        (llm-provider-chat-extract-result provider data)
                        (llm-provider-extract-function-calls provider data))))
+                   (kill-current-buffer))
      :on-error (lambda (_ data)
                  (llm-provider-utils-callback-in-buffer
                   buf error-callback 'error
@@ -213,7 +216,8 @@ CALLS are a list of `llm-provider-utils-function-call'.")
                       data
                     (or (llm-provider-chat-extract-error
                          provider data))
-                    "Unknown error")))))))
+                    "Unknown error"))
+                 (kill-current-buffer)))))
 
 (cl-defmethod llm-chat-streaming ((provider llm-standard-chat-provider) prompt partial-callback
                                   response-callback error-callback)
@@ -239,7 +243,8 @@ CALLS are a list of `llm-provider-utils-function-call'.")
           (llm-provider-utils-process-result
            provider prompt
            (llm-provider-extract-partial-response provider data)
-           (llm-provider-extract-streamed-function-calls provider data))))
+           (llm-provider-extract-streamed-function-calls provider data)))
+       (kill-current-buffer))
      :on-error (lambda (_ data)
                  (llm-provider-utils-callback-in-buffer
                   buf error-callback 'error
@@ -247,7 +252,8 @@ CALLS are a list of `llm-provider-utils-function-call'.")
                       data
                     (or (llm-provider-chat-extract-error
                          provider data))
-                    "Unknown error"))))))
+                    "Unknown error"))
+                 (kill-current-buffer)))))
 
 (defun llm-provider-utils-get-system-prompt (prompt &optional example-prelude)
   "From PROMPT, turn the context and examples into a string.
