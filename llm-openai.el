@@ -245,16 +245,15 @@ whether they have been parsed before or not."
       llm-openai-current-response)))
 
 (cl-defmethod llm-provider-extract-streamed-function-calls ((_ llm-openai) response)
-  "Return the function calls in the response from RESPONSE."
   (let* ((pieces (mapcar (lambda (json)
-				                  (assoc-default 'tool_calls
-					                             (assoc-default
-						                          'delta
-						                          (aref (assoc-default
-						                                 'choices
-						                                 (json-read-from-string json))
-						                                0))))
-			                    (llm-openai--get-unparsed-json response)))
+			   (assoc-default 'tool_calls
+					  (assoc-default
+					   'delta
+					   (aref (assoc-default
+						  'choices
+						  (json-read-from-string json))
+						 0))))
+			 (llm-openai--get-unparsed-json response)))
          (cvec (make-vector (length (car pieces)) (make-llm-provider-utils-function-call))))
     (cl-loop for piece in pieces do
              (cl-loop for call in (append piece nil) do
@@ -270,10 +269,11 @@ whether they have been parsed before or not."
                         (setf (llm-provider-utils-function-call-args (aref cvec index))
                               (concat (llm-provider-utils-function-call-args (aref cvec index))
                                       arguments)))))
-            (cl-loop for call in (append cvec nil)
-                     do (setf (llm-provider-utils-function-call-args call)
-                              (json-read-from-string (llm-provider-utils-function-call-args call)))
-                     finally return cvec)))
+    (cl-loop for call in (append cvec nil)
+             do (setf (llm-provider-utils-function-call-args call)
+                      (json-read-from-string (llm-provider-utils-function-call-args call)))
+             finally return (when (> (length cvec) 0)
+			      (append cvec nil)))))
 
 (cl-defmethod llm-name ((_ llm-openai))
   "Open AI")

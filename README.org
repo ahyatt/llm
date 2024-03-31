@@ -69,12 +69,7 @@ In addition to the provider, which you may want multiple of (for example, to cha
 ** llama.cpp
 [[https://github.com/ggerganov/llama.cpp][llama.cpp]] is a way to run large language models locally.  To use it with the =llm= package, you need to start the server (with the "--embedding" flag if you plan on using embeddings).  The server must be started with a model, so it is not possible to switch models until the server is restarted to use the new model.  As such, model is not a parameter to the provider, since the model choice is already set once the server starts.
 
-Llama.cpp does not have native chat interfaces, so is not as good at multi-round conversations as other solutions such as Ollama.  It will perform better at single-responses.  However, it does support Open AI's request format for models that are good at conversation.  If you are using one of those models, you should probably use the Open AI Compatible provider instead to connect to Llama CPP.
-
-The parameters default to optional values, so mostly users should just be creating a model with ~(make-llm-llamacpp)~.  The parameters are:
-- ~:scheme~: The scheme (http/https) for the connection to llama.cpp.  This default to "http".
-- ~:host~: The host that llama.cpp server is run on.  This is optional and will default to localhost.
-- ~:port~: The port that llama.cpp server is run on.  This is optional and will default to 8080, the default llama.cpp port.
+There is a deprecated provider, however it is no longer needed.  Instead, llama cpp is Open AI compatible, so the Open AI Compatible provider should work.
 ** Fake
 This is a client that makes no call, but it just there for testing and debugging.  Mostly this is of use to programmatic clients of the llm package, but end users can also use it to understand what will be sent to the LLMs.  It has the following parameters:
 - ~:output-to-buffer~: if non-nil, the buffer or buffer name to append the request sent to the LLM to.
