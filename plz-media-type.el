@@ -52,23 +52,32 @@
   cause)
 
 (defclass plz-media-type ()
-  ((type
+  ((coding-system
+    :documentation "The coding system to use for the media type."
+    :initarg :coding-system
+    :initform nil
+    :type (or null symbol))
+   (type
     :documentation "The media type."
     :initarg :type
     :type symbol)
    (subtype
     :documentation "The media subtype."
     :initarg :subtype
-    :subtype symbol)
+    :type symbol)
    (parameters
     :documentation "The parameters of the media type."
     :initarg :parameters
     :initform nil
-    :subtype list))
+    :type list))
   "A class that hold information about the type, subtype and
 parameters of a media type.  It is meant to be sub-classed to
 handle the processing of different media types and supports the
-processing of streaming and non-streaming HTTP responses.")
+processing of streaming and non-streaming HTTP responses.  The
+response will be decoded with the coding-system of the charset
+parameter in the content type header, or the coding-sytem of the
+media type.  If the coding system of a media type is nil, the
+response will not be decoded.")
 
 (defun plz-media-type-charset (media-type)
   "Return the character set of the MEDIA-TYPE."
@@ -77,7 +86,9 @@ processing of streaming and non-streaming HTTP responses.")
 
 (defun plz-media-type-coding-system (media-type)
   "Return the coding system of the MEDIA-TYPE."
-  (coding-system-from-name (or (plz-media-type-charset media-type) "UTF-8")))
+  (if-let (charset (plz-media-type-charset media-type))
+      (coding-system-from-name charset)
+    (oref media-type coding-system)))
 
 (defun plz-media-type-name (media-type)
   "Return the name of the MEDIA-TYPE as a string."
@@ -134,10 +145,17 @@ an alist of parameters."
       (alist-get t media-types)
       (plz-media-type:application/octet-stream)))
 
-(defun plz-media-type--of-response (media-types response)
+(defun plz-media-type-of-response (media-types response)
   "Lookup the content type of RESPONSE in MEDIA-TYPES."
   (let ((media-type (plz-media-type--content-type response)))
-    (clone (plz-media--type-find media-types media-type))))
+    (clone (plz-media--type-find media-types media-type)
+           :parameters (oref media-type parameters))))
+
+(defun plz-media-type-decode-string (media-type string)
+  "Decode the STRING according to the MEDIA-TYPE."
+  (if-let (coding-system (plz-media-type-coding-system media-type))
+      (decode-coding-string string coding-system)
+    string))
 
 (defvar-local plz-media-type--current nil
   "The media type of the process buffer.")
@@ -161,10 +179,8 @@ CHUNK is a part of the HTTP body."
     (with-current-buffer (process-buffer process)
       (let ((moving (= (point) (process-mark process))))
         (if-let (media-type plz-media-type--current)
-            (let ((coding-system (plz-media-type-coding-system media-type))
-                  (response plz-media-type--response))
-              (setf (plz-response-body response)
-                    (decode-coding-string chunk coding-system))
+            (let ((response plz-media-type--response))
+              (setf (plz-response-body response) chunk)
               (plz-media-type-process media-type process response))
           (progn
             (save-excursion
@@ -176,8 +192,7 @@ CHUNK is a part of the HTTP body."
               (let ((body-start (point)))
                 (goto-char (point-min))
                 (let* ((response (prog1 (plz--response) (widen)))
-                       (media-type (plz-media-type--of-response media-types response))
-                       (coding-system (plz-media-type-coding-system media-type)))
+                       (media-type (plz-media-type-of-response media-types response)))
                   (setq-local plz-media-type--current media-type)
                   (setq-local plz-media-type--response
                               (make-plz-response
@@ -186,8 +201,7 @@ CHUNK is a part of the HTTP body."
                                :version (plz-response-version response)))
                   (when-let (body (plz-response-body response))
                     (when (> (length body) 0)
-                      (setf (plz-response-body response)
-                            (decode-coding-string body coding-system))
+                      (setf (plz-response-body response) body)
                       (delete-region body-start (point-max))
                       (set-marker (process-mark process) (point))
                       (plz-media-type-process media-type process response))))))))
@@ -224,13 +238,14 @@ body.  It is used as the default media type processor.")
   (ignore media-type)
   (save-excursion
     (goto-char (process-mark process))
-    (insert (plz-response-body chunk))
+    (insert (plz-media-type-decode-string media-type (plz-response-body chunk)))
     (set-marker (process-mark process) (point))))
 
 ;; Content Type: application/json
 
 (defclass plz-media-type:application/json (plz-media-type:application/octet-stream)
-  ((subtype :initform 'json)
+  ((coding-system :initform 'utf-8)
+   (subtype :initform 'json)
    (array-type
     :documentation "Specifies which Lisp type is used to represent arrays.  It can be
 `array' (the default) or `list'."
@@ -347,7 +362,6 @@ will always be set to nil.")
   ((media-type plz-media-type:application/json-array) response)
   "Transform the RESPONSE into a format suitable for MEDIA-TYPE."
   (ignore media-type)
-  (plz-media-type:application/json-array--parse-stream media-type)
   (setf (plz-response-body response) nil)
   response)
 
@@ -401,14 +415,15 @@ will always be set to nil.")
 (cl-defmethod plz-media-type-then
   ((media-type plz-media-type:application/x-ndjson) response)
   "Transform the RESPONSE into a format suitable for MEDIA-TYPE."
-  (plz-media-type:application/x-ndjson--parse-stream media-type)
+  (ignore media-type)
   (setf (plz-response-body response) nil)
   response)
 
 ;; Content Type: application/xml
 
 (defclass plz-media-type:application/xml (plz-media-type:application/octet-stream)
-  ((subtype :initform 'xml))
+  ((coding-system :initform 'utf-8)
+   (subtype :initform 'xml))
   "Media type class that handles the processing of HTTP responses
 in the XML format.  The HTTP response is processed in a
 non-streaming way.  After the response has been received, the
@@ -428,7 +443,7 @@ function.")
 
 (defclass plz-media-type:text/html (plz-media-type:application/xml)
   ((type :initform 'text)
-   (subtype :initform 'xml))
+   (subtype :initform 'html))
   "Media type class that handles the processing of HTTP responses
 in the HTML format.  The HTTP response is processed in a
 non-streaming way.  After the response has been received, the
@@ -436,11 +451,23 @@ body of the plz-response structure is set to the result of parsing
 the HTTP response body with the `libxml-parse-html-region'
 function.")
 
+(defclass plz-media-type:text/xml (plz-media-type:application/xml)
+  ((coding-system :initform 'us-ascii)
+   (type :initform 'text)
+   (subtype :initform 'xml))
+  "Media type class that handles the processing of HTTP responses
+in the HTML format.  The HTTP response is processed in a
+non-streaming way.  After the response has been received, the
+body of the plz-response structure is set to the result of
+parsing the HTTP response body with the
+`libxml-parse-html-region' function.")
+
 (defvar plz-media-types
   `((application/json . ,(plz-media-type:application/json))
     (application/octet-stream . ,(plz-media-type:application/octet-stream))
     (application/xml . ,(plz-media-type:application/xml))
     (text/html . ,(plz-media-type:text/html))
+    (text/xml . ,(plz-media-type:text/xml))
     (t . ,(plz-media-type:application/octet-stream)))
   "Association list from media type to content type.")
 
@@ -452,7 +479,7 @@ function.")
             (cond
              ((plz-error-response plzerror)
               (let ((response (plz-error-response plzerror)))
-                (if-let (media-type (plz-media-type--of-response media-types response))
+                (if-let (media-type (plz-media-type-of-response media-types response))
                     (list msg (with-temp-buffer
                                 (when-let (body (plz-response-body response))
                                   (insert body)
