@@ -88,6 +88,14 @@ Return nil if there is no error.")
   "By default, use the same URL as normal chat."
   (llm-provider-chat-url provider))
 
+(cl-defgeneric llm-provider-chat-timeout (provider)
+  "Return the seconds of timeout for PROVIDER.
+Return nil for the standard timeout.")
+
+(cl-defmethod llm-provider-chat-timeout ((_ llm-standard-provider))
+  "By default, the standard provider has the standard timeout."
+  nil)
+
 (cl-defgeneric llm-provider-chat-request (provider prompt streaming)
   "Return the request for the PROVIDER for PROMPT.
 STREAMING is true if this is a streaming request.")
@@ -144,6 +152,7 @@ CALLS are a list of `llm-provider-utils-function-call'.")
 (cl-defmethod llm-embedding ((provider llm-standard-full-provider) string)
   (llm-provider-request-prelude provider)
   (let ((response (llm-request-sync (llm-provider-embedding-url provider)
+                                    :timeout (llm-provider-chat-timeout provider)
                                     :headers (llm-provider-headers provider)
                                     :data (llm-provider-embedding-request provider string))))
     (if-let ((err-msg (llm-provider-embedding-extract-error provider response)))
