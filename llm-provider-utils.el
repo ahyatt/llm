@@ -22,7 +22,257 @@
 ;;; Code:
 
 (require 'llm)
+(require 'llm-request-plz)
 (require 'seq)
+
+(cl-defstruct llm-standard-provider
+  "A struct indicating that this is a standard provider.
+This is for dispatch purposes, so this contains no actual data.
+
+This represents any provider, regardless of what it implements.
+
+This should not be used outside of this file.")
+
+(cl-defstruct (llm-standard-chat-provider (:include llm-standard-provider))
+  "A struct for indicating a provider that implements chat.")
+
+(cl-defstruct (llm-standard-full-provider (:include llm-standard-chat-provider))
+  "A struct for providers that implements chat and embeddings.")
+
+;; Methods necessary for both embedding and chat requests.
+
+(cl-defgeneric llm-provider-request-prelude (provider)
+  "Execute any prelude code necessary before running a request.")
+
+(cl-defmethod llm-provider-request-prelude ((_ llm-standard-provider))
+  "Do nothing for the standard provider."
+  nil)
+
+(cl-defgeneric llm-provider-headers (provider)
+  "Return the headers for the PROVIDER.")
+
+(cl-defmethod llm-provider-headers ((_ llm-standard-provider))
+  "By default, the standard provider has no headers."
+  nil)
+
+;; Methods for embeddings
+(cl-defgeneric llm-provider-embedding-url (provider)
+  "Return the URL for embeddings for the PROVIDER.")
+
+(cl-defgeneric llm-provider-embedding-request (provider string)
+  "Return the request for the PROVIDER for STRING.")
+
+(cl-defgeneric llm-provider-embedding-extract-error (provider response)
+  "Return an error message from RESPONSE for the PROVIDER.
+
+RESPONSE is a parsed JSON object.
+
+Return nil if there is no error.")
+
+(cl-defmethod llm-provider-embedding-extract-error ((_ llm-standard-full-provider) _)
+  "By default, the standard provider has no error extractor."
+  nil)
+
+(cl-defgeneric llm-provider-embedding-extract-result (provider response)
+  "Return the result from RESPONSE for the PROVIDER.")
+
+;; Methods for chat
+
+(cl-defgeneric llm-provider-chat-url (provider)
+  "Return the URL for chat for the PROVIDER.")
+
+(cl-defgeneric llm-provider-chat-streaming-url (provider)
+  "Return the URL for streaming chat for the PROVIDER.")
+
+(cl-defmethod llm-provider-chat-streaming-url ((provider llm-standard-chat-provider))
+  "By default, use the same URL as normal chat."
+  (llm-provider-chat-url provider))
+
+(cl-defgeneric llm-provider-chat-timeout (provider)
+  "Return the seconds of timeout for PROVIDER.
+Return nil for the standard timeout.")
+
+(cl-defmethod llm-provider-chat-timeout ((_ llm-standard-provider))
+  "By default, the standard provider has the standard timeout."
+  nil)
+
+(cl-defgeneric llm-provider-chat-request (provider prompt streaming)
+  "Return the request for the PROVIDER for PROMPT.
+STREAMING is true if this is a streaming request.")
+
+(cl-defgeneric llm-provider-chat-extract-error (provider response)
+  "Return an error message from RESPONSE for the PROVIDER.")
+
+(cl-defmethod llm-provider-chat-extract-error ((_ llm-standard-chat-provider) _)
+  "By default, the standard provider has no error extractor."
+  nil)
+
+(cl-defgeneric llm-provider-chat-extract-result (provider response)
+  "Return the result from RESPONSE for the PROVIDER.")
+
+(cl-defgeneric llm-provider-append-to-prompt (provider prompt result func-results)
+  "Append RESULT to PROMPT for the PROVIDER.
+FUNC-RESULTS is a list of function results, if any.")
+
+(cl-defmethod llm-provider-append-to-prompt ((_ llm-standard-chat-provider) prompt result
+                                             &optional func-results)
+  "By default, the standard provider appends to the prompt."
+  (llm-provider-utils-append-to-prompt prompt result func-results))
+
+(cl-defgeneric llm-provider-streaming-media-handler (provider msg-receiver fc-receiver)
+  "Return a function that will handle streaming media for PROVIDER.
+
+This should be a cons of the media type as a symbol, and a plist
+of the particular data the media type needs to process the
+streaming media.")
+
+(cl-defmethod llm-provider-streaming-media-handler ((_ llm-standard-chat-provider) msg-receiver fc-receiver)
+  "By default, the standard provider has no streaming media handler."
+  nil)
+
+;; Methods for chat function calling
+
+(cl-defgeneric llm-provider-extract-function-calls (provider response)
+  "Return the function calls from RESPONSE for the PROVIDER.
+If there are no function calls, return nil.  If there are
+function calls, return a list of
+`llm-provider-utils-function-call'.")
+
+(cl-defmethod llm-provider-extract-function-calls ((_ llm-standard-chat-provider) _)
+  "By default, the standard provider has no function call extractor."
+  nil)
+
+(cl-defgeneric llm-provider-populate-function-calls (provider prompt calls)
+  "For PROVIDER, in PROMPT, record that function CALLS were received.
+This is the recording before the calls were executed.
+CALLS are a list of `llm-provider-utils-function-call'.")
+
+(cl-defgeneric llm-provider-collect-streaming-function-data (provider data)
+  "Transform a list of streaming function call DATA responses.
+
+The DATA responses are a list of whatever is sent to the function
+call handler in `llm-provider-streaming-media-handler'.  This should
+return a list of `llm-chat-function-call' structs.")
+
+(cl-defmethod llm-provider-collect-streaming-function-data ((provider llm-standard-chat-provider) data)
+  "By default, there is no streaming function calling."
+  nil)
+
+;; Standard provider implementations of llm functionality
+
+(cl-defmethod llm-embedding ((provider llm-standard-full-provider) string)
+  (llm-provider-request-prelude provider)
+  (let ((response (llm-request-plz-sync
+                   (llm-provider-embedding-url provider)
+                   :timeout (llm-provider-chat-timeout provider)
+                   :headers (llm-provider-headers provider)
+                   :data (llm-provider-embedding-request provider string))))
+    (if-let ((err-msg (llm-provider-embedding-extract-error provider response)))
+        (error err-msg)
+      (llm-provider-embedding-extract-result provider response))))
+
+(cl-defmethod llm-embedding-async ((provider llm-standard-full-provider) string vector-callback error-callback)
+  (llm-provider-request-prelude provider)
+  (let ((buf (current-buffer)))
+    (llm-request-plz-async
+     (llm-provider-embedding-url provider)
+     :headers (llm-provider-headers provider)
+     :data (llm-provider-embedding-request provider string)
+     :on-success (lambda (data)
+                   (if-let ((err-msg (llm-provider-embedding-extract-error provider data)))
+                       (llm-request-callback-in-buffer
+                        buf error-callback 'error
+                        err-msg)
+                     (llm-provider-utils-callback-in-buffer
+                      buf vector-callback
+                      (llm-provider-embedding-extract-result provider data))))
+     :on-error (lambda (_ data)
+                 (llm-provider-utils-callback-in-buffer
+                  buf error-callback 'error
+                  (if (stringp data)
+                      data
+                    (or (llm-provider-embedding-extract-error
+                         provider data)
+			            "Unknown error")))))))
+
+(cl-defmethod llm-chat ((provider llm-standard-chat-provider) prompt)
+  (llm-provider-request-prelude provider)
+  (let ((response (llm-request-plz-sync (llm-provider-chat-url provider)
+                                        :headers (llm-provider-headers provider)
+                                        :data (llm-provider-chat-request provider prompt nil))))
+    (if-let ((err-msg (llm-provider-chat-extract-error provider response)))
+        (error err-msg)
+      (llm-provider-utils-process-result provider prompt
+                                         (llm-provider-chat-extract-result
+                                          provider response)
+                                         (llm-provider-extract-function-calls
+                                          provider response)))))
+
+(cl-defmethod llm-chat-async ((provider llm-standard-chat-provider) prompt success-callback
+                              error-callback)
+  (llm-provider-request-prelude provider)
+  (let ((buf (current-buffer)))
+    (llm-request-plz-async
+     (llm-provider-chat-url provider)
+     :headers (llm-provider-headers provider)
+     :data (llm-provider-chat-request provider prompt nil)
+     :on-success (lambda (data)
+                   (if-let ((err-msg (llm-provider-chat-extract-error provider data)))
+                       (llm-provider-utils-callback-in-buffer
+                        buf error-callback 'error
+                        err-msg)
+                     (llm-provider-utils-callback-in-buffer
+                      buf success-callback
+                      (llm-provider-utils-process-result
+                       provider prompt
+                       (llm-provider-chat-extract-result provider data)
+                       (llm-provider-extract-function-calls provider data)))))
+     :on-error (lambda (_ data)
+                 (llm-provider-utils-callback-in-buffer
+                  buf error-callback 'error
+                  (if (stringp data)
+                      data
+                    (or (llm-provider-chat-extract-error
+                         provider data))
+                    "Unknown error"))))))
+
+(cl-defmethod llm-chat-streaming ((provider llm-standard-chat-provider) prompt partial-callback
+                                  response-callback error-callback)
+  (llm-provider-request-prelude provider)
+  (let ((buf (current-buffer))
+        (current-text "")
+        (fc nil))
+    (llm-request-plz-async
+     (llm-provider-chat-streaming-url provider)
+     :headers (llm-provider-headers provider)
+     :data (llm-provider-chat-request provider prompt t)
+     :media-type (llm-provider-streaming-media-handler
+                  provider
+                  (lambda (s)
+		            (when (> (length s) 0)
+                      (setq current-text
+                            (concat current-text s))
+                      (when partial-callback
+			            (llm-provider-utils-callback-in-buffer
+			             buf partial-callback current-text))))
+                  (lambda (fc-new) (push fc-new fc)))
+     :on-success
+     (lambda (data)
+       (llm-provider-utils-callback-in-buffer
+        buf response-callback
+        (llm-provider-utils-process-result
+         provider prompt
+         current-text
+         (llm-provider-collect-streaming-function-data
+		  provider (nreverse fc)))))
+     :on-error (lambda (_ data)
+                 (llm-provider-utils-callback-in-buffer
+                  buf error-callback 'error
+                  (if (stringp data)
+                      data
+                    (or (llm-provider-chat-extract-error
+                         provider data))
+                    "Unknown error"))))))
 
 (defun llm-provider-utils-get-system-prompt (prompt &optional example-prelude)
   "From PROMPT, turn the context and examples into a string.
@@ -59,15 +309,16 @@ If there is an assistance response, do nothing."
                             (eq (llm-chat-prompt-interaction-role interaction) 'system))
                           (llm-chat-prompt-interactions prompt)))
           (system-content (llm-provider-utils-get-system-prompt prompt example-prelude)))
-      (if system-prompt
-          (setf (llm-chat-prompt-interaction-content system-prompt)
-                (concat (llm-chat-prompt-interaction-content system-prompt)
-                        "\n"
-                        system-content))
-        (push (make-llm-chat-prompt-interaction
-               :role 'system
-               :content system-content)
-              (llm-chat-prompt-interactions prompt))))))
+      (when (and system-content (> (length system-content) 0))
+	(if system-prompt
+            (setf (llm-chat-prompt-interaction-content system-prompt)
+                  (concat (llm-chat-prompt-interaction-content system-prompt)
+                          "\n"
+                          system-content))
+          (push (make-llm-chat-prompt-interaction
+		 :role 'system
+		 :content system-content)
+		(llm-chat-prompt-interactions prompt)))))))
 
 (defun llm-provider-utils-combine-to-user-prompt (prompt &optional example-prelude)
   "Add context and examples to a user prompt in PROMPT.
@@ -89,7 +340,7 @@ things.  Providers should probably issue a warning when using this."
     (setf (llm-chat-prompt-interactions prompt)
           (list (make-llm-chat-prompt-interaction
                  :role 'user
-                 :content 
+                 :content
                  (concat (or history-prelude "Previous interactions:") "\n\n"
                          (mapconcat (lambda (interaction)
                                       (format "%s: %s" (pcase (llm-chat-prompt-interaction-role interaction)
@@ -205,32 +456,37 @@ NAME is the function name.
 ARG is an alist of arguments to values."
   id name args)
 
-(cl-defgeneric llm-provider-utils-populate-function-calls (provider prompt calls)
-  "For PROVIDER, in PROMPT, record that function CALLS were received.
-This is the recording before the calls were executed.
-CALLS are a list of `llm-provider-utils-function-call'."
-  (ignore provider prompt calls)
-  (signal 'not-implemented nil))
+(defun llm-provider-utils-process-result (provider prompt text funcalls)
+  "Process the RESPONSE from the provider for PROMPT.
+This execute function calls if there are any, does any result
+appending to the prompt, and returns an appropriate response for
+the client.
 
-(defun llm-provider-utils-populate-function-results (prompt func result)
+FUNCALLS is a list of function calls, if any.
+
+TEXT is the text output from the provider, if any.  There should
+be either FUNCALLS or TEXT."
+  (if-let ((funcalls funcalls))
+      ;; If we have function calls, execute them and return the results, and
+      ;; it talso takes care of updating the prompt.
+      (llm-provider-utils-execute-function-calls provider prompt funcalls)
+    (llm-provider-append-to-prompt provider prompt text)
+    text))
+
+(defun llm-provider-utils-populate-function-results (provider prompt func result)
   "Append the RESULT of FUNC to PROMPT.
 FUNC is a `llm-provider-utils-function-call' struct."
-  (llm-provider-utils-append-to-prompt
-   prompt result (make-llm-chat-prompt-function-call-result
-                  :call-id (llm-provider-utils-function-call-id func)
-                  :function-name (llm-provider-utils-function-call-name func)
-                  :result result)))
+  (llm-provider-append-to-prompt
+   provider prompt result
+   (make-llm-chat-prompt-function-call-result
+    :call-id (llm-provider-utils-function-call-id func)
+    :function-name (llm-provider-utils-function-call-name func)
+    :result result)))
 
-(defun llm-provider-utils-process-result (provider prompt response)
-  "From RESPONSE, execute function call.
+(defun llm-provider-utils-execute-function-calls (provider prompt funcalls)
+  "Execute FUNCALLS, a list of `llm-provider-utils-function-calls'.
 
-RESPONSE is either a string or list of
-`llm-provider-utils-function-calls'.
-
-This should be called with any response that might have function
-calls. If the response is a string, nothing will happen, but in
-either case, the response suitable for returning to the client
-will be returned.
+A response suitable for returning to the client will be returned.
 
 PROVIDER is the provider that supplied the response.
 
@@ -240,38 +496,44 @@ function call, the result.
 
 This returns the response suitable for output to the client; a
 cons of functions called and their output."
-  (if (consp response)
-      (progn
-        ;; Then this must be a function call, return the cons of a the funcion
-        ;; called and the result.
-        (llm-provider-utils-populate-function-calls provider prompt response)
-        (cl-loop for func in response collect
-                        (let* ((name (llm-provider-utils-function-call-name func))
-                               (arguments (llm-provider-utils-function-call-args func))
-                               (function (seq-find
-                                          (lambda (f) (equal name (llm-function-call-name f)))
-                                          (llm-chat-prompt-functions prompt))))
-                          (cons name
-                                (let* ((args (cl-loop for arg in (llm-function-call-args function)
-                                                      collect (cdr (seq-find (lambda (a)
-                                                                               (eq (intern
-                                                                                    (llm-function-arg-name arg))
-                                                                                   (car a)))
-                                                                             arguments))))
-                                       (result (apply (llm-function-call-function function) args)))
-                                  (llm-provider-utils-populate-function-results
-                                   prompt func result)
-                                  (llm--log
-                                   'api-funcall
-                                   :provider provider
-                                   :msg (format "%s --> %s"
-                                                (format "%S"
-                                                        (cons (llm-function-call-name function)
-                                                              args))
-                                                (format "%s" result)))
-                                  result)))))
-    (llm-provider-utils-append-to-prompt prompt response)
-    response))
+  (llm-provider-populate-function-calls provider prompt funcalls)
+  (cl-loop for func in funcalls collect
+           (let* ((name (llm-provider-utils-function-call-name func))
+                  (arguments (llm-provider-utils-function-call-args func))
+                  (function (seq-find
+                             (lambda (f) (equal name (llm-function-call-name f)))
+                             (llm-chat-prompt-functions prompt))))
+             (cons name
+                   (let* ((args (cl-loop for arg in (llm-function-call-args function)
+                                         collect (cdr (seq-find (lambda (a)
+                                                                  (eq (intern
+                                                                       (llm-function-arg-name arg))
+                                                                      (car a)))
+                                                                arguments))))
+                          (result (apply (llm-function-call-function function) args)))
+                     (llm-provider-utils-populate-function-results
+		      provider prompt func result)
+                     (llm--log
+                      'api-funcall
+                      :provider provider
+                      :msg (format "%s --> %s"
+                                   (format "%S"
+                                           (cons (llm-function-call-name function)
+                                                 args))
+                                   (format "%s" result)))
+                     result)))))
+
+
+;; This is a useful method for getting out of the request buffer when it's time
+;; to make callbacks.
+(defun llm-provider-utils-callback-in-buffer (buf f &rest args)
+  "Run F with ARSG in the context of BUF.
+But if BUF has been killed, use a temporary buffer instead.
+If F is nil, nothing is done."
+  (when f
+    (if (buffer-live-p buf)
+        (with-current-buffer buf (apply f args))
+      (with-temp-buffer (apply f args)))))
 
 (provide 'llm-provider-utils)
 ;;; llm-provider-utils.el ends here

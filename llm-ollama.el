@@ -45,7 +45,7 @@
   :type 'integer
   :group 'llm-ollama)
 
-(cl-defstruct llm-ollama
+(cl-defstruct (llm-ollama (:include llm-standard-full-provider))
   "A structure for holding information needed by Ollama's API.
 
 SCHEME is the http scheme to use, a string. It is optional and
@@ -72,41 +72,30 @@ EMBEDDING-MODEL is the model to use for embeddings.  It is required."
   (format "%s://%s:%d/api/%s" (llm-ollama-scheme provider )(llm-ollama-host provider)
           (llm-ollama-port provider) method))
 
-(defun llm-ollama--embedding-request (provider string)
+(cl-defmethod llm-provider-embedding-url ((provider llm-ollama))
+  (llm-ollama--url provider "embeddings"))
+
+(cl-defmethod llm-provider-chat-url ((provider llm-ollama))
+  (llm-ollama--url provider "chat"))
+
+(cl-defmethod llm-provider-chat-timeout ((_ llm-ollama))
+  llm-ollama-chat-timeout)
+
+(cl-defmethod llm-provider-embedding-request ((provider llm-ollama) string)
   "Return the request to the server for the embedding of STRING.
 PROVIDER is the llm-ollama provider."
   `(("prompt" . ,string)
     ("model" . ,(llm-ollama-embedding-model provider))))
 
-(defun llm-ollama--embedding-extract-response (response)
+(cl-defmethod llm-provider-embedding-extract-result ((_ llm-ollama) response)
   "Return the embedding from the server RESPONSE."
   (assoc-default 'embedding response))
 
-(defun llm-ollama--error-message (data)
-  "Return the error message from DATA."
-  (if (stringp data) data (assoc-default 'error data)))
+(cl-defmethod llm-provider-chat-extract-result ((_ llm-ollama) response)
+  "Return the chat response from the server RESPONSE"
+  (assoc-default 'content (assoc-default 'message response)))
 
-(cl-defmethod llm-embedding-async ((provider llm-ollama) string vector-callback error-callback)
-  (let ((buf (current-buffer)))
-    (llm-request-plz-async (llm-ollama--url provider "embeddings")
-                           :data (llm-ollama--embedding-request provider string)
-                           :on-success (lambda (data)
-                                         (llm-request-callback-in-buffer
-                                          buf vector-callback (llm-ollama--embedding-extract-response data)))
-                           :on-error (lambda (type err)
-                                       (llm-request-callback-in-buffer
-                                        buf error-callback type
-                                        (llm-ollama--error-message))))))
-
-(cl-defmethod llm-embedding ((provider llm-ollama) string)
-  (llm-ollama--embedding-extract-response
-   (llm-request-plz-sync (llm-ollama--url provider "embeddings")
-                         :data (llm-ollama--embedding-request provider string))))
-
-(defun llm-ollama--chat-request (provider prompt streaming)
-  "From PROMPT, create the chat request data to send.
-PROVIDER is the llm-ollama provider to use.
-STREAMING is a boolean to control whether to stream the response."
+(cl-defmethod llm-provider-chat-request ((provider llm-ollama) prompt streaming)
   (let (request-alist messages options)
     (setq messages
           (mapcar (lambda (interaction)
@@ -127,57 +116,14 @@ STREAMING is a boolean to control whether to stream the response."
     (when options (push `("options" . ,options) request-alist))
     request-alist))
 
-(defun llm-ollama--get-response (response)
-  "Return the response from the parsed json RESPONSE."
-  (assoc-default 'content (assoc-default 'message response)))
-
-(cl-defmethod llm-chat ((provider llm-ollama) prompt)
-  ;; We expect to be in a new buffer with the response, which we use to store
-  ;; local variables. The temp buffer won't have the response, but that's fine,
-  ;; we really just need it for the local variables.
-  (with-temp-buffer
-    (let ((output (llm-ollama--get-response
-                   (llm-request-plz-sync-raw-output 
-                    (llm-ollama--url provider "chat")
-                    :data (llm-ollama--chat-request provider prompt nil)
-                    ;; ollama is run on a user's machine, and it can take a while.
-                    :timeout llm-ollama-chat-timeout))))
-      (llm-provider-utils-append-to-prompt prompt output)
-      output)))
-
-(cl-defmethod llm-chat-async ((provider llm-ollama) prompt response-callback error-callback)
-  (let ((buf (current-buffer)))
-    (llm-request-plz-async
-     (llm-ollama--url provider "chat")
-     :data (llm-ollama--chat-request provider prompt nil)
-     :timeout llm-ollama-chat-timeout
-     :on-success (lambda (data)
-                   (let ((response (llm-ollama--get-response data)))
-                     (llm-provider-utils-append-to-prompt prompt response)
-                     (llm-request-plz-callback-in-buffer buf response-callback response)))
-     :on-error (lambda (code data)
-                 (llm-request-plz-callback-in-buffer
-                  buf error-callback 'error
-                  (llm-ollama--error-message data))))))
-
-(cl-defmethod llm-chat-streaming ((provider llm-ollama) prompt partial-callback response-callback error-callback)
-  (let ((buf (current-buffer))
-        (response-text ""))
-    (llm-request-plz-ndjson
-     (llm-ollama--url provider "chat")
-      :data (llm-ollama--chat-request provider prompt t)
-      :on-success (lambda (response)
-                    (llm-provider-utils-append-to-prompt prompt response-text)
-                    (llm-request-callback-in-buffer
-                     buf response-callback
-                     response-text))
-      :on-object (lambda (data)
-                   (when-let ((response (llm-ollama--get-response data)))
-                     (setq response-text (concat response-text response))
-                     (llm-request-callback-in-buffer buf partial-callback response-text)))
-      :on-error (lambda (type msg)
-                  (llm-request-callback-in-buffer buf error-callback type
-                                                  (llm-ollama--error-message msg))))))
+(cl-defmethod llm-provider-streaming-media-handler ((_ llm-ollama) msg-receiver _)
+  (cons 'application/x-ndjson
+        (plz-media-type:application/x-ndjson
+         :handler (lambda (data)
+                     (when-let ((response (assoc-default
+                                           'content
+                                           (assoc-default 'message data))))
+                       (funcall msg-receiver response))))))
 
 (cl-defmethod llm-name ((provider llm-ollama))
   (llm-ollama-chat-model provider))
