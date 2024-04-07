@@ -254,7 +254,7 @@ connection phase and waiting to receive the response (the
 
 ;;;;; Public
 
-(cl-defun plz (method url &rest rest &key headers body else finally noquery process-filter
+(cl-defun plz (method url &rest rest &key headers body else filter finally noquery
                       (as 'string) (then 'sync)
                       (body-type 'text) (decode t decode-s)
                       (connect-timeout plz-connect-timeout) (timeout plz-timeout))
@@ -330,6 +330,15 @@ from a host, respectively.
 
 NOQUERY is passed to `make-process', which see.
 
+FILTER is an optional function to be used as the process filter
+for the curl process.  It can be used to handle HTTP responses in
+a streaming way.  The function must accept 2 arguments, the
+process object running curl, and a string which is output
+received from the process.  The default process filter inserts
+the output of the process into the process buffer.  The provided
+FILTER function should at least insert output up to the HTTP body
+into the process buffer.
+
 \(To silence checkdoc, we mention the internal argument REST.)"
   ;; FIXME(v0.8): Remove the note about error changes from the docstring.
   ;; FIXME(v0.8): Update error signals in docstring.
@@ -404,7 +413,7 @@ NOQUERY is passed to `make-process', which see.
                                 :coding 'binary
                                 :command (append (list plz-curl-program) curl-command-line-args)
                                 :connection-type 'pipe
-                                :filter process-filter
+                                :filter filter
                                 :sentinel #'plz--sentinel
                                 :stderr stderr-process
                                 :noquery noquery))
@@ -755,7 +764,6 @@ argument passed to `plz--sentinel', which see."
         (pcase-exhaustive status
           ((or 0 "finished\n")
            ;; Curl exited normally: check HTTP status code.
-           (widen)
            (goto-char (point-min))
            (plz--skip-proxy-headers)
            (while (plz--skip-redirect-headers))

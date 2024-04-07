@@ -102,12 +102,7 @@ TIMEOUT is the number of seconds to wait for a response."
 
 (defun llm-request-plz--handle-error (error on-error)
   "Handle the ERROR with the ON-ERROR callback."
-  (cond ((plz-media-type-filter-error-p error)
-         (let ((cause (plz-media-type-filter-error-cause error))
-               (response (plz-error-response error)))
-           (funcall on-error 'error
-                    (format "Error with cause: %s, response: %s" cause response))))
-        ((plz-error-curl-error error)
+  (cond ((plz-error-curl-error error)
          (let ((curl-error (plz-error-curl-error error)))
            (funcall on-error 'error
                     (format "curl error code %d: %s"

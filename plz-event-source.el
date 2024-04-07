@@ -290,7 +290,14 @@
   (with-slots (handlers) source
     (dolist (pair handlers)
       (when (equal (car pair) (oref event type))
-        (funcall (cdr pair) source event)))))
+        (let ((timer (timer-create)))
+          (timer-set-time timer (current-time))
+          (timer-set-function timer
+                              (lambda (handler source event)
+                                (with-temp-buffer
+                                  (funcall handler source event)))
+                              (list (cdr pair) source event))
+          (timer-activate timer))))))
 
 (defun plz-event-source-dispatch-events (source events)
   "Dispatch the EVENTS to the listeners of event SOURCE."
