@@ -169,10 +169,10 @@ STREAMING if non-nil, turn on response streaming."
 (cl-defmethod llm-provider-extract-function-calls ((_ llm-openai) response)
   (mapcar (lambda (call)
             (let ((function (cdr (nth 2 call))))
-	      (make-llm-provider-utils-function-call
-                 :id (assoc-default 'id call)
-                 :name (assoc-default 'name function)
-                 :args (json-read-from-string (assoc-default 'arguments function)))))
+              (make-llm-provider-utils-function-call
+               :id (assoc-default 'id call)
+               :name (assoc-default 'name function)
+               :args (json-read-from-string (assoc-default 'arguments function)))))
           (assoc-default 'tool_calls
                          (assoc-default 'message
                                         (aref (assoc-default 'choices response) 0)))))
@@ -237,7 +237,7 @@ whether they have been parsed before or not."
         ;; append to current-response (assuming it's also a string,
         ;; which it should be).
         (setq current-response
-              (concat current-response (string-join processed-lines ""))))            
+              (concat current-response (string-join processed-lines ""))))
       (setq last-response (length all-lines)))
     (when (>= (length current-response) (length llm-openai-current-response))
       (setq llm-openai-current-response current-response)
@@ -247,14 +247,14 @@ whether they have been parsed before or not."
 
 (cl-defmethod llm-provider-extract-streamed-function-calls ((_ llm-openai) response)
   (let* ((pieces (mapcar (lambda (json)
-			               (assoc-default 'tool_calls
-					                      (assoc-default
-					                       'delta
+                           (assoc-default 'tool_calls
+                                          (assoc-default
+                                           'delta
                                            (aref (assoc-default
                                                   'choices
                                                   (json-read-from-string json))
                                                  0))))
-			             (llm-openai--get-unparsed-json response)))
+                         (llm-openai--get-unparsed-json response)))
          (cvec (make-vector (length (car pieces)) (make-llm-provider-utils-function-call))))
     (cl-loop for piece in pieces do
              (cl-loop for call in (append piece nil) do
@@ -274,7 +274,7 @@ whether they have been parsed before or not."
              do (setf (llm-provider-utils-function-call-args call)
                       (json-read-from-string (llm-provider-utils-function-call-args call)))
              finally return (when (> (length cvec) 0)
-			                  (append cvec nil)))))
+                              (append cvec nil)))))
 
 (cl-defmethod llm-name ((_ llm-openai))
   "Open AI")

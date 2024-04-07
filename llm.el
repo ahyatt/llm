@@ -296,7 +296,6 @@ be passed to `llm-cancel-request'."
          (result (cl-call-next-method provider prompt
                                       new-response-callback
                                       new-error-callback)))
-    
     result))
 
 (cl-defmethod llm-chat-function-call ((_ (eql nil)) _ _ _)

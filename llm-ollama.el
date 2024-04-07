@@ -178,7 +178,7 @@ PROVIDER is the llm-ollama provider."
                    ;; ollama is run on a user's machine, and it can take a while.
                    :timeout llm-ollama-chat-timeout)))
       (setf (llm-chat-prompt-interactions prompt)
-	        (append (llm-chat-prompt-interactions prompt)
+            (append (llm-chat-prompt-interactions prompt)
                     (list (make-llm-chat-prompt-interaction
                            :role 'assistant
                            :content (assoc-default 'context (llm-ollama--get-final-response output))))))
