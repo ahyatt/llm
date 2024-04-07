@@ -1,4 +1,5 @@
-* Version 0.12.4
+* Version 0.13
+- Add Claude's new support for function calling.
 - Refactor of providers to centralize embedding and chat logic.
 - Remove connection buffers after use.
 - Fixes to provider more specific error messages for most providers.

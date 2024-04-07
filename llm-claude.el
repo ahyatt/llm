@@ -43,6 +43,13 @@
   (unless (llm-claude-key provider)
     (error "No API key provided for Claude")))
 
+(defun llm-claude--tool-call (call)
+  "A Claude version of a function spec for CALL."
+  `(("name" . ,(llm-function-call-name call))
+    ("description" . ,(llm-function-call-description call))
+    ("input_schema" . ,(llm-provider-utils-openai-arguments
+                        (llm-function-call-args call)))))
+
 (cl-defmethod llm-provider-chat-request ((provider llm-claude) prompt stream)
   (let ((request `(("model" . ,(llm-claude-chat-model provider))
                    ("stream" . ,(if stream t :json-false))
@@ -50,15 +57,40 @@
                    ("max_tokens" . ,(or (llm-chat-prompt-max-tokens prompt) 4096))
                    ("messages" .
                     ,(mapcar (lambda (interaction)
-                               `(("role" . ,(llm-chat-prompt-interaction-role interaction))
-                                 ("content" . ,(llm-chat-prompt-interaction-content interaction))))
+                               (append
+                                `(("role" . ,(pcase (llm-chat-prompt-interaction-role interaction)
+                                              ('function 'user)
+                                              ('assistant 'assistant)
+                                              ('user 'user)))
+                                 ("content" . ,(or (llm-chat-prompt-interaction-content interaction)
+                                                   (llm-chat-prompt-function-call-result-result
+                                                    (llm-chat-prompt-interaction-function-call-result interaction)))))
+                                (when-let ((r (llm-chat-prompt-interaction-function-call-result interaction)))
+                                  `(("tool_use_id" . ,(llm-chat-prompt-function-call-result-call-id r))))))
                              (llm-chat-prompt-interactions prompt)))))
         (system (llm-provider-utils-get-system-prompt prompt)))
+    (when (llm-chat-prompt-functions prompt)
+      (push `("tools" . ,(mapcar (lambda (f) (llm-claude--tool-call f))
+                                 (llm-chat-prompt-functions prompt))) request))
     (when (> (length system) 0)
       (push `("system" . ,system) request))
     (when (llm-chat-prompt-temperature prompt)
       (push `("temperature" . ,(llm-chat-prompt-temperature prompt)) request))
     request))
+
+(cl-defmethod llm-provider-extract-function-calls ((_ llm-claude) response)
+  (let ((content (append (assoc-default 'content response) nil)))
+    (cl-loop for item in content
+             when (equal "tool_use" (assoc-default 'type item))
+             collect (make-llm-provider-utils-function-call
+                     :id (assoc-default 'id item)
+                     :name (assoc-default 'name item)
+                     :args (assoc-default 'input item)))))
+
+(cl-defmethod llm-provider-populate-function-calls ((_ llm-claude) _ _)
+  ;; Claude does not need to be sent back the function calls it sent in the
+  ;; first place.
+  nil)
 
 (cl-defmethod llm-provider-chat-extract-result ((_ llm-claude) response)
   (let ((content (aref (assoc-default 'content response) 0)))
@@ -90,10 +122,11 @@
 
 (cl-defmethod llm-provider-headers ((provider llm-claude))
   `(("x-api-key" . ,(llm-claude-key provider))
-    ("anthropic-version" . "2023-06-01")))
+    ("anthropic-version" . "2023-06-01")
+    ("anthropic-beta" . "tools-2024-04-04")))
 
 (cl-defmethod llm-provider-chat-extract-error ((_ llm-claude) response)
-  (let ((err (assoc-default 'error response)))
+  (when-let ((err (assoc-default 'error response)))
     (format "Error %s: '%s'" (assoc-default 'type err)
             (assoc-default 'message err))))
 
@@ -111,7 +144,7 @@
   "Claude")
 
 (cl-defmethod llm-capabilities ((_ llm-claude))
-  (list 'streaming))
+  (list 'streaming 'function-calls))
 
 (provide 'llm-claude)
 

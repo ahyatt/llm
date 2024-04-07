@@ -50,7 +50,7 @@ In addition to the provider, which you may want multiple of (for example, to cha
   gcloud beta services identity create --service=aiplatform.googleapis.com --project=PROJECT_ID
   #+end_src
 ** Claude
-[[https://docs.anthropic.com/claude/docs/intro-to-claude][Claude]] is Anthropic's large language model.  It does not support embeddings.  You can set it up with the following parameters:
+[[https://docs.anthropic.com/claude/docs/intro-to-claude][Claude]] is Anthropic's large language model.  It does not support embeddings.  It does support function calling, but currently not in streaming.  You can set it up with the following parameters:
 
 =:key=: The API key you get from [[https://console.anthropic.com/settings/keys][Claude's settings page]].  This is required.
 =:chat-model=: One of the [[https://docs.anthropic.com/claude/docs/models-overview][Claude models]].  Defaults to "claude-3-opus-20240229", the most powerful model.
@@ -136,9 +136,9 @@ This basic structure is useful because it can guarantee a well-structured output
 (if the LLM does decide to call the function). *Not every LLM can handle function
 calling, and those that do not will ignore the functions entirely*. The function
 =llm-capabilities= will return a list with =function-calls= in it if the LLM
-supports function calls. Right now only Gemini, Vertex and Open AI support
-function calling. Ollama should get function calling soon. However, even for
-LLMs that handle function calling, there is a fair bit of difference in the
+supports function calls. Right now only Gemini, Vertex, Claude, and Open AI
+support function calling. Ollama should get function calling soon. However, even
+for LLMs that handle function calling, there is a fair bit of difference in the
 capabilities. Right now, it is possible to write function calls that succeed in
 Open AI but cause errors in Gemini, because Gemini does not appear to handle
 functions that have types that contain other types.  So client programs are
