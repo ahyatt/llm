@@ -119,14 +119,19 @@ FUNC-RESULTS is a list of function results, if any.")
   "By default, the standard provider appends to the prompt."
   (llm-provider-utils-append-to-prompt prompt result func-results))
 
-(cl-defgeneric llm-provider-streaming-media-handler (provider msg-receiver fc-receiver)
-  "Return a function that will handle streaming media for PROVIDER.
+(cl-defgeneric llm-provider-streaming-media-handler (provider msg-receiver fc-receiver err-receiver)
+  "Define how to handle streaming media for the PROVIDER.
 
-This should be a cons of the media type as a symbol, and a plist
-of the particular data the media type needs to process the
-streaming media.")
+This should return a cons of the media type and an instance that
+handle objects of that type.
 
-(cl-defmethod llm-provider-streaming-media-handler ((_ llm-standard-chat-provider) msg-receiver fc-receiver)
+The handlers defined can call MSG-RECEIVER when they receive part
+of a text message for the client (a chat response).  If they
+receive a function call, they should call FC-RECEIVER with the
+function call.  If they receive an error, they should call
+ERR-RECEIVER with the error message.")
+
+(cl-defmethod llm-provider-streaming-media-handler ((_ llm-standard-chat-provider) _ _ _)
   "By default, the standard provider has no streaming media handler."
   nil)
 
@@ -255,7 +260,11 @@ return a list of `llm-chat-function-call' structs.")
                       (when partial-callback
 			            (llm-provider-utils-callback-in-buffer
 			             buf partial-callback current-text))))
-                  (lambda (fc-new) (push fc-new fc)))
+                  (lambda (fc-new) (push fc-new fc))
+                  (lambda (err)
+                    (llm-provider-utils-callback-in-buffer
+                     buf error-callback 'error
+                     err)))
      :on-success
      (lambda (data)
        (llm-provider-utils-callback-in-buffer
@@ -271,8 +280,8 @@ return a list of `llm-chat-function-call' structs.")
                   (if (stringp data)
                       data
                     (or (llm-provider-chat-extract-error
-                         provider data))
-                    "Unknown error"))))))
+                         provider data)
+                        "Unknown error")))))))
 
 (defun llm-provider-utils-get-system-prompt (prompt &optional example-prelude)
   "From PROMPT, turn the context and examples into a string.
@@ -470,7 +479,10 @@ be either FUNCALLS or TEXT."
       ;; If we have function calls, execute them and return the results, and
       ;; it talso takes care of updating the prompt.
       (llm-provider-utils-execute-function-calls provider prompt funcalls)
-    (llm-provider-append-to-prompt provider prompt text)
+    ;; We probably shouldn't be called if text is nil, but if we do,
+    ;; we shouldn't add something invalid to the prompt.
+    (when text
+      (llm-provider-append-to-prompt provider prompt text))
     text))
 
 (defun llm-provider-utils-populate-function-results (provider prompt func result)

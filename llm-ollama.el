@@ -30,6 +30,7 @@
 (require 'llm-request-plz)
 (require 'llm-provider-utils)
 (require 'json)
+(require 'plz-media-type)
 
 (defgroup llm-ollama nil
   "LLM implementation for Ollama."
@@ -116,7 +117,7 @@ PROVIDER is the llm-ollama provider."
     (when options (push `("options" . ,options) request-alist))
     request-alist))
 
-(cl-defmethod llm-provider-streaming-media-handler ((_ llm-ollama) msg-receiver _)
+(cl-defmethod llm-provider-streaming-media-handler ((_ llm-ollama) msg-receiver _ _)
   (cons 'application/x-ndjson
         (plz-media-type:application/x-ndjson
          :handler (lambda (data)

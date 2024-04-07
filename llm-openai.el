@@ -30,6 +30,7 @@
 (require 'llm-request-plz)
 (require 'llm-provider-utils)
 (require 'json)
+(require 'plz-event-source)
 
 (defgroup llm-openai nil
   "LLM implementation for Open AI."
@@ -201,17 +202,17 @@ RESPONSE can be nil if the response is complete."
                                 (assoc-default 'tool_calls delta))))
       content-or-call)))
 
-(cl-defmethod llm-provider-streaming-media-handler ((_ llm-openai) msg-receiver fc-receiver)
+(cl-defmethod llm-provider-streaming-media-handler ((_ llm-openai) msg-receiver fc-receiver _)
   (cons 'text/event-stream
-	(plz-event-source:text/event-stream
+	    (plz-event-source:text/event-stream
          :events `((message
-                   .
-		   ,(lambda (_ event)
-		      (let ((data (plz-event-source-event-data event)))
-			(unless (equal data "[DONE]")
-			  (when-let ((response (llm-openai--get-partial-chat-response
-						(json-read-from-string data))))
-                            (funcall (if (stringp response) msg-receiver fc-receiver) response))))))))))
+                    .
+		            ,(lambda (_ event)
+		               (let ((data (plz-event-source-event-data event)))
+			             (unless (equal data "[DONE]")
+			               (when-let ((response (llm-openai--get-partial-chat-response
+						                         (json-read-from-string data))))
+                             (funcall (if (stringp response) msg-receiver fc-receiver) response))))))))))
 
 (cl-defmethod llm-provider-collect-streaming-function-data ((_ llm-openai) data)
   (let ((cvec (make-vector (length (car data)) nil)))

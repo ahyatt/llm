@@ -229,7 +229,7 @@ nothing to add, in which case it is nil."
            calls)))
 
 (cl-defmethod llm-provider-streaming-media-handler ((provider llm-google)
-                                                    msg-receiver fc-receiver)
+                                                    msg-receiver fc-receiver _)
   (cons 'application/json
         (plz-media-type:application/json-array
          :handler

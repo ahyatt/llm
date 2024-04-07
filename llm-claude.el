@@ -28,6 +28,7 @@
 (require 'llm)
 (require 'llm-request)
 (require 'llm-provider-utils)
+(require 'plz-event-source)
 (require 'rx)
 
 ;; Models defined at https://docs.anthropic.com/claude/docs/models-overview
@@ -66,23 +67,26 @@
         (assoc-default 'text content)
       (format "Unsupported non-text response: %s" content))))
 
-(cl-defmethod llm-provider-streaming-media-handler ((_ llm-claude) msg-receiver _)
+(cl-defmethod llm-provider-streaming-media-handler ((_ llm-claude)
+                                                    msg-receiver _ err-receiver)
   (cons 'text/event-stream
-	(plz-event-source:text/event-stream
-        :events `((message_start . ignore)
-                  (content_block_start . ignore)
-                  (ping . ignore)
-                  (message_stop . ignore)
-                  (content_block_stop . ignore)
-                  (content_block_delta
-                   .
-                   ,(lambda (_ event)
-                      (let* ((data (plz-event-source-event-data event))
-			     (json (json-parse-string data :object-type 'alist))
-                             (delta (assoc-default 'delta json))
-                             (type (assoc-default 'type delta)))
-                        (when (equal type "text_delta")
-                          (funcall msg-receiver (assoc-default 'text delta))))))))))
+	    (plz-event-source:text/event-stream
+         :events `((message_start . ignore)
+                   (content_block_start . ignore)
+                   (ping . ignore)
+                   (message_stop . ignore)
+                   (content_block_stop . ignore)
+                   (error . ,(lambda (_ event)
+                               (funcall err-receiver (plz-event-source-event-data event))))
+                   (content_block_delta
+                    .
+                    ,(lambda (_ event)
+                       (let* ((data (plz-event-source-event-data event))
+			                  (json (json-parse-string data :object-type 'alist))
+                              (delta (assoc-default 'delta json))
+                              (type (assoc-default 'type delta)))
+                         (when (equal type "text_delta")
+                           (funcall msg-receiver (assoc-default 'text delta))))))))))
 
 (cl-defmethod llm-provider-headers ((provider llm-claude))
   `(("x-api-key" . ,(llm-claude-key provider))
