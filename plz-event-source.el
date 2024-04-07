@@ -290,7 +290,14 @@
   (with-slots (handlers) source
     (dolist (pair handlers)
       (when (equal (car pair) (oref event type))
-        (funcall (cdr pair) source event)))))
+        (let ((timer (timer-create)))
+          (timer-set-time timer (current-time))
+          (timer-set-function timer
+                              (lambda (handler event)
+                                (with-temp-buffer
+                                  (funcall handler event)))
+                              (list (cdr pair) event))
+          (timer-activate timer))))))
 
 (defun plz-event-source-dispatch-events (source events)
   "Dispatch the EVENTS to the listeners of event SOURCE."
@@ -447,13 +454,13 @@ ELSE callbacks will always be set to nil.")
                                         (handler (cdr pair)))
                                     (cond
                                      ((equal 'open type)
-                                      (cons type (lambda (source event)
+                                      (cons type (lambda (event)
                                                    (setf (oref event data) response)
-                                                   (funcall handler source event))))
+                                                   (funcall handler event))))
                                      ((equal 'close type)
-                                      (cons type (lambda (source event)
+                                      (cons type (lambda (event)
                                                    (setf (oref event data) response)
-                                                   (funcall handler source event))))
+                                                   (funcall handler event))))
                                      (t pair))))
                                 (oref media-type events))))))
       (setq-local plz-event-source--current source)))

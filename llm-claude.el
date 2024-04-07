@@ -76,11 +76,11 @@
                    (ping . ignore)
                    (message_stop . ignore)
                    (content_block_stop . ignore)
-                   (error . ,(lambda (_ event)
+                   (error . ,(lambda (event)
                                (funcall err-receiver (plz-event-source-event-data event))))
                    (content_block_delta
                     .
-                    ,(lambda (_ event)
+                    ,(lambda (event)
                        (let* ((data (plz-event-source-event-data event))
 			                  (json (json-parse-string data :object-type 'alist))
                               (delta (assoc-default 'delta json))
