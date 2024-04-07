@@ -364,18 +364,22 @@ of by calling the `describe_function' function."
     (llm-tester-log "SUCCESS: Provider %s cancelled an async request" (type-of provider))
     (llm-cancel-request chat-async-request)))
 
-(defun llm-tester-bad-provider (provider)
+(defun llm-tester--bad-provider-callback (provider call)
+  "Return testing error callback for CALL."
+  (lambda (type message)
+    (cond
+     ((not (symbolp type))
+      (llm-tester-log "ERROR: Provider %s returned an error on %s with a non-symbol type %s with message %s" (type-of provider) call type message))
+     ((not (stringp message))
+      (llm-tester-log "ERROR: Provider %s returned an error on %s with a non-string message %s with type %s" (type-of provider) call message type))
+     ((string-match-p "Unknown Error" message)
+      (llm-tester-log "ERROR: Provider %s returned a message on %s with 'Unknown Error' instead of more specific error message" (type-of provider) call))
+      (t
+       (llm-tester-log "SUCCESS: Provider %s on %s returned an error of type %s with message %s" (type-of provider) call type message)))))
+
+(defun llm-tester-bad-provider-async (provider)
   "When PROVIDER is bad in a some way, test error handling."
-  (let ((error-callback
-         (lambda (type message)
-           (cond
-            ((not (symbolp type))
-             (llm-tester-log "ERROR: Provider %s returned an error with a non-symbol type %s with message %s" (type-of provider) type message))
-            ((not (stringp message))
-             (llm-tester-log "ERROR: Provider %s returned an error with a non-string message %s with type %s" (type-of provider) message type))
-            (t
-             (llm-tester-log "SUCCESS: Provider %s returned an error of type %s with message %s" (type-of provider) type message)))))
-        (success-callback
+  (let ((success-callback
          (lambda (_)
            (llm-tester-log "ERROR: Provider %s returned a response when it should have been an error" (type-of provider)))))
     (condition-case nil
@@ -385,13 +389,29 @@ of by calling the `describe_function' function."
             (llm-embedding-async
              provider "This is a test."
              success-callback
-             error-callback))
+             (llm-tester--bad-provider-callback provider "llm-embedding-async")))
           (llm-tester-log "Testing bad provider %s for correct error handling for chat" provider)
           (llm-chat-async
            provider
            (llm-make-simple-chat-prompt "This is a test")
            success-callback
-           error-callback))
+           (llm-tester--bad-provider-callback provider "llm-chat-async")))
+      (error (llm-tester-log "ERROR: Provider %s threw an error when it should have been caught" (type-of provider))))))
+
+(defun llm-tester-bad-provider-streaming (provider)
+  "When PROVIDER is bad in a some way, test error handling."
+  (let ((success-callback
+         (lambda (_)
+           (llm-tester-log "ERROR: Provider %s returned a response when it should have been an error" (type-of provider)))))
+    (condition-case nil
+        (progn
+          (llm-tester-log "Testing bad provider %s for correct error handling for chat-streaming" provider)
+          (llm-chat-streaming
+           provider
+           (llm-make-simple-chat-prompt "This is a test")
+           success-callback
+	   success-callback
+           (llm-tester--bad-provider-callback provider "llm-chat-streaming")))
       (error (llm-tester-log "ERROR: Provider %s threw an error when it should have been caught" (type-of provider))))))
 
 (defun llm-tester-all (provider &optional bad-variants delay)
@@ -438,7 +458,8 @@ default is 1.  Delays can help avoid rate limiting."
       (llm-tester-function-calling-conversation-async provider)
       (sleep-for delay))
     (dolist (bad-variant bad-variants)
-      (llm-tester-bad-provider bad-variant)
+      (llm-tester-bad-provider-async bad-variant)
+      (llm-tester-bad-provider-streaming bad-variant)
       (sleep-for delay))
     (sleep-for 10)
     (llm-tester-log "%s\nEnd of testing for %s\n\n"

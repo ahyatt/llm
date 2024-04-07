@@ -116,7 +116,7 @@ MODEL is the embedding model to use, or nil to use the default.."
           (unless (string-suffix-p "/" (llm-openai-compatible-url provider))
             "/") command))
 
-(cl-defmethod llm-provider-embedding-error-extractor ((_ llm-openai) err-response)
+(cl-defmethod llm-provider-embedding-extract-error ((_ llm-openai) err-response)
   (let ((errdata (assoc-default 'error err-response)))
       (when errdata
         (format "Open AI returned error: %s message: %s"
@@ -124,7 +124,7 @@ MODEL is the embedding model to use, or nil to use the default.."
                 (cdr (assoc 'message errdata))))))
 
 (cl-defmethod llm-provider-chat-extract-error ((provider llm-openai) err-response)
-  (llm-provider-embedding-error-extractor provider err-response))
+  (llm-provider-embedding-extract-error provider err-response))
 
 (cl-defmethod llm-provider-chat-request ((provider llm-openai) prompt streaming)
   "From PROMPT, create the chat request data to send.

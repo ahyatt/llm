@@ -116,18 +116,20 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
 (cl-defmethod llm-provider-embedding-extract-error ((provider llm-google) err-response)
   (llm-provider-chat-extract-error provider err-response))
 
-(cl-defmethod llm-provider-chat-extract-error ((_ llm-google) err-response)
-  (if-let ((err (assoc-default 'error err-response)))
-    (format "Problem calling GCloud Vertex AI: status: %s message: %s"
-            (assoc-default 'code err)
-            (assoc-default 'message err))
-    (if-let ((candidates (assoc-default 'candidates err-response)))
-	(when (and (vectorp candidates)
-		   (> (length candidates) 0)
-		   (equal "SAFETY"
-			  (assoc-default 'finishReason (aref candidates 0))))
-	  (format "Could not finish due to detected Gemini safety violations: %s"
-		  (assoc-default 'safetyRatings (aref candidates 0)))))))
+(cl-defmethod llm-provider-chat-extract-error ((provider llm-google) err-response)
+  (if (vectorp err-response)
+      (llm-provider-chat-extract-error provider (aref err-response 0))
+    (if-let ((err (assoc-default 'error err-response)))
+	(format "Problem calling GCloud Vertex AI: status: %s message: %s"
+		(assoc-default 'code err)
+		(assoc-default 'message err))
+      (if-let ((candidates (assoc-default 'candidates err-response)))
+	  (when (and (vectorp candidates)
+		     (> (length candidates) 0)
+		     (equal "SAFETY"
+			    (assoc-default 'finishReason (aref candidates 0))))
+	    (format "Could not finish due to detected Gemini safety violations: %s"
+		    (assoc-default 'safetyRatings (aref candidates 0))))))))
 
 (cl-defmethod llm-provider-embedding-request ((provider llm-vertex) string)
   `(("instances" . [(("content" . ,string))])))

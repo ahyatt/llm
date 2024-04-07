@@ -111,6 +111,12 @@ PROVIDER is the llm-ollama provider."
     (when options (push `("options" . ,options) request-alist))
     request-alist))
 
+(cl-defmethod llm-provider-embedding-extract-error ((_ llm-ollama) err-response)
+  (assoc-default 'error err-response))
+
+(cl-defmethod llm-provider-chat-extract-error ((provider llm-ollama) err-response)
+  (llm-provider-embedding-extract-error provider err-response))
+
 (defvar-local llm-ollama-current-response ""
   "The response so far from the server.")
 

@@ -92,8 +92,10 @@
   `(("x-api-key" . ,(llm-claude-key provider))
     ("anthropic-version" . "2023-06-01")))
 
-(cl-defmethod llm-provider-extact-error ((_ llm-claude) response)
-  (assoc-default 'error response))
+(cl-defmethod llm-provider-chat-extract-error ((_ llm-claude) response)
+  (let ((err (assoc-default 'error response)))
+    (format "Error %s: '%s'" (assoc-default 'type err)
+	    (assoc-default 'message err))))
 
 (cl-defmethod llm-provider-chat-url ((_ llm-claude))
   "https://api.anthropic.com/v1/messages")

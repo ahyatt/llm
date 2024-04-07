@@ -182,7 +182,7 @@ CALLS are a list of `llm-provider-utils-function-call'.")
                       data
                     (or (llm-provider-embedding-extract-error
                          provider data)
-			            "Unknown error")))
+			"Unknown error")))
                  (kill-current-buffer)))))
 
 (cl-defmethod llm-chat ((provider llm-standard-chat-provider) prompt)
@@ -224,8 +224,8 @@ CALLS are a list of `llm-provider-utils-function-call'.")
                   (if (stringp data)
                       data
                     (or (llm-provider-chat-extract-error
-                         provider data))
-                    "Unknown error"))
+                         provider data)
+                        "Unknown error")))
                  (kill-current-buffer)))))
 
 (cl-defmethod llm-chat-streaming ((provider llm-standard-chat-provider) prompt partial-callback
@@ -260,8 +260,8 @@ CALLS are a list of `llm-provider-utils-function-call'.")
                   (if (stringp data)
                       data
                     (or (llm-provider-chat-extract-error
-                         provider data))
-                    "Unknown error"))
+                         provider data)
+                        "Unknown error")))
                  (kill-current-buffer)))))
 
 (defun llm-provider-utils-get-system-prompt (prompt &optional example-prelude)
