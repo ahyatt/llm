@@ -238,8 +238,8 @@ return a list of `llm-chat-function-call' structs.")
                   (if (stringp data)
                       data
                     (or (llm-provider-chat-extract-error
-                         provider data))
-                    "Unknown error"))))))
+                         provider data)
+                        "Unknown error")))))))
 
 (cl-defmethod llm-chat-streaming ((provider llm-standard-chat-provider) prompt partial-callback
                                   response-callback error-callback)
