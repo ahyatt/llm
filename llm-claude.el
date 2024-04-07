@@ -95,7 +95,7 @@
 (cl-defmethod llm-provider-chat-extract-error ((_ llm-claude) response)
   (let ((err (assoc-default 'error response)))
     (format "Error %s: '%s'" (assoc-default 'type err)
-	    (assoc-default 'message err))))
+            (assoc-default 'message err))))
 
 (cl-defmethod llm-provider-chat-url ((_ llm-claude))
   "https://api.anthropic.com/v1/messages")

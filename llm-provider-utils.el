@@ -182,7 +182,7 @@ CALLS are a list of `llm-provider-utils-function-call'.")
                       data
                     (or (llm-provider-embedding-extract-error
                          provider data)
-			"Unknown error")))
+                        "Unknown error")))
                  (kill-current-buffer)))))
 
 (cl-defmethod llm-chat ((provider llm-standard-chat-provider) prompt)
@@ -241,18 +241,18 @@ CALLS are a list of `llm-provider-utils-function-call'.")
        ;; We won't have a result if this is a streaming function call,
        ;; so we don't call on-partial in that case.
        (when-let ((result (llm-provider-extract-partial-response provider data)))
-	 ;; Let's not be so strict, a partial response empty string
-	 ;; should be equivalent to nil.
-	 (when (> (length result) 0)
+         ;; Let's not be so strict, a partial response empty string
+         ;; should be equivalent to nil.
+         (when (> (length result) 0)
            (llm-provider-utils-callback-in-buffer buf partial-callback result))))
      :on-success-raw
      (lambda (data)
        (llm-provider-utils-callback-in-buffer
-          buf response-callback
-          (llm-provider-utils-process-result
-           provider prompt
-           (llm-provider-extract-partial-response provider data)
-           (llm-provider-extract-streamed-function-calls provider data)))
+        buf response-callback
+        (llm-provider-utils-process-result
+         provider prompt
+         (llm-provider-extract-partial-response provider data)
+         (llm-provider-extract-streamed-function-calls provider data)))
        (kill-current-buffer))
      :on-error (lambda (_ data)
                  (llm-provider-utils-callback-in-buffer
@@ -300,15 +300,15 @@ If there is an assistance response, do nothing."
                           (llm-chat-prompt-interactions prompt)))
           (system-content (llm-provider-utils-get-system-prompt prompt example-prelude)))
       (when (and system-content (> (length system-content) 0))
-	(if system-prompt
+        (if system-prompt
             (setf (llm-chat-prompt-interaction-content system-prompt)
                   (concat (llm-chat-prompt-interaction-content system-prompt)
                           "\n"
                           system-content))
           (push (make-llm-chat-prompt-interaction
-		 :role 'system
-		 :content system-content)
-		(llm-chat-prompt-interactions prompt)))))))
+                 :role 'system
+                 :content system-content)
+                (llm-chat-prompt-interactions prompt)))))))
 
 (defun llm-provider-utils-combine-to-user-prompt (prompt &optional example-prelude)
   "Add context and examples to a user prompt in PROMPT.
@@ -502,7 +502,7 @@ cons of functions called and their output."
                                                                 arguments))))
                           (result (apply (llm-function-call-function function) args)))
                      (llm-provider-utils-populate-function-results
-		      provider prompt func result)
+                      provider prompt func result)
                      (llm--log
                       'api-funcall
                       :provider provider

@@ -156,15 +156,15 @@
 (defun llm-tester-verify-prompt (prompt)
   "Test PROMPT to make sure there are no obvious problems"
   (mapc (lambda (i)
-	      (when (equal (llm-chat-prompt-interaction-content i) "")
-	        (llm-tester-log "ERROR: prompt had an empty interaction")))
-	    (llm-chat-prompt-interactions prompt))
+          (when (equal (llm-chat-prompt-interaction-content i) "")
+            (llm-tester-log "ERROR: prompt had an empty interaction")))
+        (llm-chat-prompt-interactions prompt))
   (when (> (length (seq-filter
-		            (lambda (i)
-		              (eq
-		               (llm-chat-prompt-interaction-role i) 'system))
-		            (llm-chat-prompt-interactions prompt)))
-	       1)
+                    (lambda (i)
+                      (eq
+                       (llm-chat-prompt-interaction-role i) 'system))
+                    (llm-chat-prompt-interactions prompt)))
+           1)
     (llm-tester-log "ERROR: prompt had more than one system interaction"))
   ;; Test that we don't have two of the same role in a row
   (let ((last nil))
@@ -202,19 +202,18 @@
                     (lambda (response)
                       (push response outputs)
                       (llm-chat-prompt-append-response prompt "This is the second message.")
-		      (llm-tester-verify-prompt prompt)
+                      (llm-tester-verify-prompt prompt)
                       (llm-chat-async provider prompt
                                       (lambda (response)
                                         (unless (eq buf (current-buffer))
                                           (llm-tester-log "ERROR: Provider %s returned a response not in the original buffer" (type-of provider)))
                                         (push response outputs)
                                         (llm-chat-prompt-append-response prompt "This is the third message.")
-					(llm-tester-verify-prompt prompt)
+                                        (llm-tester-verify-prompt prompt)
                                         (llm-chat-async provider prompt
                                                         (lambda (response)
                                                           (push response outputs)
-							  (llm-tester-verify-prompt prompt)
-
+                                                          (llm-tester-verify-prompt prompt)
                                                           (llm-tester-log "SUCCESS: Provider %s provided a conversation with responses %s" (type-of provider) (nreverse outputs)))
                                                         (lambda (type message)
                                                           (llm-tester-log "ERROR: Provider %s returned an error of type %s with message %s" (type-of provider) type message))))
@@ -238,19 +237,19 @@
        (lambda ()
          (goto-char (point-max)) (insert "\n")
          (llm-chat-prompt-append-response prompt "This is the second message.")
-	 (llm-tester-verify-prompt prompt)
+         (llm-tester-verify-prompt prompt)
          (llm-chat-streaming-to-point
           provider prompt
           buf (with-current-buffer buf (point-max))
           (lambda ()
             (goto-char (point-max)) (insert "\n")
             (llm-chat-prompt-append-response prompt "This is the third message.")
-	    (llm-tester-verify-prompt prompt)
+            (llm-tester-verify-prompt prompt)
             (llm-chat-streaming-to-point
              provider prompt buf (with-current-buffer buf (point-max))
              (lambda ()
                (llm-tester-log "SUCCESS: Provider %s provided a conversation with responses %s" (type-of provider) (buffer-string))
-	       (llm-tester-verify-prompt prompt)
+               (llm-tester-verify-prompt prompt)
                (kill-buffer buf))))))))))
 
 (defun llm-tester-create-test-function-prompt ()
@@ -410,7 +409,7 @@ of by calling the `describe_function' function."
            provider
            (llm-make-simple-chat-prompt "This is a test")
            success-callback
-	   success-callback
+           success-callback
            (llm-tester--bad-provider-callback provider "llm-chat-streaming")))
       (error (llm-tester-log "ERROR: Provider %s threw an error when it should have been caught" (type-of provider))))))
 

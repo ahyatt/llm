@@ -120,16 +120,16 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
   (if (vectorp err-response)
       (llm-provider-chat-extract-error provider (aref err-response 0))
     (if-let ((err (assoc-default 'error err-response)))
-	(format "Problem calling GCloud Vertex AI: status: %s message: %s"
-		(assoc-default 'code err)
-		(assoc-default 'message err))
+        (format "Problem calling GCloud Vertex AI: status: %s message: %s"
+                (assoc-default 'code err)
+                (assoc-default 'message err))
       (if-let ((candidates (assoc-default 'candidates err-response)))
-	  (when (and (vectorp candidates)
-		     (> (length candidates) 0)
-		     (equal "SAFETY"
-			    (assoc-default 'finishReason (aref candidates 0))))
-	    (format "Could not finish due to detected Gemini safety violations: %s"
-		    (assoc-default 'safetyRatings (aref candidates 0))))))))
+          (when (and (vectorp candidates)
+                     (> (length candidates) 0)
+                     (equal "SAFETY"
+                            (assoc-default 'finishReason (aref candidates 0))))
+            (format "Could not finish due to detected Gemini safety violations: %s"
+                    (assoc-default 'safetyRatings (aref candidates 0))))))))
 
 (cl-defmethod llm-provider-embedding-request ((provider llm-vertex) string)
   `(("instances" . [(("content" . ,string))])))
@@ -162,7 +162,7 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
                :args (assoc-default 'args call)))
             (mapcan (lambda (maybe-call)
                       (when-let ((fc (assoc-default 'functionCall maybe-call)))
-			(list fc)))
+                        (list fc)))
                     (assoc-default
                      'parts (assoc-default
                              'content
