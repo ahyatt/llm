@@ -207,7 +207,7 @@ RESPONSE can be nil if the response is complete."
 	    (plz-event-source:text/event-stream
          :events `((message
                     .
-		            ,(lambda (_ event)
+		            ,(lambda (event)
 		               (let ((data (plz-event-source-event-data event)))
 			             (unless (equal data "[DONE]")
 			               (when-let ((response (llm-openai--get-partial-chat-response
