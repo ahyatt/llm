@@ -91,8 +91,13 @@ MODEL is the embedding model to use, or nil to use the default.."
   "Return the headers to use for a request from PROVIDER.")
 
 (cl-defmethod llm-openai--headers ((provider llm-openai))
-  (when (llm-openai-key provider)
-    `(("Authorization" . ,(format "Bearer %s" (llm-openai-key provider))))))
+  (when-let ((key (llm-openai-key provider)))
+    ;; Encode the API key to ensure it is unibyte. The request library gets
+    ;; confused by multibyte headers, which turn the entire body multibyte if
+    ;; there’s a non-ascii character, regardless of encoding. And API keys are
+    ;; likely to be obtained from external sources like shell-command-to-string,
+    ;; which always returns multibyte.
+    `(("Authorization" . ,(format "Bearer %s" (encode-coding-string key 'utf-8))))))
 
 (cl-defmethod llm-provider-headers ((provider llm-openai))
   (llm-openai--headers provider))
