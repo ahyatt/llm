@@ -72,23 +72,24 @@
               (llm-tester-log "ERROR: Provider %s returned an empty embedding" (type-of provider))))
       (llm-tester-log "ERROR: Provider %s did not return any embedding" (type-of provider)))))
 
+(defun llm-tester--tiny-prompt ()
+  "Return prompt with a small amount of output, for testing purposes."
+  (llm-make-chat-prompt
+      "Tell me a random cool feature of emacs."
+      :context "You must answer all questions as if you were the butler Jeeves from Jeeves and Wooster.  Start all interactions with the phrase, 'Very good, sir.'"
+      :examples '(("Tell me the capital of France." . "Very good, sir.  The capital of France is Paris, which I expect you to be familiar with, since you were just there last week with your Aunt Agatha.")
+                  ("Could you take me to my favorite place?" . "Very good, sir.  I believe you are referring to the Drone's Club, which I will take you to after you put on your evening attire."))
+      :temperature 0.5
+      :max-tokens 100))
+
 (defun llm-tester-chat-async (provider)
   "Test that PROVIDER can interact with the LLM chat."
   (llm-tester-log "Testing provider %s for chat" (type-of provider))
   (let ((buf (current-buffer)))
     (llm-chat-async
-       provider
-       (make-llm-chat-prompt
-        :interactions (list
-                       (make-llm-chat-prompt-interaction
-                        :role 'user
-                        :content "Tell me a random cool feature of emacs."))
-        :context "You must answer all questions as if you were the butler Jeeves from Jeeves and Wooster.  Start all interactions with the phrase, 'Very good, sir.'"
-        :examples '(("Tell me the capital of France." . "Very good, sir.  The capital of France is Paris, which I expect you to be familiar with, since you were just there last week with your Aunt Agatha.")
-                    ("Could you take me to my favorite place?" . "Very good, sir.  I believe you are referring to the Drone's Club, which I will take you to after you put on your evening attire."))
-        :temperature 0.5
-        :max-tokens 100)
-       (lambda (response)
+     provider
+     (llm-tester--tiny-prompt)
+     (lambda (response)
          (unless (eq buf (current-buffer))
            (llm-tester-log "ERROR: Provider %s returned a response not in the original buffer" (type-of provider)))
          (if response
@@ -102,18 +103,7 @@
 (defun llm-tester-chat-sync (provider)
   "Test that PROVIDER can interact with the LLM chat."
   (llm-tester-log "Testing provider %s for chat" (type-of provider))
-  (let ((response (llm-chat
-                   provider
-                   (make-llm-chat-prompt
-                    :interactions (list
-                                   (make-llm-chat-prompt-interaction
-                                    :role 'user
-                                    :content "Tell me a random cool feature of emacs."))
-                    :context "You must answer all questions as if you were the butler Jeeves from Jeeves and Wooster.  Start all interactions with the phrase, 'Very good, sir.'"
-                    :examples '(("Tell me the capital of France." . "Very good, sir.  The capital of France is Paris, which I expect you to be familiar with, since you were just there last week with your Aunt Agatha.")
-                                ("Could you take me to my favorite place?" . "Very good, sir.  I believe you are referring to the Drone's Club, which I will take you to after you put on your evening attire."))
-                    :temperature 0.5
-                    :max-tokens 100))))
+  (let ((response (llm-chat provider (llm-tester--tiny-prompt))))
     (if response
         (if (> (length response) 0)
             (llm-tester-log "SUCCESS: Provider %s provided a response %s" (type-of provider) response)
@@ -128,11 +118,8 @@
         (buf (current-buffer)))
     (llm-chat-streaming
      provider
-     (make-llm-chat-prompt
-      :interactions (list
-                     (make-llm-chat-prompt-interaction
-                      :role 'user
-                      :content "Write a medium length poem in iambic pentameter about the pleasures of using Emacs.  The poem should make snide references to vi."))
+     (llm-make-chat-prompt
+      "Write a medium length poem in iambic pentameter about the pleasures of using Emacs.  The poem should make snide references to vi."      
       :temperature 0.5)
      (lambda (text)
        (unless (eq buf (current-buffer))
@@ -254,24 +241,22 @@
 
 (defun llm-tester-create-test-function-prompt ()
   "Create a function to test function calling with."
-  (make-llm-chat-prompt
-                 :context "The user will describe an emacs lisp function they are looking
+  (llm-make-chat-prompt
+   "I'm looking for a function that will return the current buffer's file name."
+   :context "The user will describe an emacs lisp function they are looking
 for, and you need to provide the most likely function you know
 of by calling the `describe_function' function."
-                 :interactions (list (make-llm-chat-prompt-interaction
-                                      :role 'user
-                                      :content "I'm looking for a function that will return the current buffer's file name."))
-                 :temperature 0.1
-                 :functions
-                 (list (make-llm-function-call
-                        :function (lambda (f) f)
-                        :name "describe_function"
-                        :description "Takes an elisp function name and shows the user the functions and their descriptions."
-                        :args (list (make-llm-function-arg
-                                     :name "function_name"
-                                     :description "A function name to describe."
-                                     :type 'string
-                                     :required t))))))
+   :temperature 0.1
+   :functions
+   (list (make-llm-function-call
+          :function (lambda (f) f)
+          :name "describe_function"
+          :description "Takes an elisp function name and shows the user the functions and their descriptions."
+          :args (list (make-llm-function-arg
+                       :name "function_name"
+                       :description "A function name to describe."
+                       :type 'string
+                       :required t))))))
 
 (defun llm-tester-function-calling-sync (provider)
   "Test that PROVIDER can call functions."

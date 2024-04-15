@@ -1,4 +1,6 @@
-* Version 0.13
+* Veresion 0.14
+- Introduce new way of creating prompts: llm-make-chat-prompt, deprecating the older ways.
+ Version 0.13
 - Add Claude's new support for function calling.
 - Refactor of providers to centralize embedding and chat logic.
 - Remove connection buffers after use.

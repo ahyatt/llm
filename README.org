@@ -91,7 +91,7 @@ Client applications should require the =llm= package, and code against it.  Most
 
 For all callbacks, the callback will be executed in the buffer the function was first called from.  If the buffer has been killed, it will be executed in a temporary buffer instead.
 ** Main functions
-- ~llm-chat provider prompt~:  With user-chosen ~provider~ , and a ~llm-chat-prompt~ structure (containing context, examples, interactions, and parameters such as temperature and max tokens), send that prompt to the LLM and wait for the string output.
+- ~llm-chat provider prompt~:  With user-chosen ~provider~ , and a ~llm-chat-prompt~ structure (created by ~llm-make-chat-prompt~), send that prompt to the LLM and wait for the string output.
 - ~llm-chat-async provider prompt response-callback error-callback~: Same as ~llm-chat~, but executes in the background.  Takes a ~response-callback~ which will be called with the text response.  The ~error-callback~ will be called in case of error, with the error symbol and an error message.
 - ~llm-chat-streaming provider prompt partial-callback response-callback error-callback~:  Similar to ~llm-chat-async~, but request a streaming response.  As the response is built up, ~partial-callback~ is called with the all the text retrieved up to the current point.  Finally, ~reponse-callback~ is called with the complete text.
 - ~llm-embedding provider string~: With the user-chosen ~provider~, send a string and get an embedding, which is a large vector of floating point values.  The embedding represents the semantic meaning of the string, and the vector can be compared against other vectors, where smaller distances between the vectors represent greater semantic similarity.
@@ -102,14 +102,20 @@ For all callbacks, the callback will be executed in the buffer the function was 
 - ~llm-chat-token-limit~.  Gets the token limit for the chat model.  This isn't possible for some backends like =llama.cpp=, in which the model isn't selected or known by this library.
 
   And the following helper functions:
-  - ~llm-make-simple-chat-prompt text~: For the common case of just wanting a simple text prompt without the richness that ~llm-chat-prompt~ struct provides, use this to turn a string into a ~llm-chat-prompt~ that can be passed to the main functions above.
-  - ~llm-chat-prompt-to-text prompt~: Somewhat opposite of the above, from a prompt, return a string representation.  This is not usually suitable for passing to LLMs, but for debugging purposes.
+  - ~llm-make-chat-prompt text &keys context examples functions temperature
+    max-tokens~: This is how you make prompts.  ~text~ can be a string (the user
+    input to the llm chatbot), or a list representing a series of back-and-forth
+    exchanges, of odd number, with the last element of the list representing the
+    user's latest input.  This supports inputting context (also commonly called
+    a system prompt, although it isn't guaranteed to replace the actual system
+    prompt), examples, and other important elements, all detailed in the docstring for this function.
+  - ~llm-chat-prompt-to-text prompt~: From a prompt, return a string representation.  This is not usually suitable for passing to LLMs, but for debugging purposes.
   - ~llm-chat-streaming-to-point provider prompt buffer point finish-callback~: Same basic arguments as ~llm-chat-streaming~, but will stream to ~point~ in ~buffer~.
   - ~llm-chat-prompt-append-response prompt response role~: Append a new response (from the user, usually) to the prompt.  The ~role~ is optional, and defaults to ~'user~.
 ** Logging
 Interactions with the =llm= package can be logged by setting ~llm-log~ to a non-nil value.  This should be done only when developing.  The log can be found in the =*llm log*= buffer.
 ** How to handle conversations
-Conversations can take place by repeatedly calling ~llm-chat~ and its variants.  For a conversation, the entire prompt must be a variable, because the ~llm-chat-prompt-interactions~ slot will be getting changed by the chat functions to store the conversation.  For some providers, this will store the history directly in ~llm-chat-prompt-interactions~, but for others (such as ollama), the conversation history is opaque.  For that reason, the correct way to handle a conversation is to repeatedly call ~llm-chat~ or variants, and after each time, add the new user text with ~llm-chat-prompt-append-response~.  The following is an example:
+Conversations can take place by repeatedly calling ~llm-chat~ and its variants.  The prompt should be constructed with ~llm-make-chat-prompt~. For a conversation, the entire prompt must be kept as a variable, because the ~llm-chat-prompt-interactions~ slot will be getting changed by the chat functions to store the conversation.  For some providers, this will store the history directly in ~llm-chat-prompt-interactions~, but other LLMs have an opaque conversation history.  For that reason, the correct way to handle a conversation is to repeatedly call ~llm-chat~ or variants with the same prompt structure, kept in a variable, and after each time, add the new user text with ~llm-chat-prompt-append-response~.  The following is an example:
 
 #+begin_src emacs-lisp
 (defvar-local llm-chat-streaming-prompt nil)
@@ -117,11 +123,11 @@ Conversations can take place by repeatedly calling ~llm-chat~ and its variants. 
   "Called when the user has input TEXT as the next input."
   (if llm-chat-streaming-prompt
       (llm-chat-prompt-append-response llm-chat-streaming-prompt text)
-    (setq llm-chat-streaming-prompt (llm-make-simple-chat-prompt text))
+    (setq llm-chat-streaming-prompt (llm-make-chat-prompt text))
     (llm-chat-streaming-to-point provider llm-chat-streaming-prompt (current-buffer) (point-max) (lambda ()))))
 #+end_src
 ** Caution about ~llm-chat-prompt-interactions~
-The interactions in a prompt may be modified by conversation or by the conversion of the context and examples to what the LLM understands.  Different providers require different things from the interactions.  Some can handle system prompts, some cannot.  Some may have richer APIs for examples and context, some not.  Do not attempt to read or manipulate ~llm-chat-prompt-interactions~ after initially setting it up for the first time, because you are likely to make changes that only work for some providers.
+The interactions in a prompt may be modified by conversation or by the conversion of the context and examples to what the LLM understands.  Different providers require different things from the interactions.  Some can handle system prompts, some cannot.  Some require alternating user and assistant chat interactions, others can handle anything.  It's important that clients keep to behaviors that work on all providers.  Do not attempt to read or manipulate ~llm-chat-prompt-interactions~ after initially setting it up for the first time, because you are likely to make changes that only work for some providers.  Similarly, don't directly create a prompt with ~make-llm-chat-prompt~, because it is easy to create something that wouldn't work for all providers.
 ** Function calling
 *Note: function calling functionality is currently alpha quality.  If you want to use function calling, please watch the =llm= [[https://github.com/ahyatt/llm/discussions][discussions]] for any announcements about changes.*
 

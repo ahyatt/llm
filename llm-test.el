@@ -58,6 +58,25 @@
            (llm-chat (make-llm-fake :chat-action-func (lambda () "Response"))
                      (make-llm-chat-prompt)))))
 
+(ert-deftest llm-make-chat-prompt ()
+  (should-error (llm-make-chat-prompt nil))
+  (should-error (llm-make-chat-prompt '("a" "b")))
+  (should (equal (llm-make-chat-prompt
+                  '("a" "b" "c")
+                  :temperature 0.2)
+                 (make-llm-chat-prompt
+                  :interactions (list (make-llm-chat-prompt-interaction
+                                       :role 'user :content "a")
+                                      (make-llm-chat-prompt-interaction
+                                       :role 'assistant :content "b")
+                                      (make-llm-chat-prompt-interaction
+                                       :role 'user :content "c"))
+                  :temperature 0.2)))
+  (should (equal (llm-make-chat-prompt "a")
+                 (make-llm-chat-prompt
+                  :interactions (list (make-llm-chat-prompt-interaction
+                                       :role 'user :content "a"))))))
+
 (ert-deftest llm-test-chat-token-limit-openai ()
   (cl-flet* ((token-limit-for (model)
                (llm-chat-token-limit (make-llm-openai :chat-model model)))

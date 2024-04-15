@@ -69,41 +69,7 @@ See %s for the details on the restrictions on use." name tos)))
 (cl-defstruct llm-chat-prompt
   "This stores all the information needed for a structured chat prompt.
 
-CONTEXT is a string given to the LLM as context for the entire
-interaction, such as instructions to the LLM on how to reply,
-persona, information on the user, or anything else that applies
-to the chat as a whole.  This is optional.
-
-EXAMPLES is a list of conses, where the car is an example
-inputs, and cdr is the corresponding example outputs.  This is optional.
-
-INTERACTIONS is a list message sent by either the llm or the
-user. It is a either list of `llm-chat-prompt-interaction'
-objects or list of an opaque converation ID (anything not a
-`llm-chat-prompt-interaction') and the latest
-`llm-chat-prompt-interaction' in the conversation to submit. When
-building up a chat, the chat methods update this to a new value,
-and the client is expected to append a new interaction to the
-end, without introspecting the value otherwise. The function
-`llm-chat-prompt-append-response' accomplishes that operation, and
-should be used. 'Because this value updated by the called
-function, for continuing chats, the whole prompt MUST be a
-variable passed in to the chat function. INTERACTIONS is
-required.
-
-FUNCTIONS is a list of `llm-function-call' structs. These may be
-called IF the LLM supports them. If the LLM does not support
-them, a `not-implemented' signal will be thrown. This is
-optional. When this is given, the LLM will either call the
-function or return text as normal, depending on what the LLM
-decides.
-
-TEMPERATURE is a floating point number with a minimum of 0, and
-maximum of 1, which controls how predictable the result is, with
-0 being the most predicatable, and 1 being the most creative.
-This is not required.
-
-MAX-TOKENS is the maximum number of tokens to generate.  This is optional."
+Use of this directly is deprecated, instead use `llm-make-chat-prompt'."
   context examples interactions functions temperature max-tokens)
 
 (cl-defstruct llm-chat-prompt-interaction
@@ -194,8 +160,90 @@ this variable in this library. TYPE can be one of `api-send',
   "Create a `llm-chat-prompt' with TEXT sent to the LLM provider.
 This is a helper function for when you just need to send text to
 an LLM, and don't need the more advanced features that the
-`llm-chat-prompt' struct makes available."
-  (make-llm-chat-prompt :interactions (list (make-llm-chat-prompt-interaction :role 'user :content text))))
+`llm-chat-prompt' struct makes available.
+
+This is deprecated, and you should use `llm-make-chat-prompt'
+instead."
+  (llm-make-chat-prompt text))
+
+(cl-defun llm-make-chat-prompt (text &key context examples functions
+                                     temperature max-tokens)
+  "Create a `llm-chat-prompt' with TEXT sent to the LLM provider.
+
+This is the most correct and easy way to create an
+`llm-chat-prompt', and should suffice for almost all uses.
+
+Note that this should be called just once per interactive session
+with an LLM, and the prompt re-used for all subsequent
+interactions.  The reason for this is that some LLMs may store
+data about previous interactions in opaque ways, so they can only
+be populated once.  Therefore, if PREVIOUS-INTERACTIONS is
+populated, a best effort is made to do something reasonable, but
+it may not be quite the same on all providers as the prompt
+mutating in terms of an actual conversation.
+
+TEXT is the latest user input to the LLM, the thing to be
+responded to.  This is required.  This can also be a string, in
+which case it represents the chat history, starting with the
+user's initial chat, followed by the response, and so on.  If it
+is a list, it MUST be an odd number, since the presumption is
+that it ends with the user's latest input to the LLM.
+
+CONTEXT is a string given to the LLM as context for the entire
+interaction, such as instructions to the LLM on how to reply,
+persona, information on the user, or anything else that applies
+to the chat as a whole.  This is optional.
+
+EXAMPLES is a list of conses, where the car is an example
+inputs, and cdr is the corresponding example outputs.  This is optional.
+
+INTERACTIONS is a list message sent by either the llm or the
+user. It is a either list of `llm-chat-prompt-interaction'
+objects or list of an opaque converation ID (anything not a
+`llm-chat-prompt-interaction') and the latest
+`llm-chat-prompt-interaction' in the conversation to submit. When
+building up a chat, the chat methods update this to a new value,
+and the client is expected to append a new interaction to the
+end, without introspecting the value otherwise. The function
+`llm-chat-prompt-append-response' accomplishes that operation, and
+should be used. 'Because this value updated by the called
+function, for continuing chats, the whole prompt MUST be a
+variable passed in to the chat function. INTERACTIONS is
+required.
+
+FUNCTIONS is a list of `llm-function-call' structs. These may be
+called IF the LLM supports them. If the LLM does not support
+them, a `not-implemented' signal will be thrown. This is
+optional. When this is given, the LLM will either call the
+function or return text as normal, depending on what the LLM
+decides.
+
+TEMPERATURE is a floating point number with a minimum of 0, and
+maximum of 1, which controls how predictable the result is, with
+0 being the most predicatable, and 1 being the most creative.
+This is not required.
+
+MAX-TOKENS is the maximum number of tokens to generate.  This is optional.
+
+CONTEXT, EXAMPLES, FUNCTIONS, TEMPERATURE, and MAX-TOKENS are
+usually turned into part of the interaction, and if so, they will
+be put in the first interaction of the prompt (before anything in
+PREVIOUS-INTERACTIONS)."
+  (unless text
+    (error "TEXT is required"))
+  (when (and (listp text) (zerop (mod (length text) 2)))
+    (error "TEXT, as a list, must have an odd number of elements."))
+  (make-llm-chat-prompt
+   :context context
+   :examples examples
+   :interactions (seq-map-indexed (lambda (s i)
+                                    (make-llm-chat-prompt-interaction
+                                     :role (if (zerop (mod i 2)) 'user 'assistant)
+                                     :content s))
+                                  (if (listp text) text (list text)))
+   :functions functions
+   :temperature temperature
+   :max-tokens max-tokens))
 
 (defun llm-chat-prompt-append-response (prompt response &optional role)
   "Append a new RESPONSE to PROMPT, to continue a conversation.
