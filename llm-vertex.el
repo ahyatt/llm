@@ -156,17 +156,19 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
 (cl-defmethod llm-provider-extract-function-calls ((provider llm-google) response)
   (if (vectorp response)
       (llm-provider-extract-function-calls provider (aref response 0))
-    (mapcar (lambda (call)
-              (make-llm-provider-utils-function-call
-               :name (assoc-default 'name call)
-               :args (assoc-default 'args call)))
-            (mapcan (lambda (maybe-call)
-                      (when-let ((fc (assoc-default 'functionCall maybe-call)))
-                        (list fc)))
-                    (assoc-default
-                     'parts (assoc-default
-                             'content
-                             (aref (assoc-default 'candidates response) 0)))))))
+    ;; In some error cases, the response does not have any candidates.
+    (when (assoc-default 'candidates response)
+      (mapcar (lambda (call)
+                (make-llm-provider-utils-function-call
+                 :name (assoc-default 'name call)
+                 :args (assoc-default 'args call)))
+              (mapcan (lambda (maybe-call)
+                        (when-let ((fc (assoc-default 'functionCall maybe-call)))
+                          (list fc)))
+                      (assoc-default
+                       'parts (assoc-default
+                               'content
+                               (aref (assoc-default 'candidates response) 0))))))))
 
 (cl-defmethod llm-provider-extract-streamed-function-calls ((provider llm-google) response)
   (llm-provider-extract-function-calls provider (json-read-from-string response)))
