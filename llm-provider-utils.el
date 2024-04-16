@@ -290,11 +290,7 @@ This should be used for providers that have a notion of a system prompt.
 If there is a system prompt, and no assistant response, add to it.
 If there is no system prompt, create one.
 If there is an assistance response, do nothing."
-  (unless (seq-some
-           (lambda (interaction)
-             (eq (llm-chat-prompt-interaction-role interaction) 'assistant))
-           (llm-chat-prompt-interactions prompt))
-    (let ((system-prompt (seq-find
+  (let ((system-prompt (seq-find
                           (lambda (interaction)
                             (eq (llm-chat-prompt-interaction-role interaction) 'system))
                           (llm-chat-prompt-interactions prompt)))
@@ -308,17 +304,20 @@ If there is an assistance response, do nothing."
           (push (make-llm-chat-prompt-interaction
                  :role 'system
                  :content system-content)
-                (llm-chat-prompt-interactions prompt)))))))
+                (llm-chat-prompt-interactions prompt))
+          (setf (llm-chat-prompt-context prompt) nil
+                (llm-chat-prompt-examples prompt) nil)))))
 
 (defun llm-provider-utils-combine-to-user-prompt (prompt &optional example-prelude)
   "Add context and examples to a user prompt in PROMPT.
 This should be used for providers that do not have a notion of a system prompt."
-  (when (= (length (llm-chat-prompt-interactions prompt)) 1)
-    (when-let ((system-content (llm-provider-utils-get-system-prompt prompt example-prelude)))
+  (when-let ((system-content (llm-provider-utils-get-system-prompt prompt example-prelude)))
       (setf (llm-chat-prompt-interaction-content (car (llm-chat-prompt-interactions prompt)))
             (concat system-content
                     "\n"
-                    (llm-chat-prompt-interaction-content (car (llm-chat-prompt-interactions prompt))))))))
+                    (llm-chat-prompt-interaction-content (car (llm-chat-prompt-interactions prompt))))
+            (llm-chat-prompt-context prompt) nil
+            (llm-chat-prompt-examples prompt) nil)))
 
 (defun llm-provider-utils-collapse-history (prompt &optional history-prelude)
   "Collapse history to a single prompt.
