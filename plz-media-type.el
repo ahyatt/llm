@@ -11,6 +11,11 @@
 
 ;; This file is part of GNU Emacs.
 
+;; It is temporarily vendored within the llm library.  Please DO NOT
+;; depend on it!  It is subject to change.  Once we think this package
+;; is stable, we will release it to GNU ELPA.  If no serious issues
+;; are found, we plan to do this in Q4 of 2024.
+
 ;;; License:
 
 ;; This program is free software; you can redistribute it and/or modify
@@ -72,6 +77,19 @@ parameter in the content type header, or the coding-sytem of the
 media type.  If the coding system of a media type is nil, the
 response will not be decoded.")
 
+(cl-defgeneric plz-media-type-else (media-type error)
+  "Transform and handle the ERROR according to MEDIA-TYPE.")
+
+(cl-defgeneric plz-media-type-then (media-type response)
+  "Transform and handle the RESPONSE according to MEDIA-TYPE.")
+
+(cl-defgeneric plz-media-type-process (media-type process chunk)
+  "Process the CHUNK according to MEDIA-TYPE using PROCESS.")
+
+(cl-defmethod plz-media-type-else ((_ (eql nil)) error)
+  "Transform and handle the ERROR according to MEDIA-TYPE."
+  error)
+
 (defun plz-media-type-charset (media-type)
   "Return the character set of the MEDIA-TYPE."
   (with-slots (parameters) media-type
@@ -83,6 +101,12 @@ response will not be decoded.")
       (coding-system-from-name charset)
     (oref media-type coding-system)))
 
+(defun plz-media-type-decode-coding-string (media-type string)
+  "Decode STRING which is encoded in the coding system of MEDIA-TYPE."
+  (if-let (coding-system (plz-media-type-coding-system media-type))
+      (decode-coding-string string coding-system)
+    string))
+
 (defun plz-media-type-name (media-type)
   "Return the name of the MEDIA-TYPE as a string."
   (with-slots (type subtype) media-type
@@ -92,24 +116,14 @@ response will not be decoded.")
   "Return the name of the MEDIA-TYPE as a symbol."
   (intern (plz-media-type-name media-type)))
 
-(cl-defgeneric plz-media-type-else (media-type error)
-  "Transform the ERROR into a format suitable for MEDIA-TYPE.")
+(defun plz-media-type-of-response (media-types response)
+  "Lookup the content type of RESPONSE in MEDIA-TYPES."
+  (let ((media-type (plz-media-type--content-type response)))
+    (clone (plz-media-type--find media-types media-type)
+           :parameters (oref media-type parameters))))
 
-(cl-defgeneric plz-media-type-then (media-type response)
-  "Transform the RESPONSE into a format suitable for MEDIA-TYPE.")
-
-(cl-defgeneric plz-media-type-process (media-type process chunk)
-  "Process the CHUNK according to MEDIA-TYPE using PROCESS.")
-
-(cl-defmethod plz-media-type-else ((_ (eql nil)) error)
-  "Transform the ERROR into a format suitable for MEDIA-TYPE."
-  error)
-
-(defun plz-media-type-parse (header)
-  "Parse the Content-Type HEADER.
-
-Return a cons cell where the car is the MIME type, and the cdr is
-an alist of parameters."
+(defun plz-media-type--parse (header)
+  "Parse the Content-Type HEADER and return a `plz-media-type' instance."
   (unless (or (null header) (string-blank-p header))
     (let* ((components (split-string header ";"))
            (mime-type (string-trim (car components)))
@@ -130,25 +144,13 @@ an alist of parameters."
   "Return the content type header of RESPONSE, or nil if it's not set."
   (let ((headers (plz-response-headers response)))
     (when-let (header (cdr (assoc 'content-type headers)))
-      (plz-media-type-parse header))))
+      (plz-media-type--parse header))))
 
-(defun plz-media--type-find (media-types media-type)
+(defun plz-media-type--find (media-types media-type)
   "Lookup the MEDIA-TYPE in MEDIA-TYPES."
   (or (alist-get (plz-media-type-symbol media-type) media-types)
       (alist-get t media-types)
       (plz-media-type:application/octet-stream)))
-
-(defun plz-media-type-of-response (media-types response)
-  "Lookup the content type of RESPONSE in MEDIA-TYPES."
-  (let ((media-type (plz-media-type--content-type response)))
-    (clone (plz-media--type-find media-types media-type)
-           :parameters (oref media-type parameters))))
-
-(defun plz-media-type-decode-string (media-type string)
-  "Decode the STRING according to the MEDIA-TYPE."
-  (if-let (coding-system (plz-media-type-coding-system media-type))
-      (decode-coding-string string coding-system)
-    string))
 
 (defvar-local plz-media-type--current nil
   "The media type of the process buffer.")
@@ -264,7 +266,7 @@ body.  It is used as the default media type processor.")
   (ignore media-type)
   (save-excursion
     (goto-char (process-mark process))
-    (insert (plz-media-type-decode-string media-type (plz-response-body chunk)))
+    (insert (plz-media-type-decode-coding-string media-type (plz-response-body chunk)))
     (set-marker (process-mark process) (point))))
 
 ;; Content Type: application/json
@@ -543,6 +545,17 @@ parsing the HTTP response body with the
      (then 'sync)
      (timeout plz-timeout))
   "Request METHOD from URL with curl.
+
+This function works in a similar way as the `plz' function, with
+the additional functionality of handling streaming and
+non-streaming media types with the :as (media-types MEDIA-TYPES)
+option.  Setting a process :filter by the user is not supported.
+Instead this function will always install its own process filter
+that will process the response until the HTTP headers arrived.
+Once the headers arrived it will hand over control to a media
+type based on the content type header of the response.  The media
+type is responsible for processing the HTTP body.
+
 Return the curl process object or, for a synchronous request, the
 selected result.
 
