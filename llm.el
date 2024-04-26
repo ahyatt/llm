@@ -4,7 +4,7 @@
 
 ;; Author: Andrew Hyatt <ahyatt@gmail.com>
 ;; Homepage: https://github.com/ahyatt/llm
-;; Package-Requires: ((emacs "28.1"))
+;; Package-Requires: ((emacs "28.1") (plz "0.8"))
 ;; Package-Version: 0.12.3
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;
