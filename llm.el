@@ -197,20 +197,6 @@ to the chat as a whole.  This is optional.
 EXAMPLES is a list of conses, where the car is an example
 inputs, and cdr is the corresponding example outputs.  This is optional.
 
-INTERACTIONS is a list message sent by either the llm or the
-user. It is a either list of `llm-chat-prompt-interaction'
-objects or list of an opaque converation ID (anything not a
-`llm-chat-prompt-interaction') and the latest
-`llm-chat-prompt-interaction' in the conversation to submit. When
-building up a chat, the chat methods update this to a new value,
-and the client is expected to append a new interaction to the
-end, without introspecting the value otherwise. The function
-`llm-chat-prompt-append-response' accomplishes that operation, and
-should be used. 'Because this value updated by the called
-function, for continuing chats, the whole prompt MUST be a
-variable passed in to the chat function. INTERACTIONS is
-required.
-
 FUNCTIONS is a list of `llm-function-call' structs. These may be
 called IF the LLM supports them. If the LLM does not support
 them, a `not-implemented' signal will be thrown. This is
