@@ -53,7 +53,7 @@ You can get this at https://makersuite.google.com/app/apikey."
   `((model . ,(llm-gemini-embedding-model provider))
     (content . ((parts . (((text . ,string))))))))
 
-(cl-defmethod llm-provider-embedding-extract-result ((provider llm-gemini) response)
+(cl-defmethod llm-provider-embedding-extract-result ((_ llm-gemini) response)
   (assoc-default 'values (assoc-default 'embedding response)))
 
 ;; from https://ai.google.dev/tutorials/rest_quickstart

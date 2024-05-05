@@ -1,4 +1,6 @@
-* Veresion 0.14
+* Veresion 0.14.1
+- Fix various issues with the 0.14 release
+* Version 0.14
 - Introduce new way of creating prompts: llm-make-chat-prompt, deprecating the older ways.
 - Improve Vertex error handling
 * Version 0.13

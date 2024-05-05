@@ -131,16 +131,16 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
             (format "Could not finish due to detected Gemini safety violations: %s"
                     (assoc-default 'safetyRatings (aref candidates 0))))))))
 
-(cl-defmethod llm-provider-embedding-request ((provider llm-vertex) string)
+(cl-defmethod llm-provider-embedding-request ((_ llm-vertex) string)
   `(("instances" . [(("content" . ,string))])))
 
 (cl-defmethod llm-provider-headers ((provider llm-vertex))
   `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider)))))
 
-(cl-defmethod llm-provider-chat-extract-result ((_ llm-google) response)
+(cl-defmethod llm-provider-chat-extract-result ((provider llm-google) response)
   (pcase (type-of response)
     ('vector (when (> (length response) 0)
-               (let ((parts (mapcar #'llm-provider-chat-extract-response response)))
+               (let ((parts (mapcar #'llm-provider-chat-extract-result provider response)))
                  (if (stringp (car parts))
                      (mapconcat #'identity parts "")
                    (car parts)))))

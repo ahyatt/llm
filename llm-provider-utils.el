@@ -168,7 +168,7 @@ CALLS are a list of `llm-provider-utils-function-call'.")
      :data (llm-provider-embedding-request provider string)
      :on-success (lambda (data)
                    (if-let ((err-msg (llm-provider-embedding-extract-error provider data)))
-                       (llm-request-callback-in-buffer
+                       (llm-provider-utils-callback-in-buffer
                         buf error-callback 'error
                         err-msg)
                      (llm-provider-utils-callback-in-buffer
