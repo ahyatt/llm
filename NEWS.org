@@ -1,5 +1,6 @@
 * Version 0.14.2
 - Fix mangled copyright line (needed to get ELPA version unstuck).
+- Fix Vertex response handling bug.
 * Version 0.14.1
 - Fix various issues with the 0.14 release
 * Version 0.14
