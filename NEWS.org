@@ -1,4 +1,6 @@
-* Veresion 0.14.1
+* Version 0.14.2
+- Fix mangled copyright line (needed to get ELPA version unstuck).
+* Version 0.14.1
 - Fix various issues with the 0.14 release
 * Version 0.14
 - Introduce new way of creating prompts: llm-make-chat-prompt, deprecating the older ways.
