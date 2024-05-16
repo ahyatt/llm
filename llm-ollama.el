@@ -27,9 +27,10 @@
 
 (require 'cl-lib)
 (require 'llm)
-(require 'llm-request)
+(require 'llm-request-plz)
 (require 'llm-provider-utils)
 (require 'json)
+(require 'plz-media-type)
 
 (defgroup llm-ollama nil
   "LLM implementation for Ollama."
@@ -91,7 +92,11 @@ PROVIDER is the llm-ollama provider."
   "Return the embedding from the server RESPONSE."
   (assoc-default 'embedding response))
 
-(cl-defmethod llm-provider-chat-request ((provider llm-ollama) prompt _)
+(cl-defmethod llm-provider-chat-extract-result ((_ llm-ollama) response)
+  "Return the chat response from the server RESPONSE"
+  (assoc-default 'content (assoc-default 'message response)))
+
+(cl-defmethod llm-provider-chat-request ((provider llm-ollama) prompt streaming)
   (let (request-alist messages options)
     (setq messages
           (mapcar (lambda (interaction)
@@ -104,6 +109,7 @@ PROVIDER is the llm-ollama provider."
             messages))
     (push `("messages" . ,messages) request-alist)
     (push `("model" . ,(llm-ollama-chat-model provider)) request-alist)
+    (push `("stream" . ,(if streaming t :json-false)) request-alist)
     (when (llm-chat-prompt-temperature prompt)
       (push `("temperature" . ,(llm-chat-prompt-temperature prompt)) options))
     (when (llm-chat-prompt-max-tokens prompt)
@@ -111,81 +117,14 @@ PROVIDER is the llm-ollama provider."
     (when options (push `("options" . ,options) request-alist))
     request-alist))
 
-(cl-defmethod llm-provider-embedding-extract-error ((_ llm-ollama) err-response)
-  (assoc-default 'error err-response))
-
-(cl-defmethod llm-provider-chat-extract-error ((provider llm-ollama) err-response)
-  (llm-provider-embedding-extract-error provider err-response))
-
-(defvar-local llm-ollama-current-response ""
-  "The response so far from the server.")
-
-(defvar-local llm-ollama-last-response 0
-  "The last response number we've read.")
-
-(cl-defmethod llm-provider-extract-partial-response ((_ llm-ollama) response)
-  "Return the text in the partial chat response from RESPONSE."
-  ;; To begin with, we should still be in the buffer with the actual response.
-  (let ((current-response llm-ollama-current-response)
-        (last-response llm-ollama-last-response))
-    (with-temp-buffer
-      (insert response)
-      ;; Responses in ollama are always one per line.
-      (let* ((end-pos (save-excursion (goto-char (point-max))
-                                      (when (search-backward-regexp
-                                             (rx (seq "done\":false}" line-end))
-                                             nil t)
-                                        (line-end-position)))))
-        (when end-pos
-          (let ((all-lines (seq-filter
-                            (lambda (line) (string-match-p (rx (seq string-start ?{)) line))
-                            (split-string (buffer-substring-no-properties 1 end-pos) "\n" t))))
-            (setq
-             current-response
-             (concat current-response
-                     (mapconcat
-                      (lambda (line) (assoc-default 'content (assoc-default 'message (json-read-from-string line))))
-                      ;; Take from response output last-response to the end. This
-                      ;; counts only valid responses, so we need to throw out all
-                      ;; other lines that aren't valid JSON.
-                      (seq-subseq all-lines last-response) "")))
-            (setq last-response (length all-lines))))))
-    ;; If there is no new content, don't manipulate anything.
-    (when (> (length current-response) (length llm-ollama-current-response))
-      (setq llm-ollama-last-response last-response)
-      (setq llm-ollama-current-response current-response))
-    current-response))
-
-(defun llm-ollama--get-final-response (response)
-  "Return the final post-streaming json output from RESPONSE."
-  (with-temp-buffer
-    (insert response)
-    ;; Find the last json object in the buffer.
-    (goto-char (point-max))
-    (search-backward "{" nil t)
-    (json-read)))
-
-;; Ollama chat is a streaming API, so we need to handle it differently tha normal.
-
-(cl-defmethod llm-chat ((provider llm-ollama) prompt)
-  ;; We expect to be in a new buffer with the response, which we use to store
-  ;; local variables. The temp buffer won't have the response, but that's fine,
-  ;; we really just need it for the local variables.
-  (with-temp-buffer
-    (let ((output (llm-request-sync-raw-output 
-                   (llm-provider-chat-url provider)
-                   :data (llm-provider-chat-request provider prompt t)
-                   ;; ollama is run on a user's machine, and it can take a while.
-                   :timeout llm-ollama-chat-timeout)))
-      (setf (llm-chat-prompt-interactions prompt)
-            (append (llm-chat-prompt-interactions prompt)
-                    (list (make-llm-chat-prompt-interaction
-                           :role 'assistant
-                           :content (assoc-default 'context (llm-ollama--get-final-response output))))))
-      (llm-provider-extract-partial-response provider output))))
-
-(cl-defmethod llm-chat-async ((provider llm-ollama) prompt response-callback error-callback)
-  (llm-chat-streaming provider prompt #'ignore response-callback error-callback))
+(cl-defmethod llm-provider-streaming-media-handler ((_ llm-ollama) msg-receiver _ _)
+  (cons 'application/x-ndjson
+        (plz-media-type:application/x-ndjson
+         :handler (lambda (data)
+                     (when-let ((response (assoc-default
+                                           'content
+                                           (assoc-default 'message data))))
+                       (funcall msg-receiver response))))))
 
 (cl-defmethod llm-name ((provider llm-ollama))
   (llm-ollama-chat-model provider))

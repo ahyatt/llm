@@ -27,9 +27,10 @@
 
 (require 'cl-lib)
 (require 'llm)
-(require 'llm-request)
+(require 'llm-request-plz)
 (require 'llm-provider-utils)
 (require 'json)
+(require 'plz-event-source)
 
 (defgroup llm-openai nil
   "LLM implementation for Open AI."
@@ -74,6 +75,9 @@ MODEL is the embedding model to use, or nil to use the default.."
 (cl-defmethod llm-provider-embedding-extract-result ((_ llm-openai) response)
   "Return the embedding from the server RESPONSE."
   (assoc-default 'embedding (aref (assoc-default 'data response) 0)))
+
+(cl-defgeneric llm-openai--check-key (provider)
+  "Check that the key is set for the Open AI provider.")
 
 (cl-defmethod llm-openai--check-key ((provider llm-openai))
   (unless (llm-openai-key provider)
@@ -192,94 +196,52 @@ STREAMING if non-nil, turn on response streaming."
                                         (llm-provider-utils-function-call-args call))))))
            calls)))
 
-(defvar-local llm-openai-current-response ""
-  "The response so far from the server.")
+(defun llm-openai--get-partial-chat-response (response)
+  "Return the text in the partial chat response from RESPONSE.
+RESPONSE can be nil if the response is complete."
+  (when response
+    (let* ((choices (assoc-default 'choices response))
+           (delta (when (> (length choices) 0)
+                    (assoc-default 'delta (aref choices 0))))
+           (content-or-call (or (assoc-default 'content delta)
+                                (assoc-default 'tool_calls delta))))
+      content-or-call)))
 
-(defvar-local llm-openai-last-response 0
-  "The number of the last streaming response we read.
-The responses from OpenAI are not numbered, but we just number
-them from 1 to however many are sent.")
+(cl-defmethod llm-provider-streaming-media-handler ((_ llm-openai) msg-receiver fc-receiver _)
+  (cons 'text/event-stream
+	    (plz-event-source:text/event-stream
+         :events `((message
+                    .
+		            ,(lambda (event)
+		               (let ((data (plz-event-source-event-data event)))
+			             (unless (equal data "[DONE]")
+			               (when-let ((response (llm-openai--get-partial-chat-response
+						                         (json-read-from-string data))))
+                             (funcall (if (stringp response) msg-receiver fc-receiver) response))))))))))
 
-(defun llm-openai--get-unparsed-json (response)
-  "Return the unparsed JSON from RESPONSE.
-The response is a list of all the responses, regardless of
-whether they have been parsed before or not."
-  (with-temp-buffer
-    (insert response)
-    (let* ((complete-rx (rx (seq line-start "data: ")))
-           (end-pos (save-excursion (goto-char (point-max))
-                                    (when (search-backward-regexp
-                                           complete-rx
-                                           nil t)
-                                      (line-end-position)))))
-      (when end-pos
-        (mapcar (lambda (line) (replace-regexp-in-string "data: " "" line))
-                (seq-filter
-                 (lambda (line)
-                   (and (string-match-p complete-rx line)
-                        (not (string-match-p (rx (seq line-start "data: [DONE]"))
-                                             line))))
-                 (split-string (buffer-substring-no-properties 1 end-pos) "\n")))))))
-
-(cl-defmethod llm-provider-extract-partial-response ((_ llm-openai) response)
-  "Return the text in the partial chat response from RESPONSE."
-  ;; To begin with, we should still be in the buffer with the actual response.
-  (let ((current-response llm-openai-current-response)
-        (last-response llm-openai-last-response))
-    (let* ((all-lines (llm-openai--get-unparsed-json response))
-           (processed-lines
-            (mapcar (lambda (json)
-                      (assoc-default 'content
-                                     (assoc-default
-                                      'delta
-                                      (aref (assoc-default
-                                             'choices
-                                             (json-read-from-string json))
-                                            0))))
-                    (seq-subseq all-lines last-response))))
-      (when (stringp (car processed-lines))
-        ;; The data is a string - a normal response, which we just
-        ;; append to current-response (assuming it's also a string,
-        ;; which it should be).
-        (setq current-response
-              (concat current-response (string-join processed-lines ""))))
-      (setq last-response (length all-lines)))
-    (when (>= (length current-response) (length llm-openai-current-response))
-      (setq llm-openai-current-response current-response)
-      (setq llm-openai-last-response last-response))
-    (when (> (length llm-openai-current-response) 0)
-      llm-openai-current-response)))
-
-(cl-defmethod llm-provider-extract-streamed-function-calls ((_ llm-openai) response)
-  (let* ((pieces (mapcar (lambda (json)
-                           (assoc-default 'tool_calls
-                                          (assoc-default
-                                           'delta
-                                           (aref (assoc-default
-                                                  'choices
-                                                  (json-read-from-string json))
-                                                 0))))
-                         (llm-openai--get-unparsed-json response)))
-         (cvec (make-vector (length (car pieces)) (make-llm-provider-utils-function-call))))
-    (cl-loop for piece in pieces do
-             (cl-loop for call in (append piece nil) do
-                      (let* ((index (assoc-default 'index call))
-                             (id (assoc-default 'id call))
-                             (function (assoc-default 'function call))
-                             (name (assoc-default 'name function))
-                             (arguments (assoc-default 'arguments function)))
-                        (when id
-                          (setf (llm-provider-utils-function-call-id (aref cvec index)) id))
-                        (when name
-                          (setf (llm-provider-utils-function-call-name (aref cvec index)) name))
-                        (setf (llm-provider-utils-function-call-args (aref cvec index))
-                              (concat (llm-provider-utils-function-call-args (aref cvec index))
-                                      arguments)))))
+(cl-defmethod llm-provider-collect-streaming-function-data ((_ llm-openai) data)
+  (let ((cvec (make-vector (length (car data)) nil)))
+    (dotimes (i (length (car data)))
+      (setf (aref cvec i) (make-llm-provider-utils-function-call)))
+    (cl-loop for part in data do
+	     (cl-loop for call in (append part nil) do
+		      (let* ((index (assoc-default 'index call))
+			     (id (assoc-default 'id call))
+			     (function (assoc-default 'function call))
+			     (name (assoc-default 'name function))
+			     (arguments (assoc-default 'arguments function)))
+			(when id
+			  (setf (llm-provider-utils-function-call-id (aref cvec index)) id))
+			(when name
+			  (setf (llm-provider-utils-function-call-name (aref cvec index)) name))
+			(setf (llm-provider-utils-function-call-args (aref cvec index))
+			      (concat (llm-provider-utils-function-call-args (aref cvec index))
+				      arguments)))))
     (cl-loop for call in (append cvec nil)
              do (setf (llm-provider-utils-function-call-args call)
                       (json-read-from-string (llm-provider-utils-function-call-args call)))
              finally return (when (> (length cvec) 0)
-                              (append cvec nil)))))
+                  (append cvec nil)))))
 
 (cl-defmethod llm-name ((_ llm-openai))
   "Open AI")

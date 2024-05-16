@@ -22,7 +22,7 @@
 ;;; Code:
 
 (require 'llm)
-(require 'llm-request)
+(require 'llm-request-plz)
 (require 'seq)
 
 (cl-defstruct llm-standard-provider
@@ -119,9 +119,21 @@ FUNC-RESULTS is a list of function results, if any.")
   "By default, the standard provider appends to the prompt."
   (llm-provider-utils-append-to-prompt prompt result func-results))
 
-(cl-defgeneric llm-provider-extract-partial-response (provider response)
-  "Extract the result string from partial RESPONSE for the PROVIDER.
-This should return the entire string so far.")
+(cl-defgeneric llm-provider-streaming-media-handler (provider msg-receiver fc-receiver err-receiver)
+  "Define how to handle streaming media for the PROVIDER.
+
+This should return a cons of the media type and an instance that
+handle objects of that type.
+
+The handlers defined can call MSG-RECEIVER when they receive part
+of a text message for the client (a chat response).  If they
+receive a function call, they should call FC-RECEIVER with the
+function call.  If they receive an error, they should call
+ERR-RECEIVER with the error message.")
+
+(cl-defmethod llm-provider-streaming-media-handler ((_ llm-standard-chat-provider) _ _ _)
+  "By default, the standard provider has no streaming media handler."
+  nil)
 
 ;; Methods for chat function calling
 
@@ -140,21 +152,26 @@ function calls, return a list of
 This is the recording before the calls were executed.
 CALLS are a list of `llm-provider-utils-function-call'.")
 
-(cl-defgeneric llm-provider-extract-streamed-function-calls (provider response)
-  "Extract the result string from partial RESPONSE for the PROVIDER.")
+(cl-defgeneric llm-provider-collect-streaming-function-data (provider data)
+  "Transform a list of streaming function call DATA responses.
 
-(cl-defmethod llm-provider-extract-streamed-function-calls ((_ llm-standard-chat-provider) _)
-  "By default, there are no function calls."
+The DATA responses are a list of whatever is sent to the function
+call handler in `llm-provider-streaming-media-handler'.  This should
+return a list of `llm-chat-function-call' structs.")
+
+(cl-defmethod llm-provider-collect-streaming-function-data ((provider llm-standard-chat-provider) data)
+  "By default, there is no streaming function calling."
   nil)
 
 ;; Standard provider implementations of llm functionality
 
 (cl-defmethod llm-embedding ((provider llm-standard-full-provider) string)
   (llm-provider-request-prelude provider)
-  (let ((response (llm-request-sync (llm-provider-embedding-url provider)
-                                    :timeout (llm-provider-chat-timeout provider)
-                                    :headers (llm-provider-headers provider)
-                                    :data (llm-provider-embedding-request provider string))))
+  (let ((response (llm-request-plz-sync
+                   (llm-provider-embedding-url provider)
+                   :timeout (llm-provider-chat-timeout provider)
+                   :headers (llm-provider-headers provider)
+                   :data (llm-provider-embedding-request provider string))))
     (if-let ((err-msg (llm-provider-embedding-extract-error provider response)))
         (error err-msg)
       (llm-provider-embedding-extract-result provider response))))
@@ -162,7 +179,7 @@ CALLS are a list of `llm-provider-utils-function-call'.")
 (cl-defmethod llm-embedding-async ((provider llm-standard-full-provider) string vector-callback error-callback)
   (llm-provider-request-prelude provider)
   (let ((buf (current-buffer)))
-    (llm-request-async
+    (llm-request-plz-async
      (llm-provider-embedding-url provider)
      :headers (llm-provider-headers provider)
      :data (llm-provider-embedding-request provider string)
@@ -173,8 +190,7 @@ CALLS are a list of `llm-provider-utils-function-call'.")
                         err-msg)
                      (llm-provider-utils-callback-in-buffer
                       buf vector-callback
-                      (llm-provider-embedding-extract-result provider data)))
-                   (kill-current-buffer))
+                      (llm-provider-embedding-extract-result provider data))))
      :on-error (lambda (_ data)
                  (llm-provider-utils-callback-in-buffer
                   buf error-callback 'error
@@ -182,14 +198,13 @@ CALLS are a list of `llm-provider-utils-function-call'.")
                       data
                     (or (llm-provider-embedding-extract-error
                          provider data)
-                        "Unknown error")))
-                 (kill-current-buffer)))))
+			            "Unknown error")))))))
 
 (cl-defmethod llm-chat ((provider llm-standard-chat-provider) prompt)
   (llm-provider-request-prelude provider)
-  (let ((response (llm-request-sync (llm-provider-chat-url provider)
-                                    :headers (llm-provider-headers provider)
-                                    :data (llm-provider-chat-request provider prompt nil))))
+  (let ((response (llm-request-plz-sync (llm-provider-chat-url provider)
+                                        :headers (llm-provider-headers provider)
+                                        :data (llm-provider-chat-request provider prompt nil))))
     (if-let ((err-msg (llm-provider-chat-extract-error provider response)))
         (error err-msg)
       (llm-provider-utils-process-result provider prompt
@@ -202,7 +217,7 @@ CALLS are a list of `llm-provider-utils-function-call'.")
                               error-callback)
   (llm-provider-request-prelude provider)
   (let ((buf (current-buffer)))
-    (llm-request-async
+    (llm-request-plz-async
      (llm-provider-chat-url provider)
      :headers (llm-provider-headers provider)
      :data (llm-provider-chat-request provider prompt nil)
@@ -216,8 +231,7 @@ CALLS are a list of `llm-provider-utils-function-call'.")
                       (llm-provider-utils-process-result
                        provider prompt
                        (llm-provider-chat-extract-result provider data)
-                       (llm-provider-extract-function-calls provider data))))
-                   (kill-current-buffer))
+                       (llm-provider-extract-function-calls provider data)))))
      :on-error (lambda (_ data)
                  (llm-provider-utils-callback-in-buffer
                   buf error-callback 'error
@@ -225,35 +239,41 @@ CALLS are a list of `llm-provider-utils-function-call'.")
                       data
                     (or (llm-provider-chat-extract-error
                          provider data)
-                        "Unknown error")))
-                 (kill-current-buffer)))))
+                        "Unknown error")))))))
 
 (cl-defmethod llm-chat-streaming ((provider llm-standard-chat-provider) prompt partial-callback
                                   response-callback error-callback)
   (llm-provider-request-prelude provider)
-  (let ((buf (current-buffer)))
-    (llm-request-async
+  (let ((buf (current-buffer))
+        (current-text "")
+        (fc nil))
+    (llm-request-plz-async
      (llm-provider-chat-streaming-url provider)
      :headers (llm-provider-headers provider)
      :data (llm-provider-chat-request provider prompt t)
-     :on-partial
-     (lambda (data)
-       ;; We won't have a result if this is a streaming function call,
-       ;; so we don't call on-partial in that case.
-       (when-let ((result (llm-provider-extract-partial-response provider data)))
-         ;; Let's not be so strict, a partial response empty string
-         ;; should be equivalent to nil.
-         (when (> (length result) 0)
-           (llm-provider-utils-callback-in-buffer buf partial-callback result))))
-     :on-success-raw
+     :media-type (llm-provider-streaming-media-handler
+                  provider
+                  (lambda (s)
+		            (when (> (length s) 0)
+                      (setq current-text
+                            (concat current-text s))
+                      (when partial-callback
+			            (llm-provider-utils-callback-in-buffer
+			             buf partial-callback current-text))))
+                  (lambda (fc-new) (push fc-new fc))
+                  (lambda (err)
+                    (llm-provider-utils-callback-in-buffer
+                     buf error-callback 'error
+                     err)))
+     :on-success
      (lambda (data)
        (llm-provider-utils-callback-in-buffer
         buf response-callback
         (llm-provider-utils-process-result
          provider prompt
-         (llm-provider-extract-partial-response provider data)
-         (llm-provider-extract-streamed-function-calls provider data)))
-       (kill-current-buffer))
+         current-text
+         (llm-provider-collect-streaming-function-data
+		  provider (nreverse fc)))))
      :on-error (lambda (_ data)
                  (llm-provider-utils-callback-in-buffer
                   buf error-callback 'error
@@ -261,8 +281,7 @@ CALLS are a list of `llm-provider-utils-function-call'.")
                       data
                     (or (llm-provider-chat-extract-error
                          provider data)
-                        "Unknown error")))
-                 (kill-current-buffer)))))
+                        "Unknown error")))))))
 
 (defun llm-provider-utils-get-system-prompt (prompt &optional example-prelude)
   "From PROMPT, turn the context and examples into a string.
@@ -459,7 +478,10 @@ be either FUNCALLS or TEXT."
       ;; If we have function calls, execute them and return the results, and
       ;; it talso takes care of updating the prompt.
       (llm-provider-utils-execute-function-calls provider prompt funcalls)
-    (llm-provider-append-to-prompt provider prompt text)
+    ;; We probably shouldn't be called if text is nil, but if we do,
+    ;; we shouldn't add something invalid to the prompt.
+    (when text
+      (llm-provider-append-to-prompt provider prompt text))
     text))
 
 (defun llm-provider-utils-populate-function-results (provider prompt func result)

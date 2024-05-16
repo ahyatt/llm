@@ -28,6 +28,7 @@
 (require 'llm)
 (require 'llm-request)
 (require 'llm-provider-utils)
+(require 'plz-event-source)
 (require 'rx)
 
 ;; Models defined at https://docs.anthropic.com/claude/docs/models-overview
@@ -98,27 +99,26 @@
         (assoc-default 'text content)
       (format "Unsupported non-text response: %s" content))))
 
-;; see https://docs.anthropic.com/claude/reference/messages-streaming
-(cl-defmethod llm-provider-extract-partial-response ((_ llm-claude) response)
-  "Return the partial response from text RESPONSE."
-  (let ((regex (rx (seq "\"text\":" (0+ whitespace)
-                        (group-n 1 ?\" (0+ anychar) ?\") (0+ whitespace) ?} (0+ whitespace) ?}))))
-    (with-temp-buffer
-      (insert response)
-      ;; We use the quick and dirty solution of just looking for any line that
-      ;; has a "text" field.
-      (let ((matched-lines))
-        (goto-char (point-min))
-        (while (re-search-forward "\"text\":" nil t)
-          (push (buffer-substring-no-properties
-                 (line-beginning-position)
-                 (line-end-position))
-                matched-lines))
-        (mapconcat (lambda (line)
-                     (if (string-match regex line)
-                         (read (match-string 1 line))
-                       (warn "Could not parse streaming response: %s" line)))
-                   (nreverse matched-lines) "")))))
+(cl-defmethod llm-provider-streaming-media-handler ((_ llm-claude)
+                                                    msg-receiver _ err-receiver)
+  (cons 'text/event-stream
+	    (plz-event-source:text/event-stream
+         :events `((message_start . ignore)
+                   (content_block_start . ignore)
+                   (ping . ignore)
+                   (message_stop . ignore)
+                   (content_block_stop . ignore)
+                   (error . ,(lambda (event)
+                               (funcall err-receiver (plz-event-source-event-data event))))
+                   (content_block_delta
+                    .
+                    ,(lambda (event)
+                       (let* ((data (plz-event-source-event-data event))
+			                  (json (json-parse-string data :object-type 'alist))
+                              (delta (assoc-default 'delta json))
+                              (type (assoc-default 'type delta)))
+                         (when (equal type "text_delta")
+                           (funcall msg-receiver (assoc-default 'text delta))))))))))
 
 (cl-defmethod llm-provider-headers ((provider llm-claude))
   `(("x-api-key" . ,(llm-claude-key provider))

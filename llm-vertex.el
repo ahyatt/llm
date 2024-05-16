@@ -25,7 +25,7 @@
 
 (require 'cl-lib)
 (require 'llm)
-(require 'llm-request)
+(require 'llm-request-plz)
 (require 'llm-provider-utils)
 (require 'json)
 
@@ -174,19 +174,6 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
 (cl-defmethod llm-provider-extract-streamed-function-calls ((provider llm-google) response)
   (llm-provider-extract-function-calls provider (json-read-from-string response)))
 
-(cl-defmethod llm-provider-extract-partial-response ((_ llm-google) response)
-  "Return the partial response from as much of RESPONSE as we can parse."
-  (with-temp-buffer
-    (insert response)
-    (let ((result ""))
-      ;; We just will parse every line that is "text": "..." and concatenate them.   
-      (save-excursion
-        (goto-char (point-min))
-        (while (re-search-forward (rx (seq (literal "\"text\": ")
-                                           (group-n 1 ?\" (* any) ?\") line-end)) nil t)
-          (setq result (concat result (json-read-from-string (match-string 1))))))
-      result)))
-
 (cl-defmethod llm-provider-chat-request ((_ llm-google) prompt _)
   (llm-provider-utils-combine-to-user-prompt prompt llm-vertex-example-prelude)
   (append
@@ -253,8 +240,22 @@ nothing to add, in which case it is nil."
                  (args . ,(llm-provider-utils-function-call-args fc))))))
            calls)))
 
+(cl-defmethod llm-provider-streaming-media-handler ((provider llm-google)
+                                                    msg-receiver fc-receiver _)
+  (cons 'application/json
+        (plz-media-type:application/json-array
+         :handler
+         (lambda (element)
+           (if-let ((response (llm-provider-chat-extract-result provider element)))
+	       (funcall msg-receiver response)
+	     (when-let ((fc (llm-provider-extract-function-calls provider element)))
+                 (funcall fc-receiver fc)))))))
+
+(cl-defmethod llm-provider-collect-streaming-function-data ((_ llm-google) data)
+  (car data))
+
 (defun llm-vertex--chat-url (provider &optional streaming)
-"Return the correct url to use for PROVIDER.
+  "Return the correct url to use for PROVIDER.
 If STREAMING is non-nil, use the URL for the streaming API."
   (format "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:%s"
           llm-vertex-gcloud-region

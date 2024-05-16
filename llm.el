@@ -4,8 +4,8 @@
 
 ;; Author: Andrew Hyatt <ahyatt@gmail.com>
 ;; Homepage: https://github.com/ahyatt/llm
-;; Package-Requires: ((emacs "28.1"))
-;; Package-Version: 0.14.2
+;; Package-Requires: ((emacs "28.1") (plz "0.8"))
+;; Package-Version: 0.14.3
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;
 ;; This program is free software; you can redistribute it and/or
@@ -518,6 +518,9 @@ methods."
   (cl-letf (((symbol-function 'url-http-async-sentinel) (lambda (_ _)))
             (kill-buffer-query-functions nil))
     (kill-buffer buf)))
+
+(cl-defmethod llm-cancel-request ((proc process))
+  (delete-process proc))
 
 (cl-defgeneric llm-name (_)
   "Return the name of the model in PROVIDER.
