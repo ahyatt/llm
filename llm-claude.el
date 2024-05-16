@@ -102,7 +102,7 @@
 (cl-defmethod llm-provider-streaming-media-handler ((_ llm-claude)
                                                     msg-receiver _ err-receiver)
   (cons 'text/event-stream
-	    (plz-event-source:text/event-stream
+        (plz-event-source:text/event-stream
          :events `((message_start . ignore)
                    (content_block_start . ignore)
                    (ping . ignore)
@@ -114,7 +114,7 @@
                     .
                     ,(lambda (event)
                        (let* ((data (plz-event-source-event-data event))
-			                  (json (json-parse-string data :object-type 'alist))
+                              (json (json-parse-string data :object-type 'alist))
                               (delta (assoc-default 'delta json))
                               (type (assoc-default 'type delta)))
                          (when (equal type "text_delta")

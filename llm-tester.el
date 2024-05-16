@@ -119,7 +119,7 @@
     (llm-chat-streaming
      provider
      (llm-make-chat-prompt
-      "Write a medium length poem in iambic pentameter about the pleasures of using Emacs.  The poem should make snide references to vi."      
+      "Write a medium length poem in iambic pentameter about the pleasures of using Emacs.  The poem should make snide references to vi."
       :temperature 0.5)
      (lambda (text)
        (unless (eq buf (current-buffer))

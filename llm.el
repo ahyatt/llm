@@ -79,7 +79,7 @@ ROLE can a symbol, of either `user', `assistant', or `function'.
 FUNCTION-CALL-RESULTS is a struct of type
 `llm-chat-prompt-function-call-results', which is only populated
 if `role' is `function'. It stores the results of just one
-function call."  
+function call."
   role content function-call-result)
 
 (cl-defstruct llm-chat-prompt-function-call-result
@@ -379,7 +379,7 @@ be passed to `llm-cancel-request'."
 (cl-defmethod llm-chat-streaming :around (provider prompt partial-callback response-callback error-callback)
   "Log the input to llm-chat-async."
   (llm--log 'api-send :provider provider :prompt prompt)
-  ;; We need to wrap the callbacks before we set llm-log to nil. 
+  ;; We need to wrap the callbacks before we set llm-log to nil.
   (let* ((new-partial-callback (lambda (response)
                                  (when partial-callback
                                    (llm--log 'api-receive-partial :provider provider :msg response)

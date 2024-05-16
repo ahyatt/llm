@@ -198,7 +198,7 @@ return a list of `llm-chat-function-call' structs.")
                       data
                     (or (llm-provider-embedding-extract-error
                          provider data)
-			            "Unknown error")))))))
+                        "Unknown error")))))))
 
 (cl-defmethod llm-chat ((provider llm-standard-chat-provider) prompt)
   (llm-provider-request-prelude provider)
@@ -254,12 +254,12 @@ return a list of `llm-chat-function-call' structs.")
      :media-type (llm-provider-streaming-media-handler
                   provider
                   (lambda (s)
-		            (when (> (length s) 0)
+                    (when (> (length s) 0)
                       (setq current-text
                             (concat current-text s))
                       (when partial-callback
-			            (llm-provider-utils-callback-in-buffer
-			             buf partial-callback current-text))))
+                        (llm-provider-utils-callback-in-buffer
+                         buf partial-callback current-text))))
                   (lambda (fc-new) (push fc-new fc))
                   (lambda (err)
                     (llm-provider-utils-callback-in-buffer
@@ -273,7 +273,7 @@ return a list of `llm-chat-function-call' structs.")
          provider prompt
          current-text
          (llm-provider-collect-streaming-function-data
-		  provider (nreverse fc)))))
+          provider (nreverse fc)))))
      :on-error (lambda (_ data)
                  (llm-provider-utils-callback-in-buffer
                   buf error-callback 'error

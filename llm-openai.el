@@ -209,14 +209,14 @@ RESPONSE can be nil if the response is complete."
 
 (cl-defmethod llm-provider-streaming-media-handler ((_ llm-openai) msg-receiver fc-receiver _)
   (cons 'text/event-stream
-	    (plz-event-source:text/event-stream
+        (plz-event-source:text/event-stream
          :events `((message
                     .
-		            ,(lambda (event)
-		               (let ((data (plz-event-source-event-data event)))
-			             (unless (equal data "[DONE]")
-			               (when-let ((response (llm-openai--get-partial-chat-response
-						                         (json-read-from-string data))))
+                    ,(lambda (event)
+                       (let ((data (plz-event-source-event-data event)))
+                         (unless (equal data "[DONE]")
+                           (when-let ((response (llm-openai--get-partial-chat-response
+                                                 (json-read-from-string data))))
                              (funcall (if (stringp response) msg-receiver fc-receiver) response))))))))))
 
 (cl-defmethod llm-provider-collect-streaming-function-data ((_ llm-openai) data)
@@ -224,19 +224,19 @@ RESPONSE can be nil if the response is complete."
     (dotimes (i (length (car data)))
       (setf (aref cvec i) (make-llm-provider-utils-function-call)))
     (cl-loop for part in data do
-	     (cl-loop for call in (append part nil) do
-		      (let* ((index (assoc-default 'index call))
-			     (id (assoc-default 'id call))
-			     (function (assoc-default 'function call))
-			     (name (assoc-default 'name function))
-			     (arguments (assoc-default 'arguments function)))
-			(when id
-			  (setf (llm-provider-utils-function-call-id (aref cvec index)) id))
-			(when name
-			  (setf (llm-provider-utils-function-call-name (aref cvec index)) name))
-			(setf (llm-provider-utils-function-call-args (aref cvec index))
-			      (concat (llm-provider-utils-function-call-args (aref cvec index))
-				      arguments)))))
+         (cl-loop for call in (append part nil) do
+              (let* ((index (assoc-default 'index call))
+                 (id (assoc-default 'id call))
+                 (function (assoc-default 'function call))
+                 (name (assoc-default 'name function))
+                 (arguments (assoc-default 'arguments function)))
+            (when id
+              (setf (llm-provider-utils-function-call-id (aref cvec index)) id))
+            (when name
+              (setf (llm-provider-utils-function-call-name (aref cvec index)) name))
+            (setf (llm-provider-utils-function-call-args (aref cvec index))
+                  (concat (llm-provider-utils-function-call-args (aref cvec index))
+                      arguments)))))
     (cl-loop for call in (append cvec nil)
              do (setf (llm-provider-utils-function-call-args call)
                       (json-read-from-string (llm-provider-utils-function-call-args call)))

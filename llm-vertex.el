@@ -247,8 +247,8 @@ nothing to add, in which case it is nil."
          :handler
          (lambda (element)
            (if-let ((response (llm-provider-chat-extract-result provider element)))
-	       (funcall msg-receiver response)
-	     (when-let ((fc (llm-provider-extract-function-calls provider element)))
+           (funcall msg-receiver response)
+         (when-let ((fc (llm-provider-extract-function-calls provider element)))
                  (funcall fc-receiver fc)))))))
 
 (cl-defmethod llm-provider-collect-streaming-function-data ((_ llm-google) data)
@@ -294,7 +294,7 @@ If STREAMING is non-nil, use the URL for the streaming API."
 
 (cl-defmethod llm-count-tokens ((provider llm-google) string)
   (llm-provider-request-prelude provider)
-  (let ((response (llm-request-sync 
+  (let ((response (llm-request-sync
                    (llm-google-count-tokens-url provider)
                    :headers (llm-provider-headers provider)
                    :data (llm-vertex--to-count-token-request
