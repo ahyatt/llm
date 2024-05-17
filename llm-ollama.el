@@ -27,7 +27,6 @@
 
 (require 'cl-lib)
 (require 'llm)
-(require 'llm-request-plz)
 (require 'llm-provider-utils)
 (require 'json)
 (require 'plz-media-type)

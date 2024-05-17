@@ -31,7 +31,6 @@
 
 ;;; Code:
 (require 'llm)
-(require 'llm-request)
 (require 'llm-openai)
 (require 'llm-provider-utils)
 

@@ -28,7 +28,6 @@
 (require 'llm)
 (require 'cl-lib)
 (require 'llm-openai)
-(require 'llm-request)
 (require 'llm-provider-utils)
 (require 'json)
 

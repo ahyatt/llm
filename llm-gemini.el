@@ -28,7 +28,6 @@
 
 (require 'cl-lib)
 (require 'llm)
-(require 'llm-request-plz)
 (require 'llm-vertex)
 (require 'llm-provider-utils)
 (require 'json)

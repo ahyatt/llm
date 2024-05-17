@@ -26,7 +26,6 @@
 ;;; Code:
 
 (require 'llm)
-(require 'llm-request)
 (require 'llm-provider-utils)
 (require 'plz-event-source)
 (require 'rx)
