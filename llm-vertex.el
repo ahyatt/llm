@@ -151,8 +151,7 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
                              (assoc-default 'content
                                             (aref (assoc-default 'candidates response) 0)))))
                  (when parts
-                   (assoc-default 'text (aref parts 0))))
-             "NOTE: No response was sent back by the LLM, the prompt may have violated safety checks."))))
+                   (assoc-default 'text (aref parts 0))))))))
 
 (cl-defmethod llm-provider-extract-function-calls ((provider llm-google) response)
   (if (vectorp response)
@@ -241,15 +240,18 @@ nothing to add, in which case it is nil."
            calls)))
 
 (cl-defmethod llm-provider-streaming-media-handler ((provider llm-google)
-                                                    msg-receiver fc-receiver _)
+                                                    msg-receiver fc-receiver
+                                                    err-receiver)
   (cons 'application/json
         (plz-media-type:application/json-array
          :handler
          (lambda (element)
+           (when-let ((err-response (llm-provider-chat-extract-error provider element)))
+             (funcall err-receiver err-response))
            (if-let ((response (llm-provider-chat-extract-result provider element)))
-           (funcall msg-receiver response)
-         (when-let ((fc (llm-provider-extract-function-calls provider element)))
-                 (funcall fc-receiver fc)))))))
+               (funcall msg-receiver response)
+             (when-let ((fc (llm-provider-extract-function-calls provider element)))
+               (funcall fc-receiver fc)))))))
 
 (cl-defmethod llm-provider-collect-streaming-function-data ((_ llm-google) data)
   (car data))

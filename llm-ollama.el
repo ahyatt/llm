@@ -82,6 +82,12 @@ EMBEDDING-MODEL is the model to use for embeddings.  It is required."
 (cl-defmethod llm-provider-chat-timeout ((_ llm-ollama))
   llm-ollama-chat-timeout)
 
+(cl-defmethod llm-provider-embedding-extract-error ((_ llm-ollama) response)
+  (assoc-default 'error response))
+
+(cl-defmethod llm-provider-chat-extract-error ((_ llm-ollama) response)
+  (assoc-default 'error response))
+
 (cl-defmethod llm-provider-embedding-request ((provider llm-ollama) string)
   "Return the request to the server for the embedding of STRING.
 PROVIDER is the llm-ollama provider."
