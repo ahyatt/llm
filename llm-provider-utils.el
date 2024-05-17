@@ -161,6 +161,7 @@ return a list of `llm-chat-function-call' structs.")
 
 (cl-defmethod llm-provider-collect-streaming-function-data ((provider llm-standard-chat-provider) data)
   "By default, there is no streaming function calling."
+  (ignore provider data)
   nil)
 
 ;; Standard provider implementations of llm functionality
@@ -266,7 +267,8 @@ return a list of `llm-chat-function-call' structs.")
                      buf error-callback 'error
                      err)))
      :on-success
-     (lambda (data)
+     (lambda (_)
+       ;; We don't need the data at the end of streaming, so we can ignore it.
        (llm-provider-utils-callback-in-buffer
         buf response-callback
         (llm-provider-utils-process-result
