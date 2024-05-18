@@ -50,7 +50,7 @@
 
 (defcustom llm-log nil
   "Whether to log messages to the llm module.
-Logs will be in the buffer *llm log*. This should only be used
+Logs will be in the buffer *llm log*.  This should only be used
 for debugging, because the log buffer will grow without bound."
   :type 'boolean)
 
@@ -78,7 +78,7 @@ ROLE can a symbol, of either `user', `assistant', or `function'.
 
 FUNCTION-CALL-RESULTS is a struct of type
 `llm-chat-prompt-function-call-results', which is only populated
-if `role' is `function'. It stores the results of just one
+if `role' is `function'.  It stores the results of just one
 function call."
   role content function-call-result)
 
@@ -87,9 +87,9 @@ function call."
 
 CALL-ID is an ID for this function call, if available.
 
-FUNCTION-NAME is the name of the function. This is required.
+FUNCTION-NAME is the name of the function.  This is required.
 
-RESULT is the result of the function call. This is required."
+RESULT is the result of the function call.  This is required."
   call-id function-name result)
 
 (cl-defstruct llm-function-call
@@ -101,7 +101,7 @@ NAME is a human readable name of the function.
 
 DESCRIPTION is a human readable description of the function.
 
-ARGS is a list of `llm-function-arg' structs. "
+ARGS is a list of `llm-function-arg' structs."
   function
   name
   description
@@ -112,10 +112,10 @@ ARGS is a list of `llm-function-arg' structs. "
 
 NAME is the name of the argument.
 
-DESCRIPTION is a human readable description of the argument. It
+DESCRIPTION is a human readable description of the argument.  It
 can be nil for enums.
 
-TYPE is the type of the argument. It can be one of `string',
+TYPE is the type of the argument.  It can be one of `string',
 `integer', `float', `boolean' or the special lists, `(or <type1>
 <type2> ... <typen>)', `(enum <string1> <string2> ...
 <stringn>)', or `(list <type>)'.
@@ -129,7 +129,7 @@ REQUIRED is whether this is required or not."
 (cl-defun llm--log (type &key provider prompt msg)
   "Log a MSG of TYPE, given PROVIDER, PROMPT, and MSG.
 These are all optional, each one should be the normal meaning of
-this variable in this library. TYPE can be one of `api-send',
+this variable in this library.  TYPE can be one of `api-send',
 `api-receive-parial', `api-receive-complete', `api-error', or
 `prompt-append'."
   (when llm-log
@@ -197,10 +197,10 @@ to the chat as a whole.  This is optional.
 EXAMPLES is a list of conses, where the car is an example
 inputs, and cdr is the corresponding example outputs.  This is optional.
 
-FUNCTIONS is a list of `llm-function-call' structs. These may be
-called IF the LLM supports them. If the LLM does not support
-them, a `not-implemented' signal will be thrown. This is
-optional. When this is given, the LLM will either call the
+FUNCTIONS is a list of `llm-function-call' structs.  These may be
+called IF the LLM supports them.  If the LLM does not support
+them, a `not-implemented' signal will be thrown.  This is
+optional.  When this is given, the LLM will either call the
 function or return text as normal, depending on what the LLM
 decides.
 
@@ -218,7 +218,7 @@ PREVIOUS-INTERACTIONS)."
   (unless text
     (error "TEXT is required"))
   (when (and (listp text) (zerop (mod (length text) 2)))
-    (error "TEXT, as a list, must have an odd number of elements."))
+    (error "TEXT, as a list, must have an odd number of elements"))
   (make-llm-chat-prompt
    :context context
    :examples examples
@@ -254,7 +254,7 @@ need to override it."
 PROMPT is a `llm-chat-prompt'.
 
 The response is a string response by the LLM when functions are
-not called. If functions are called, the response is a list of
+not called.  If functions are called, the response is a list of
 conses of the function named called (as a symbol), and the
 corresponding result from calling it.
 
@@ -289,7 +289,7 @@ conversation so far."
   "Call RESPONSE-CALLBACK with a response to PROMPT from PROVIDER.
 
 The response is a string response by the LLM when functions are
-not called. If functions are called, the response is a list of
+not called.  If functions are called, the response is a list of
 conses of the function named called (as a symbol), and the
 corresponding result from calling it.
 
@@ -333,22 +333,22 @@ be passed to `llm-cancel-request'."
     result))
 
 (cl-defmethod llm-chat-function-call ((_ (eql nil)) _ _ _)
-  (error "LLM provider was nil.  Please set the provider in the application you are using."))
+  (error "LLM provider was nil.  Please set the provider in the application you are using"))
 
 (cl-defgeneric llm-chat-streaming (provider prompt partial-callback response-callback error-callback)
   "Stream a response to PROMPT from PROVIDER.
 PROMPT is a `llm-chat-prompt'.
 
 The response is a string response by the LLM when functions are
-not called. If functions are called, the response is a list of
+not called.  If functions are called, the response is a list of
 conses of the function named called (as a symbol), and the
 corresponding result from calling it.
 
 PARTIAL-CALLBACK is called with the output of the string response
-as it is built up. The callback is called with the entire
-response that has been received, as it is streamed back. It is
+as it is built up.  The callback is called with the entire
+response that has been received, as it is streamed back.  It is
 not guaranteed to be called with the complete response before
-RESPONSE-CALLBACK is called. This can be nil, so that
+RESPONSE-CALLBACK is called.  This can be nil, so that
 implementations can just define this method which can be called
 by `llm-chat-async', but with a nil value here to never get
 partial callbacks.
@@ -444,10 +444,10 @@ minimum of functionality to be included in this package, which is
 non-streaming chat:
 
 `streaming': the LLM can actually stream responses in the
- streaming call. Calls to `llm-chat-streaming' will work
- regardless even if the LLM doesn't support streaming, it just
- won't have any partial responses, so basically just operates
- like `llm-chat-async'.
+streaming call.  Calls to `llm-chat-streaming' will work
+regardless even if the LLM doesn't support streaming, it just
+won't have any partial responses, so basically just operates like
+`llm-chat-async'.
 
 `embeddings': the LLM can return vector embeddings of text.
 
@@ -458,8 +458,11 @@ non-streaming chat:
 (cl-defgeneric llm-chat-token-limit (provider)
   "Return max number of tokens that can be sent to the LLM.
 For many models we know this number, but for some we don't have
-enough information to know. In those cases we return a default
-value that should be a reasonable lower bound."
+enough information to know.  In those cases we return a default
+value that should be a reasonable lower bound.
+
+PROVIDER is the provider struct that would be used for a LLM
+call."
   (ignore provider)
   2048)
 
@@ -524,7 +527,7 @@ methods."
 
 (cl-defgeneric llm-name (_)
   "Return the name of the model in PROVIDER.
-This is expected to be suitable for short labels. For example, if
+This is expected to be suitable for short labels.  For example, if
 the client wants to have a conversation with prefixes of `user> '
 and a similar label for LLM (for example `Mistral> '), this
 string should be short enough to fit that role.
@@ -533,7 +536,7 @@ Names are expected to be one word where possible, and
 capitalized when appropriate.
 
 This should be the name of the model, not the provider, where it
-makes sense. This is not expected to be unique per provider."
+makes sense.  This is not expected to be unique per provider."
   "LLM")
 
 (defun llm-chat-prompt-to-text (prompt)

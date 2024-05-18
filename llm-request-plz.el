@@ -20,7 +20,7 @@
 ;; assumes the server is using json.
 
 ;;; Code:
-(require 'cl-macs)
+(require 'cl-lib)
 (require 'json)
 (require 'plz-event-source)
 (require 'plz-media-type)
