@@ -5,7 +5,7 @@
 ;; Author: Andrew Hyatt <ahyatt@gmail.com>
 ;; Homepage: https://github.com/ahyatt/llm
 ;; Package-Requires: ((emacs "28.1") (plz "0.8"))
-;; Package-Version: 0.14.3
+;; Package-Version: 0.15.0
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;
 ;; This program is free software; you can redistribute it and/or
@@ -323,7 +323,7 @@ be passed to `llm-cancel-request'."
                                     (funcall response-callback response))))
          (new-error-callback (lambda (type err)
                                (llm--log 'api-error :provider provider
-                                           :msg (format "Error type: %s, message: %s" type err))
+                                         :msg (format "Error type: %s, message: %s" type err))
                                (let ((llm-log nil))
                                  (funcall error-callback type err))))
          (llm-log nil)
@@ -391,7 +391,7 @@ be passed to `llm-cancel-request'."
                                     (funcall response-callback response))))
          (new-error-callback (lambda (type err)
                                (llm--log 'api-error :provider provider
-                                           :msg (format "Error type: %s, message: %s" type err))
+                                         :msg (format "Error type: %s, message: %s" type err))
                                (let ((llm-log nil))
                                  (funcall error-callback type err))))
          (llm-log nil)

@@ -1,4 +1,4 @@
-* Version 0.15
+* Version 0.15.0
 - Move to =plz= backend, which uses =curl=.  This helps move this package to a
   stronger foundation backed by parsing to spec.  Thanks to Roman Scherer for
   contributing the =plz= extensions that enable this, which are currently bundled
