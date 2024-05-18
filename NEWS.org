@@ -3,6 +3,8 @@
   stronger foundation backed by parsing to spec.  Thanks to Roman Scherer for
   contributing the =plz= extensions that enable this, which are currently bundled
   in this package but will eventually become their own separate package.
+- Add model context information for Open AI's GPT 4-o.
+- Add model context information for Gemini's 1.5 models.
 * Version 0.14.2
 - Fix mangled copyright line (needed to get ELPA version unstuck).
 - Fix Vertex response handling bug.

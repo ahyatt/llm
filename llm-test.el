@@ -97,17 +97,22 @@
     (should-have-token-limit "gpt-4" 8192)
     (should-have-token-limit "gpt-4-32k" 32768)
     (should-have-token-limit "gpt-4-0613" 8192)
-    (should-have-token-limit "gpt-4-32k-0613" 32768)))
+    (should-have-token-limit "gpt-4-32k-0613" 32768)
+    (should-have-token-limit "gpt-4o" 128000)))
 
 (ert-deftest llm-test-chat-token-limit-gemini ()
   (should (= 30720 (llm-chat-token-limit (make-llm-gemini))))
   (should (= 12288 (llm-chat-token-limit
-                    (make-llm-gemini :chat-model "gemini-pro-vision")))))
+                    (make-llm-gemini :chat-model "gemini-pro-vision"))))
+  (should (= 1048576 (llm-chat-token-limit
+                      (make-llm-gemini :chat-model "gemini-1.5-flash")))))
 
 (ert-deftest llm-test-chat-token-limit-vertex ()
   (should (= 30720 (llm-chat-token-limit (make-llm-vertex))))
   (should (= 12288 (llm-chat-token-limit
-                    (make-llm-vertex :chat-model "gemini-pro-vision")))))
+                    (make-llm-vertex :chat-model "gemini-pro-vision"))))
+  (should (= 1048576 (llm-chat-token-limit
+                      (make-llm-gemini :chat-model "gemini-1.5-flash")))))
 
 (ert-deftest llm-test-chat-token-limit-ollama ()
   ;; The code is straightforward, so no need to test all the models.

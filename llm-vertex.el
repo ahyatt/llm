@@ -190,7 +190,7 @@ the key must be regenerated every hour."
                                                 'function))
                                     (stringp (llm-chat-prompt-interaction-content interaction)))
                                `(((text . ,(llm-chat-prompt-interaction-content
-                                           interaction))))
+                                            interaction))))
                              (if (eq 'function
                                      (llm-chat-prompt-interaction-role interaction))
                                  (let ((fc (llm-chat-prompt-interaction-function-call-result interaction)))
@@ -214,7 +214,7 @@ the key must be regenerated every hour."
                                                  .
                                                  ,(llm-provider-utils-openai-arguments
                                                    (llm-function-call-args tool))))))))
-                           (llm-chat-prompt-functions prompt)))))
+                 (llm-chat-prompt-functions prompt)))))
    (llm-vertex--chat-parameters prompt)))
 
 (defun llm-vertex--chat-parameters (prompt)
@@ -223,8 +223,8 @@ Return value is a cons for adding to an alist, unless there is
 nothing to add, in which case it is nil."
   (let ((params-alist))
     (when (llm-chat-prompt-temperature prompt)
-            (push `(temperature . ,(llm-chat-prompt-temperature prompt))
-                  params-alist))
+      (push `(temperature . ,(llm-chat-prompt-temperature prompt))
+            params-alist))
     (when (llm-chat-prompt-max-tokens prompt)
       (push `(maxOutputTokens . ,(llm-chat-prompt-max-tokens prompt)) params-alist))
     (when params-alist
@@ -318,6 +318,7 @@ If STREAMING is non-nil, use the URL for the streaming API."
   "Get token limit for MODEL."
   (cond ((equal "gemini-pro" model) 30720)
         ((equal "gemini-pro-vision" model) 12288)
+        ((string-match-p (rx (seq "gemini-1.5")) model) 1048576)
         ;; This shouldn't happen unless there's a new model, which could be a
         ;; smaller or larger model.  We'll play it safe and choose a reasonable
         ;; number.

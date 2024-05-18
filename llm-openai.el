@@ -127,10 +127,10 @@ PROVIDER is the Open AI provider struct."
 
 (cl-defmethod llm-provider-embedding-extract-error ((_ llm-openai) err-response)
   (let ((errdata (assoc-default 'error err-response)))
-      (when errdata
-        (format "Open AI returned error: %s message: %s"
-                (cdr (assoc 'type errdata))
-                (cdr (assoc 'message errdata))))))
+    (when errdata
+      (format "Open AI returned error: %s message: %s"
+              (cdr (assoc 'type errdata))
+              (cdr (assoc 'message errdata))))))
 
 (cl-defmethod llm-provider-chat-extract-error ((provider llm-openai) err-response)
   (llm-provider-embedding-extract-error provider err-response))
@@ -224,24 +224,24 @@ RESPONSE can be nil if the response is complete."
     (dotimes (i (length (car data)))
       (setf (aref cvec i) (make-llm-provider-utils-function-call)))
     (cl-loop for part in data do
-         (cl-loop for call in (append part nil) do
-              (let* ((index (assoc-default 'index call))
-                 (id (assoc-default 'id call))
-                 (function (assoc-default 'function call))
-                 (name (assoc-default 'name function))
-                 (arguments (assoc-default 'arguments function)))
-            (when id
-              (setf (llm-provider-utils-function-call-id (aref cvec index)) id))
-            (when name
-              (setf (llm-provider-utils-function-call-name (aref cvec index)) name))
-            (setf (llm-provider-utils-function-call-args (aref cvec index))
-                  (concat (llm-provider-utils-function-call-args (aref cvec index))
-                      arguments)))))
+             (cl-loop for call in (append part nil) do
+                      (let* ((index (assoc-default 'index call))
+                             (id (assoc-default 'id call))
+                             (function (assoc-default 'function call))
+                             (name (assoc-default 'name function))
+                             (arguments (assoc-default 'arguments function)))
+                        (when id
+                          (setf (llm-provider-utils-function-call-id (aref cvec index)) id))
+                        (when name
+                          (setf (llm-provider-utils-function-call-name (aref cvec index)) name))
+                        (setf (llm-provider-utils-function-call-args (aref cvec index))
+                              (concat (llm-provider-utils-function-call-args (aref cvec index))
+                                      arguments)))))
     (cl-loop for call in (append cvec nil)
              do (setf (llm-provider-utils-function-call-args call)
                       (json-read-from-string (llm-provider-utils-function-call-args call)))
              finally return (when (> (length cvec) 0)
-                  (append cvec nil)))))
+                              (append cvec nil)))))
 
 (cl-defmethod llm-name ((_ llm-openai))
   "Return the name of the provider."
@@ -258,8 +258,9 @@ RESPONSE can be nil if the response is complete."
         ;; models, but not for 32k models.
         (+ (* n 1024) (if (= n 16) 1 0))))
      ((equal model "gpt-4") 8192)
+     ((equal model "gpt-4o") 128000)
      ((string-match-p (rx (seq "gpt-4-" (+ ascii) "-preview")) model)
-       128000)
+      128000)
      ((string-match-p (rx (seq "gpt-4-" (+ digit))) model)
       8192)
      ((string-match-p (rx (seq "gpt-3.5-turbo-1" (+ digit))) model)
