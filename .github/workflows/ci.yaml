@@ -7,32 +7,33 @@ on:
   pull_request:
     branches: [ "main" ]
 
-test:
-  runs-on: ubuntu-latest
-  strategy:
-    matrix:
-      emacs_version:
-        # Add more lines like this if you want to test on different Emacs versions.
-        - 28.1
-        - 28.2
-        - 29.1
-        - 29.2
-  steps:
-  - name: Set up Emacs
-    uses: jcs090218/setup-emacs@master
-    with:
-      version: ${{matrix.emacs_version}}
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        emacs_version:
+          # Add more lines like this if you want to test on different Emacs versions.
+          - 28.1
+          - 28.2
+          - 29.1
+          - 29.2
+    steps:
+    - name: Set up Emacs
+      uses: jcs090218/setup-emacs@master
+      with:
+        version: ${{matrix.emacs_version}}
 
-  - name: Install Eldev
-    uses: emacs-eldev/setup-eldev@v1
+    - name: Install Eldev
+      uses: emacs-eldev/setup-eldev@v1
 
-  - name: Check out the source code
-    uses: actions/checkout@v4
+    - name: Check out the source code
+      uses: actions/checkout@v4
 
-  - name: Lint the project
-    run: |
-      eldev -p -dtT lint
+    - name: Lint the project
+      run: |
+        eldev -p -dtT lint
 
-  - name: Test the project
-    run: |
-      eldev -p -dtT test
+    - name: Test the project
+      run: |
+        eldev -p -dtT test
