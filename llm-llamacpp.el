@@ -31,8 +31,6 @@
 (require 'llm-provider-utils)
 (require 'json)
 
-(lwarn 'llm-llamacpp :warning "The LlamaCPP module is deprecated, you should use the Open AI Compatible provider instead")
-
 (defgroup llm-llamacpp nil
   "LLM implementation for llama.cpp."
   :group 'llm)
@@ -55,6 +53,8 @@ This is needed because there is no API support for previous chat conversation."
 (defun llm-llamacpp--url (provider path)
   "From PROVIDER, return the URL for llama.cpp.
 PATH is the path to append to the URL, not prefixed with a slash."
+  (lwarn 'llm-llamacpp :warning
+         "The LlamaCPP module is deprecated, you should use the Open AI Compatible provider instead")
   (let ((scheme (llm-llamacpp-scheme provider))
         (host (llm-llamacpp-host provider))
         (port (llm-llamacpp-port provider)))
@@ -67,8 +67,7 @@ PATH is the path to append to the URL, not prefixed with a slash."
   (llm-llamacpp--url provider "chat/completions"))
 
 (cl-defmethod llm-name ((_ llm-llamacpp))
-  ;; We don't actually know the name of the model, so we have to just name Llama
-  ;; CPP itself.
+  "Name of Llama CPP, because we don't know the model name."
   "Llama CPP")
 
 (cl-defmethod llm-capabilities ((_ llm-llamacpp))

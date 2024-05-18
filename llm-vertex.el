@@ -23,6 +23,8 @@
 ;; This file implements the llm functionality defined in llm.el, for Google
 ;; Cloud Vertex AI.
 
+;;; Code:
+
 (require 'cl-lib)
 (require 'llm)
 (require 'llm-request-plz)
@@ -53,7 +55,7 @@ This is only used for streaming calls."
 (defcustom llm-vertex-default-max-output-tokens 500
   "The default maximum number of tokens to ask for.
 This is only used when setting the maximum tokens is required,
-and there is no default. The maximum value possible here is 2049."
+and there is no default.  The maximum value possible here is 2049."
   :type 'integer
   :group 'llm-vertex)
 
@@ -71,14 +73,17 @@ Gemini.")
 (cl-defstruct (llm-vertex (:include llm-google))
   "A struct representing a Vertex AI client.
 
-KEY is the temporary API key for the Vertex AI. It is required to
+KEY is the temporary API key for the Vertex AI.  It is required to
 be populated before any call.
 
-CHAT-MODEL is the name of the chat model to use. If unset, will use a reasonable default.
+CHAT-MODEL is the name of the chat model to use.  If unset, will
+use a reasonable default.
 
-EMBEDDING-MODEL is the name of the embedding model to use. If unset, will use a reasonable default.
+EMBEDDING-MODEL is the name of the embedding model to use.  If
+unset, will use a reasonable default.
 
-KEY-GENTIME keeps track of when the key was generated, because the key must be regenerated every hour."
+KEY-GENTIME keeps track of when the key was generated, because
+the key must be regenerated every hour."
   key
   project
   embedding-model
@@ -99,9 +104,6 @@ KEY-GENTIME keeps track of when the key was generated, because the key must be r
       ;; the user is using multibyte strings.
       (setf (llm-vertex-key provider) (encode-coding-string result 'utf-8)))
     (setf (llm-vertex-key-gentime provider) (current-time))))
-
-(cl-defmethod llm-nonfree-message-info ((_ llm-vertex))
-  "https://policies.google.com/terms/generative-ai")
 
 (cl-defmethod llm-provider-embedding-url ((provider llm-vertex))
   (format "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:predict"
@@ -281,7 +283,7 @@ If STREAMING is non-nil, use the URL for the streaming API."
                                (not (eq (car c) 'parameters)))) request))
 
 (defun llm-vertex--count-tokens-extract-response (response)
-  "Extract the token count from the response."
+  "Extract the token count from the RESPONSE."
   (assoc-default 'totalTokens response))
 
 (cl-defgeneric llm-google-count-tokens-url (provider)
@@ -309,6 +311,7 @@ If STREAMING is non-nil, use the URL for the streaming API."
     (llm-vertex--count-tokens-extract-response response)))
 
 (cl-defmethod llm-name ((_ llm-vertex))
+  "Return the name of the provider."
   "Gemini")
 
 (defun llm-vertex--chat-token-limit (model)
@@ -316,7 +319,7 @@ If STREAMING is non-nil, use the URL for the streaming API."
   (cond ((equal "gemini-pro" model) 30720)
         ((equal "gemini-pro-vision" model) 12288)
         ;; This shouldn't happen unless there's a new model, which could be a
-        ;; smaller or larger model. We'll play it safe and choose a reasonable
+        ;; smaller or larger model.  We'll play it safe and choose a reasonable
         ;; number.
         (t 4096)))
 

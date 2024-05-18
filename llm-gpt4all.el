@@ -55,7 +55,7 @@ default the default GPT4all port."
   (llm-chat-async provider prompt response-callback error-callback))
 
 (cl-defmethod llm-name ((provider llm-gpt4all))
-  "Return the name of the provider."
+  "Return the name of the PROVIDER."
   (llm-gpt4all-chat-model provider))
 
 (cl-defmethod llm-chat-token-limit ((provider llm-gpt4all))

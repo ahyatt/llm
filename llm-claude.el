@@ -36,10 +36,10 @@
   (chat-model "claude-3-opus-20240229" :read-only t))
 
 (cl-defmethod llm-nonfree-message-info ((_ llm-claude))
+  "Return Claude's nonfree ToS."
   "https://www.anthropic.com/legal/consumer-terms")
 
 (cl-defmethod llm-provider-prelude ((provider llm-claude))
-  "Check if the API key is valid, error if not."
   (unless (llm-claude-key provider)
     (error "No API key provided for Claude")))
 
@@ -130,6 +130,7 @@
             (assoc-default 'message err))))
 
 (cl-defmethod llm-provider-chat-url ((_ llm-claude))
+  "Return the URL for the Claude API."
   "https://api.anthropic.com/v1/messages")
 
 ;; See https://docs.anthropic.com/claude/docs/models-overview
@@ -140,6 +141,7 @@
     (_ 200000)))
 
 (cl-defmethod llm-name ((_ llm-claude))
+  "Return the name of the provider."
   "Claude")
 
 (cl-defmethod llm-capabilities ((_ llm-claude))

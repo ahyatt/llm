@@ -16,8 +16,8 @@
 ;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
 
 ;;; Commentary:
-;; This file provides basic functions for providers who need to request data. It
-;; assumes the server is using json.
+;; This file provides basic functions for providers who need to request data.
+;; It assumes the server is using json.
 
 ;;; Code:
 (require 'cl-lib)
@@ -53,7 +53,7 @@ not very long so that we can end stuck requests."
   "Make a request to URL.  The raw text response will be returned.
 
 HEADERS will be added in the Authorization header, in addition to
-standard json header. This is optional.
+standard json header.  This is optional.
 
 DATA will be jsonified and sent as the request body.
 This is required.
@@ -89,7 +89,7 @@ TIMEOUT is the number of seconds to wait for a response."
   "Make a request to URL.  The parsed response will be returned.
 
 HEADERS will be added in the Authorization header, in addition to
-standard json header. This is optional.
+the standard json header.  This is optional.
 
 DATA will be jsonified and sent as the request body.
 This is required.
@@ -121,13 +121,13 @@ TIMEOUT is the number of seconds to wait for a response."
 Nothing will be returned.
 
 HEADERS will be added in the Authorization header, in addition to
-standard json header. This is optional.
+standard json header.  This is optional.
 
 DATA will be jsonified and sent as the request body.
 This is required.
 
 ON-SUCCESS will be called with the response body as a json
-object. This is optional in the case that ON-SUCCESS-DATA is set,
+object.  This is optional in the case that ON-SUCCESS-DATA is set,
 and required otherwise.
 
 ON-ERROR will be called with the error code and a response-body.

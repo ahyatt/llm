@@ -1,4 +1,4 @@
-;;; llm.el --- Interface to pluggable llm backends -*- lexical-binding: t -*-
+;;; llm.el --- Interface to pluggable llm backends -*- lexical-binding: t; byte-compile-docstring-max-column: 200 -*-
 
 ;; Copyright (c) 2023  Free Software Foundation, Inc.
 

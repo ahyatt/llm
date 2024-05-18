@@ -21,7 +21,7 @@
 
 ;;; Commentary:
 ;; This file implements the llm functionality defined in llm.el, for Ollama, an
-;; interface to running LLMs locally. Ollama can be found at https://ollama.ai/.
+;; interface to running LLMs locally.  Ollama can be found at https://ollama.ai/.
 
 ;;; Code:
 
@@ -48,20 +48,20 @@
 (cl-defstruct (llm-ollama (:include llm-standard-full-provider))
   "A structure for holding information needed by Ollama's API.
 
-SCHEME is the http scheme to use, a string. It is optional and
+SCHEME is the http scheme to use, a string.  It is optional and
 default to `http'.
 
-HOST is the host that Ollama is running on. It is optional and
+HOST is the host that Ollama is running on.  It is optional and
 default to localhost.
 
 PORT is the localhost port that Ollama is running on.  It is optional.
 
-CHAT-MODEL is the model to use for chat queries. It is required.
+CHAT-MODEL is the model to use for chat queries.  It is required.
 
 EMBEDDING-MODEL is the model to use for embeddings.  It is required."
   (scheme "http") (host "localhost") (port 11434) chat-model embedding-model)
 
-;; Ollama's models may or may not be free, we have no way of knowing. There's no
+;; Ollama's models may or may not be free, we have no way of knowing.  There's no
 ;; way to tell, and no ToS to point out here.
 (cl-defmethod llm-nonfree-message-info ((provider llm-ollama))
   (ignore provider)
@@ -98,7 +98,7 @@ PROVIDER is the llm-ollama provider."
   (assoc-default 'embedding response))
 
 (cl-defmethod llm-provider-chat-extract-result ((_ llm-ollama) response)
-  "Return the chat response from the server RESPONSE"
+  "Return the chat response from the server RESPONSE."
   (assoc-default 'content (assoc-default 'message response)))
 
 (cl-defmethod llm-provider-chat-request ((provider llm-ollama) prompt streaming)

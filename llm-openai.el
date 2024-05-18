@@ -45,7 +45,7 @@
 
 KEY is the API key for Open AI, which is required.
 
-CHAT-MODEL is the model to use for chat queries. If unset, it
+CHAT-MODEL is the model to use for chat queries.  If unset, it
 will use a reasonable default.
 
 EMBEDDING-MODEL is the model to use for embeddings.  If unset, it
@@ -55,18 +55,19 @@ will use a reasonable default."
 (cl-defstruct (llm-openai-compatible (:include llm-openai))
   "A structure for other APIs that use the Open AI's API.
 
-URL is the URL to use for the API, up to the command. So, for
+URL is the URL to use for the API, up to the command.  So, for
 example, if the API for chat is at
 https://api.example.com/v1/chat, then URL should be
 \"https://api.example.com/v1/\"."
   url)
 
 (cl-defmethod llm-nonfree-message-info ((_ llm-openai))
+  "Return Open AI's nonfree terms of service."
   "https://openai.com/policies/terms-of-use")
 
 (cl-defmethod llm-provider-embedding-request ((provider llm-openai) string)
   "Return the request to the server for the embedding of STRING.
-MODEL is the embedding model to use, or nil to use the default.."
+PROVIDER is the Open AI provider struct."
   `(("input" . ,string)
     ("model" . ,(or (llm-openai-embedding-model provider)
                     "text-embedding-3-small"))))
@@ -76,11 +77,11 @@ MODEL is the embedding model to use, or nil to use the default.."
   (assoc-default 'embedding (aref (assoc-default 'data response) 0)))
 
 (cl-defgeneric llm-openai--check-key (provider)
-  "Check that the key is set for the Open AI provider.")
+  "Check that the key is set for the Open AI PROVIDER.")
 
 (cl-defmethod llm-openai--check-key ((provider llm-openai))
   (unless (llm-openai-key provider)
-    (error "To call Open AI API, add a key to the `llm-openai' provider.")))
+    (error "To call Open AI API, add a key to the `llm-openai' provider")))
 
 (cl-defmethod llm-openai--check-key ((_ llm-openai-compatible))
   ;; It isn't always the case that a key is needed for Open AI compatible APIs.
@@ -95,9 +96,9 @@ MODEL is the embedding model to use, or nil to use the default.."
 
 (cl-defmethod llm-openai--headers ((provider llm-openai))
   (when-let ((key (llm-openai-key provider)))
-    ;; Encode the API key to ensure it is unibyte. The request library gets
+    ;; Encode the API key to ensure it is unibyte.  The request library gets
     ;; confused by multibyte headers, which turn the entire body multibyte if
-    ;; there’s a non-ascii character, regardless of encoding. And API keys are
+    ;; there’s a non-ascii character, regardless of encoding.  And API keys are
     ;; likely to be obtained from external sources like shell-command-to-string,
     ;; which always returns multibyte.
     `(("Authorization" . ,(format "Bearer %s" (encode-coding-string key 'utf-8))))))
@@ -243,6 +244,7 @@ RESPONSE can be nil if the response is complete."
                   (append cvec nil)))))
 
 (cl-defmethod llm-name ((_ llm-openai))
+  "Return the name of the provider."
   "Open AI")
 
 ;; See https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo

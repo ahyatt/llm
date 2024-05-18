@@ -21,7 +21,7 @@
 
 ;;; Commentary:
 ;; This file implements the llm functionality defined in llm.el, for Google's
-;; Gemini AI. The documentation is at
+;; Gemini AI.  he documentation is at
 ;; https://ai.google.dev/tutorials/rest_quickstart.
 
 ;;; Code:
@@ -40,6 +40,7 @@ You can get this at https://makersuite.google.com/app/apikey."
   key (embedding-model "embedding-001") (chat-model "gemini-pro"))
 
 (cl-defmethod llm-nonfree-message-info ((_ llm-gemini))
+  "Return nonfree terms of service for Gemini."
   "https://policies.google.com/terms/generative-ai")
 
 (cl-defmethod llm-provider-embedding-url ((provider llm-gemini))

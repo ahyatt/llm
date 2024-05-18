@@ -16,7 +16,7 @@
 ;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
 
 ;;; Commentary:
-;; This file provides functions to help build providers. It should only be used
+;; This file provides functions to help build providers.  It should only be used
 ;; by modules implementing an LLM provider.
 
 ;;; Code:
@@ -42,7 +42,8 @@ This should not be used outside of this file.")
 ;; Methods necessary for both embedding and chat requests.
 
 (cl-defgeneric llm-provider-request-prelude (provider)
-  "Execute any prelude code necessary before running a request.")
+  "Execute any prelude code necessary before running a request.
+PROVIDER is the provider that will be used to make the request.")
 
 (cl-defmethod llm-provider-request-prelude ((_ llm-standard-provider))
   "Do nothing for the standard provider."
@@ -85,7 +86,10 @@ Return nil if there is no error.")
   "Return the URL for streaming chat for the PROVIDER.")
 
 (cl-defmethod llm-provider-chat-streaming-url ((provider llm-standard-chat-provider))
-  "By default, use the same URL as normal chat."
+  "By default, use the same URL as normal chat.
+
+PROVIDER is the standard chat provider that is used to make the
+request."
   (llm-provider-chat-url provider))
 
 (cl-defgeneric llm-provider-chat-timeout (provider)
@@ -112,11 +116,14 @@ STREAMING is true if this is a streaming request.")
 
 (cl-defgeneric llm-provider-append-to-prompt (provider prompt result func-results)
   "Append RESULT to PROMPT for the PROVIDER.
+
+PROMPT is the prompt that was already sent to the provider.
+
 FUNC-RESULTS is a list of function results, if any.")
 
 (cl-defmethod llm-provider-append-to-prompt ((_ llm-standard-chat-provider) prompt result
                                              &optional func-results)
-  "By default, the standard provider appends to the prompt."
+  ;; By default, we just append to the prompt.
   (llm-provider-utils-append-to-prompt prompt result func-results))
 
 (cl-defgeneric llm-provider-streaming-media-handler (provider msg-receiver fc-receiver err-receiver)
@@ -138,9 +145,10 @@ ERR-RECEIVER with the error message.")
 ;; Methods for chat function calling
 
 (cl-defgeneric llm-provider-extract-function-calls (provider response)
-  "Return the function calls from RESPONSE for the PROVIDER.
-If there are no function calls, return nil.  If there are
-function calls, return a list of
+  "Return the function call results from RESPONSE for the PROVIDER.
+
+If there are no function call results, return nil.  If there are
+function call results, return a list of
 `llm-provider-utils-function-call'.")
 
 (cl-defmethod llm-provider-extract-function-calls ((_ llm-standard-chat-provider) _)
@@ -148,20 +156,21 @@ function calls, return a list of
   nil)
 
 (cl-defgeneric llm-provider-populate-function-calls (provider prompt calls)
-  "For PROVIDER, in PROMPT, record that function CALLS were received.
+  "For PROVIDER, in PROMPT, record function call execution.
 This is the recording before the calls were executed.
 CALLS are a list of `llm-provider-utils-function-call'.")
 
 (cl-defgeneric llm-provider-collect-streaming-function-data (provider data)
   "Transform a list of streaming function call DATA responses.
 
+PROVIDER is the struct specifying the LLM provider and its configuration.
+
 The DATA responses are a list of whatever is sent to the function
 call handler in `llm-provider-streaming-media-handler'.  This should
 return a list of `llm-chat-function-call' structs.")
 
-(cl-defmethod llm-provider-collect-streaming-function-data ((provider llm-standard-chat-provider) data)
-  "By default, there is no streaming function calling."
-  (ignore provider data)
+(cl-defmethod llm-provider-collect-streaming-function-data ((_ llm-standard-chat-provider) _)
+  ;; by default, there is no function calling
   nil)
 
 ;; Standard provider implementations of llm functionality
@@ -307,10 +316,13 @@ EXAMPLE-PRELUDE is a string to prepend to the examples."
 
 (defun llm-provider-utils-combine-to-system-prompt (prompt &optional example-prelude)
   "Add context and examples to a system prompt in PROMPT.
+
 This should be used for providers that have a notion of a system prompt.
 If there is a system prompt, and no assistant response, add to it.
 If there is no system prompt, create one.
-If there is an assistance response, do nothing."
+If there is an assistance response, do nothing.
+
+EXAMPLE-PRELUDE is the text to introduce any examples with."
   (let ((system-prompt (seq-find
                           (lambda (interaction)
                             (eq (llm-chat-prompt-interaction-role interaction) 'system))
@@ -331,7 +343,9 @@ If there is an assistance response, do nothing."
 
 (defun llm-provider-utils-combine-to-user-prompt (prompt &optional example-prelude)
   "Add context and examples to a user prompt in PROMPT.
-This should be used for providers that do not have a notion of a system prompt."
+This should be used for providers that do not have a notion of a system prompt.
+
+EXAMPLE-PRELUDE is the text to introduce any examples with."
   (when-let ((system-content (llm-provider-utils-get-system-prompt prompt example-prelude)))
       (setf (llm-chat-prompt-interaction-content (car (llm-chat-prompt-interactions prompt)))
             (concat system-content
@@ -341,11 +355,15 @@ This should be used for providers that do not have a notion of a system prompt."
             (llm-chat-prompt-examples prompt) nil)))
 
 (defun llm-provider-utils-collapse-history (prompt &optional history-prelude)
-  "Collapse history to a single prompt.
+  "Collapse history to a single PROMPT.
+
 This is useful for providers that cannot handle conversations.
-Essentially it's a way to fake conversation. Caution: tokens will
+Essentially it's a way to fake conversation.  aution: tokens will
 eventually run out, though, so this isn't a sustainable way to do
-things.  Providers should probably issue a warning when using this."
+things.  Providers should probably issue a warning when using this.
+
+HISTORY-PRELUDE is the text to use to tell the LLM that
+conversation history will follow."
   (when (> (length (llm-chat-prompt-interactions prompt)) 1)
     (setf (llm-chat-prompt-interactions prompt)
           (list (make-llm-chat-prompt-interaction
@@ -472,6 +490,8 @@ This execute function calls if there are any, does any result
 appending to the prompt, and returns an appropriate response for
 the client.
 
+PROVIDER is the struct that configures the use of the LLM.
+
 FUNCALLS is a list of function calls, if any.
 
 TEXT is the text output from the provider, if any.  There should
@@ -488,7 +508,10 @@ be either FUNCALLS or TEXT."
 
 (defun llm-provider-utils-populate-function-results (provider prompt func result)
   "Append the RESULT of FUNC to PROMPT.
-FUNC is a `llm-provider-utils-function-call' struct."
+
+FUNC is a `llm-provider-utils-function-call' struct.
+
+PROVIDER is the struct that configures the user of the LLM."
   (llm-provider-append-to-prompt
    provider prompt result
    (make-llm-chat-prompt-function-call-result

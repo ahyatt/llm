@@ -19,7 +19,7 @@
 ;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
 
 ;;; Commentary:
-;; This file contains functions to help test the LLM implementation. Because of
+;; This file contains functions to help test the LLM implementation.  Because of
 ;; LLM's inherent randomness, it isn't possible to have normal unit tests.
 ;; Humans should be looking at these results and seeing if they make sense.
 ;; However, we can test a few things automatically, including making sure that
@@ -27,10 +27,12 @@
 ;; should be.
 ;;
 ;; The normal way to use this is to create a provider for each LLM you have
-;; access to, and run `llm-tester-all' on it. Or, you can test individual parts
+;; access to, and run `llm-tester-all' on it.  Or, you can test individual parts
 ;; with their respective functions.'
 ;;
 ;; Both normal output and errors are output to the `*Messages*' buffer.
+
+;;; Code:
 
 (require 'llm)
 
@@ -141,7 +143,7 @@
        (llm-tester-log "ERROR: Provider %s returned an error of type %s with message %s" (type-of provider) type message)))))
 
 (defun llm-tester-verify-prompt (prompt)
-  "Test PROMPT to make sure there are no obvious problems"
+  "Test PROMPT to make sure there are no obvious problems."
   (mapc (lambda (i)
           (when (equal (llm-chat-prompt-interaction-content i) "")
             (llm-tester-log "ERROR: prompt had an empty interaction")))
@@ -329,7 +331,7 @@ of by calling the `describe_function' function."
                 (type-of provider) type message)))))
 
 (defun llm-tester-cancel (provider)
-  "Test that PROVIDER can do async calls which can be cancelled."
+  "Test that PROVIDER can do async which can be cancelled."
   (llm-tester-log "Testing provider %s for cancellation" (type-of provider))
   (let ((embedding-request (llm-embedding-async
                             provider "This is a test."
@@ -349,7 +351,9 @@ of by calling the `describe_function' function."
     (llm-cancel-request chat-async-request)))
 
 (defun llm-tester--bad-provider-callback (provider call)
-  "Return testing error callback for CALL."
+  "Return testing error callback for CALL.
+
+PROVIDER is the provider that is being tested."
   (lambda (type message)
     (cond
      ((not (symbolp type))
