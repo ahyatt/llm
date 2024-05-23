@@ -126,10 +126,10 @@ PROVIDER is the llm-ollama provider."
   (cons 'application/x-ndjson
         (plz-media-type:application/x-ndjson
          :handler (lambda (data)
-                     (when-let ((response (assoc-default
-                                           'content
-                                           (assoc-default 'message data))))
-                       (funcall msg-receiver response))))))
+                    (when-let ((response (assoc-default
+                                          'content
+                                          (assoc-default 'message data))))
+                      (funcall msg-receiver response))))))
 
 (cl-defmethod llm-name ((provider llm-ollama))
   (llm-ollama-chat-model provider))
