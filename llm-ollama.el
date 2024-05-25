@@ -1,6 +1,6 @@
 ;;; llm-ollama.el --- llm module for integrating with Ollama. -*- lexical-binding: t; package-lint-main-file: "llm.el"; -*-
 
-;; Copyright (c) 2023  Free Software Foundation, Inc.
+;; Copyright (c) 2023, 2024  Free Software Foundation, Inc.
 
 ;; Author: Andrew Hyatt <ahyatt@gmail.com>
 ;; Homepage: https://github.com/ahyatt/llm
@@ -119,7 +119,7 @@ PROVIDER is the llm-ollama provider."
       (push `("temperature" . ,(llm-chat-prompt-temperature prompt)) options))
     (when (llm-chat-prompt-max-tokens prompt)
       (push `("num_predict" . ,(llm-chat-prompt-max-tokens prompt)) options))
-    (setq options (append options (llm-chat-prompt-non-standard-params prompt)))    
+    (setq options (append options (llm-chat-prompt-non-standard-params prompt)))
     (when options (push `("options" . ,options) request-alist))
     request-alist))
 
