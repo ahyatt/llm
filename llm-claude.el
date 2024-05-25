@@ -59,12 +59,12 @@
                     ,(mapcar (lambda (interaction)
                                (append
                                 `(("role" . ,(pcase (llm-chat-prompt-interaction-role interaction)
-                                              ('function 'user)
-                                              ('assistant 'assistant)
-                                              ('user 'user)))
-                                 ("content" . ,(or (llm-chat-prompt-interaction-content interaction)
-                                                   (llm-chat-prompt-function-call-result-result
-                                                    (llm-chat-prompt-interaction-function-call-result interaction)))))
+                                               ('function 'user)
+                                               ('assistant 'assistant)
+                                               ('user 'user)))
+                                  ("content" . ,(or (llm-chat-prompt-interaction-content interaction)
+                                                    (llm-chat-prompt-function-call-result-result
+                                                     (llm-chat-prompt-interaction-function-call-result interaction)))))
                                 (when-let ((r (llm-chat-prompt-interaction-function-call-result interaction)))
                                   `(("tool_use_id" . ,(llm-chat-prompt-function-call-result-call-id r))))))
                              (llm-chat-prompt-interactions prompt)))))
@@ -76,16 +76,16 @@
       (push `("system" . ,system) request))
     (when (llm-chat-prompt-temperature prompt)
       (push `("temperature" . ,(llm-chat-prompt-temperature prompt)) request))
-    request))
+    (append request (llm-chat-prompt-non-standard-params prompt))))
 
 (cl-defmethod llm-provider-extract-function-calls ((_ llm-claude) response)
   (let ((content (append (assoc-default 'content response) nil)))
     (cl-loop for item in content
              when (equal "tool_use" (assoc-default 'type item))
              collect (make-llm-provider-utils-function-call
-                     :id (assoc-default 'id item)
-                     :name (assoc-default 'name item)
-                     :args (assoc-default 'input item)))))
+                      :id (assoc-default 'id item)
+                      :name (assoc-default 'name item)
+                      :args (assoc-default 'input item)))))
 
 (cl-defmethod llm-provider-populate-function-calls ((_ llm-claude) _ _)
   ;; Claude does not need to be sent back the function calls it sent in the

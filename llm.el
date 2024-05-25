@@ -70,7 +70,7 @@ See %s for the details on the restrictions on use." name tos)))
   "This stores all the information needed for a structured chat prompt.
 
 Use of this directly is deprecated, instead use `llm-make-chat-prompt'."
-  context examples interactions functions temperature max-tokens)
+  context examples interactions functions temperature max-tokens non-standard-params)
 
 (cl-defstruct llm-chat-prompt-interaction
   "This defines a single interaction given as part of a chat prompt.
@@ -167,7 +167,8 @@ instead."
   (llm-make-chat-prompt text))
 
 (cl-defun llm-make-chat-prompt (text &key context examples functions
-                                     temperature max-tokens)
+                                     temperature max-tokens
+                                     non-standard-params)
   "Create a `llm-chat-prompt' with TEXT sent to the LLM provider.
 
 This is the most correct and easy way to create an
@@ -214,7 +215,14 @@ MAX-TOKENS is the maximum number of tokens to generate.  This is optional.
 CONTEXT, EXAMPLES, FUNCTIONS, TEMPERATURE, and MAX-TOKENS are
 usually turned into part of the interaction, and if so, they will
 be put in the first interaction of the prompt (before anything in
-PREVIOUS-INTERACTIONS)."
+PREVIOUS-INTERACTIONS).
+
+NON-STANDARD-PARAMS is an alist of other options that the
+provider may or may not know how to handle.  These are expected
+to be provider specific.  Don't use this if you want the prompt
+to be used amongst different providers, because it is likely to
+cause a request error.  The cars of the alist are strings and the
+cdrs can be strings or numbers.  This is optional."
   (unless text
     (error "TEXT is required"))
   (when (and (listp text) (zerop (mod (length text) 2)))
@@ -229,7 +237,8 @@ PREVIOUS-INTERACTIONS)."
                                   (if (listp text) text (list text)))
    :functions functions
    :temperature temperature
-   :max-tokens max-tokens))
+   :max-tokens max-tokens
+   :non-standard-params non-standard-params))
 
 (defun llm-chat-prompt-append-response (prompt response &optional role)
   "Append a new RESPONSE to PROMPT, to continue a conversation.

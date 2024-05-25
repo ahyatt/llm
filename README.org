@@ -102,13 +102,7 @@ For all callbacks, the callback will be executed in the buffer the function was 
 - ~llm-chat-token-limit~.  Gets the token limit for the chat model.  This isn't possible for some backends like =llama.cpp=, in which the model isn't selected or known by this library.
 
   And the following helper functions:
-  - ~llm-make-chat-prompt text &keys context examples functions temperature
-    max-tokens~: This is how you make prompts.  ~text~ can be a string (the user
-    input to the llm chatbot), or a list representing a series of back-and-forth
-    exchanges, of odd number, with the last element of the list representing the
-    user's latest input.  This supports inputting context (also commonly called
-    a system prompt, although it isn't guaranteed to replace the actual system
-    prompt), examples, and other important elements, all detailed in the docstring for this function.
+  - ~llm-make-chat-prompt text &keys context examples functions temperature max-tokens~: This is how you make prompts.  ~text~ can be a string (the user input to the llm chatbot), or a list representing a series of back-and-forth exchanges, of odd number, with the last element of the list representing the user's latest input.  This supports inputting context (also commonly called a system prompt, although it isn't guaranteed to replace the actual system prompt), examples, and other important elements, all detailed in the docstring for this function.  The ~non-standard-params~ let you specify other options that might vary per-provider.  The correctness is up to the client.
   - ~llm-chat-prompt-to-text prompt~: From a prompt, return a string representation.  This is not usually suitable for passing to LLMs, but for debugging purposes.
   - ~llm-chat-streaming-to-point provider prompt buffer point finish-callback~: Same basic arguments as ~llm-chat-streaming~, but will stream to ~point~ in ~buffer~.
   - ~llm-chat-prompt-append-response prompt response role~: Append a new response (from the user, usually) to the prompt.  The ~role~ is optional, and defaults to ~'user~.

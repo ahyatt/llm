@@ -221,7 +221,7 @@ the key must be regenerated every hour."
   "From PROMPT, create the parameters section.
 Return value is a cons for adding to an alist, unless there is
 nothing to add, in which case it is nil."
-  (let ((params-alist))
+  (let ((params-alist (llm-chat-prompt-non-standard-params prompt)))
     (when (llm-chat-prompt-temperature prompt)
       (push `(temperature . ,(llm-chat-prompt-temperature prompt))
             params-alist))

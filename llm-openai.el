@@ -169,7 +169,7 @@ STREAMING if non-nil, turn on response streaming."
       (push `("tools" . ,(mapcar #'llm-provider-utils-openai-function-spec
                                  (llm-chat-prompt-functions prompt)))
             request-alist))
-    request-alist))
+    (append request-alist (llm-chat-prompt-non-standard-params prompt))))
 
 (cl-defmethod llm-provider-chat-extract-result ((_ llm-openai) response)
   (assoc-default 'content

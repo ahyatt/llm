@@ -119,6 +119,7 @@ PROVIDER is the llm-ollama provider."
       (push `("temperature" . ,(llm-chat-prompt-temperature prompt)) options))
     (when (llm-chat-prompt-max-tokens prompt)
       (push `("num_predict" . ,(llm-chat-prompt-max-tokens prompt)) options))
+    (setq options (append options (llm-chat-prompt-non-standard-params prompt)))    
     (when options (push `("options" . ,options) request-alist))
     request-alist))
 
