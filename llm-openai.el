@@ -1,4 +1,4 @@
-;;; llm-openai.el --- llm module for integrating with Open AI -*- lexical-binding: t; package-lint-main-file: "llm.el"; -*-
+;;; llm-openai.el --- llm module for integrating with Open AI -*- lexical-binding: t; package-lint-main-file: "llm.el"; byte-compile-docstring-max-column: 200-*-
 
 ;; Copyright (c) 2023, 2024  Free Software Foundation, Inc.
 
