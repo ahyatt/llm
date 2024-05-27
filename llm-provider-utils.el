@@ -324,22 +324,22 @@ If there is an assistance response, do nothing.
 
 EXAMPLE-PRELUDE is the text to introduce any examples with."
   (let ((system-prompt (seq-find
-                          (lambda (interaction)
-                            (eq (llm-chat-prompt-interaction-role interaction) 'system))
-                          (llm-chat-prompt-interactions prompt)))
-          (system-content (llm-provider-utils-get-system-prompt prompt example-prelude)))
-      (when (and system-content (> (length system-content) 0))
-        (if system-prompt
-            (setf (llm-chat-prompt-interaction-content system-prompt)
-                  (concat (llm-chat-prompt-interaction-content system-prompt)
-                          "\n"
-                          system-content))
-          (push (make-llm-chat-prompt-interaction
-                 :role 'system
-                 :content system-content)
-                (llm-chat-prompt-interactions prompt))
-          (setf (llm-chat-prompt-context prompt) nil
-                (llm-chat-prompt-examples prompt) nil)))))
+                        (lambda (interaction)
+                          (eq (llm-chat-prompt-interaction-role interaction) 'system))
+                        (llm-chat-prompt-interactions prompt)))
+        (system-content (llm-provider-utils-get-system-prompt prompt example-prelude)))
+    (when (and system-content (> (length system-content) 0))
+      (if system-prompt
+          (setf (llm-chat-prompt-interaction-content system-prompt)
+                (concat (llm-chat-prompt-interaction-content system-prompt)
+                        "\n"
+                        system-content))
+        (push (make-llm-chat-prompt-interaction
+               :role 'system
+               :content system-content)
+              (llm-chat-prompt-interactions prompt))
+        (setf (llm-chat-prompt-context prompt) nil
+              (llm-chat-prompt-examples prompt) nil)))))
 
 (defun llm-provider-utils-combine-to-user-prompt (prompt &optional example-prelude)
   "Add context and examples to a user prompt in PROMPT.
@@ -347,12 +347,12 @@ This should be used for providers that do not have a notion of a system prompt.
 
 EXAMPLE-PRELUDE is the text to introduce any examples with."
   (when-let ((system-content (llm-provider-utils-get-system-prompt prompt example-prelude)))
-      (setf (llm-chat-prompt-interaction-content (car (llm-chat-prompt-interactions prompt)))
-            (concat system-content
-                    "\n"
-                    (llm-chat-prompt-interaction-content (car (llm-chat-prompt-interactions prompt))))
-            (llm-chat-prompt-context prompt) nil
-            (llm-chat-prompt-examples prompt) nil)))
+    (setf (llm-chat-prompt-interaction-content (car (llm-chat-prompt-interactions prompt)))
+          (concat system-content
+                  "\n"
+                  (llm-chat-prompt-interaction-content (car (llm-chat-prompt-interactions prompt))))
+          (llm-chat-prompt-context prompt) nil
+          (llm-chat-prompt-examples prompt) nil)))
 
 (defun llm-provider-utils-collapse-history (prompt &optional history-prelude)
   "Collapse history to a single PROMPT.
@@ -382,17 +382,17 @@ conversation history will follow."
 (defun llm-provider-utils-model-token-limit (model)
   "Return the token limit for MODEL."
   (let ((model (downcase model)))
-   (cond
-    ((string-match-p "mistral-7b" model) 8192)
-    ((string-match-p "mistral" model) 8192)
-    ((string-match-p "mixtral-45b" model) 131072)
-    ((string-match-p "mixtral" model) 131072)
-    ((string-match-p "falcon" model) 2048)
-    ((string-match-p "orca 2" model) 4096)
-    ((string-match-p "orca" model) 2048)
-    ((string-match-p "llama\s*2" model) 4096)
-    ((string-match-p "llama" model) 2048)
-    ((string-match-p "starcoder" model) 8192))))
+    (cond
+     ((string-match-p "mistral-7b" model) 8192)
+     ((string-match-p "mistral" model) 8192)
+     ((string-match-p "mixtral-45b" model) 131072)
+     ((string-match-p "mixtral" model) 131072)
+     ((string-match-p "falcon" model) 2048)
+     ((string-match-p "orca 2" model) 4096)
+     ((string-match-p "orca" model) 2048)
+     ((string-match-p "llama\s*2" model) 4096)
+     ((string-match-p "llama" model) 2048)
+     ((string-match-p "starcoder" model) 8192))))
 
 (defun llm-provider-utils-openai-arguments (args)
   "Convert ARGS to the Open AI function calling spec.
@@ -452,13 +452,13 @@ applicable to many endpoints.
 
 This returns a JSON object (a list that can be converted to JSON)."
   `((type . function)
-     (function
-      .
-      ,(append
-        `((name . ,(llm-function-call-name call))
-          (description . ,(llm-function-call-description call)))
-        (when (llm-function-call-args call)
-          `((parameters
+    (function
+     .
+     ,(append
+       `((name . ,(llm-function-call-name call))
+         (description . ,(llm-function-call-description call)))
+       (when (llm-function-call-args call)
+         `((parameters
             .
             ,(llm-provider-utils-openai-arguments (llm-function-call-args call)))))))))
 
