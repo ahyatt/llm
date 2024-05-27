@@ -34,7 +34,32 @@ This represents any provider, regardless of what it implements.
 This should not be used outside of this file.")
 
 (cl-defstruct (llm-standard-chat-provider (:include llm-standard-provider))
-  "A struct for indicating a provider that implements chat.")
+  "A struct for indicating a provider that implements chat.
+DEFAULT-CHAT-TEMPERATURE is the default temperature for chats
+with the provider.  Any `temperature' specified in the chat
+prompt will override this.  This is optional, and if not set,
+when not overridden, the default value chosen by the provider
+will be used.
+
+DEFAULT-CHAT-MAX-TOKENS is the default maxmimum number of tokens
+for chats with the provider.  Any value for `max-tokens'
+specified in the chat prompt will override this.  This is
+optional, and if not set, when not overriden, no maximum will be
+specified to the provider.
+
+DEFAULT-CHAT-NON-STANDARD-PARAMS are per-provider params that
+will override and `non-standard-params' that are part of the
+prompt.  This is an alist of parameters, whose name and possible
+values will be different for each provider.  The overriding here
+is on a per-parameter basis, so the final value used in the chat
+can be a mix of these default parameters and others in the
+prompt.
+
+These values will be set as parameters on the prompt, so changing
+values after the initial call in the chat will not have an
+effect.  New values will have an effect, however."
+  default-chat-temperature default-chat-max-tokens
+  default-chat-non-standard-params)
 
 (cl-defstruct (llm-standard-full-provider (:include llm-standard-chat-provider))
   "A struct for providers that implements chat and embeddings.")
@@ -99,6 +124,21 @@ Return nil for the standard timeout.")
 (cl-defmethod llm-provider-chat-timeout ((_ llm-standard-provider))
   "By default, the standard provider has the standard timeout."
   nil)
+
+(cl-defmethod llm-provider-chat-request :before ((provider llm-standard-chat-provider) prompt _)
+  "Set PROVIDER default parameters where they do not existe in the PROMPT."
+  (setf (llm-chat-prompt-temperature prompt)
+        (or (llm-chat-prompt-temperature prompt)
+            (llm-standard-chat-provider-default-chat-temperature provider))
+        (llm-chat-prompt-max-tokens prompt)
+        (or (llm-chat-prompt-max-tokens prompt)
+            (llm-standard-chat-provider-default-chat-max-tokens provider))
+        (llm-chat-prompt-non-standard-params prompt)
+        ;; We need to merge the parameteres individually.
+        (seq-union (llm-chat-prompt-non-standard-params prompt)
+                   (llm-standard-chat-provider-default-chat-non-standard-params provider)
+                   (lambda (a b)
+                     (equal (car a) (car b))))))
 
 (cl-defgeneric llm-provider-chat-request (provider prompt streaming)
   "Return the request for the PROVIDER for PROMPT.

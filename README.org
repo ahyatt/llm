@@ -18,6 +18,12 @@ Users of an application that uses this package should not need to install it the
 
 Here ~my-openai-key~ would be a variable you set up before with your OpenAI key. Or, just substitute the key itself as a string. It's important to remember never to check your key into a public repository such as GitHub, because your key must be kept private. Anyone with your key can use the API, and you will be charged.
 
+All of the providers (except for =llm-fake=), can also take default parameters that will be used if they are not specified in the prompt.  These are the same parameters as appear in the prompt, but prefixed with =default-chat-=.  So, for example, if you find that you like Ollama to be less creative than the default, you can create your provider like:
+
+#+begin_src emacs-lisp
+(make-llm-ollama :embedding-model "mistral:latest" :chat-model "mistral:latest" :default-chat-temperature 0.1)
+#+end_src
+
 For embedding users. if you store the embeddings, you *must* set the embedding model.  Even though there's no way for the llm package to tell whether you are storing it, if the default model changes, you may find yourself storing incompatible embeddings.
 ** Open AI
 You can set up with ~make-llm-openai~, with the following parameters:

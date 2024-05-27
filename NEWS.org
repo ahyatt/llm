@@ -1,5 +1,6 @@
 * Version 0.16.0
 - Add "non-standard params" to set per-provider options.
+- Add default parameters for chat providers.
 * Version 0.15.0
 - Move to =plz= backend, which uses =curl=.  This helps move this package to a
   stronger foundation backed by parsing to spec.  Thanks to Roman Scherer for
