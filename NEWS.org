@@ -1,3 +1,5 @@
+* Version 0.16.1
+- Add support for HTTP / HTTPS proxies.
 * Version 0.16.0
 - Add "non-standard params" to set per-provider options.
 - Add default parameters for chat providers.
