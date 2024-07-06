@@ -248,7 +248,8 @@ RESPONSE can be nil if the response is complete."
   "Open AI")
 
 ;; See https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo
-;; and https://platform.openai.com/docs/models/gpt-3-5.
+;; and https://platform.openai.com/docs/models/gpt-3-5,
+;; and also https://platform.openai.com/settings/organization/limits.
 (cl-defmethod llm-chat-token-limit ((provider llm-openai))
   (let ((model (llm-openai-chat-model provider)))
     (cond
@@ -258,7 +259,7 @@ RESPONSE can be nil if the response is complete."
         ;; models, but not for 32k models.
         (+ (* n 1024) (if (= n 16) 1 0))))
      ((equal model "gpt-4") 8192)
-     ((equal model "gpt-4o") 128000)
+     ((equal model "gpt-4o") 30000)
      ((string-match-p (rx (seq "gpt-4-" (+ ascii) "-preview")) model)
       128000)
      ((string-match-p (rx (seq "gpt-4-" (+ digit))) model)

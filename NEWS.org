@@ -1,3 +1,5 @@
+* Version 0.16.2
+- Fix Open AI's gpt4-o context length, which is lower for most paying users than the max.
 * Version 0.16.1
 - Add support for HTTP / HTTPS proxies.
 * Version 0.16.0
