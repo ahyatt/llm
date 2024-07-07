@@ -98,7 +98,7 @@
     (should-have-token-limit "gpt-4-32k" 32768)
     (should-have-token-limit "gpt-4-0613" 8192)
     (should-have-token-limit "gpt-4-32k-0613" 32768)
-    (should-have-token-limit "gpt-4o" 128000)))
+    (should-have-token-limit "gpt-4o" 30000)))
 
 (ert-deftest llm-test-chat-token-limit-gemini ()
   (should (= 30720 (llm-chat-token-limit (make-llm-gemini))))
