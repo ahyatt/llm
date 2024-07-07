@@ -273,7 +273,7 @@ So, to illustrate with this example, here's how the prompt will be filled:
 
   Alternatively, you can just fill it directly:
   #+begin_src emacs-lisp
-  (llm-prompt-fill-text "Hi, I'm {{name}} and I'm here to say {{message}}"
+  (llm-prompt-fill-text "Hi, I'm {{name}} and I'm here to say {{messages}}"
                         :name "John" :messages #'my-message-retriever)
   #+end_src
 
