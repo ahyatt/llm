@@ -216,7 +216,10 @@ context size (via ~llm-chat-token-limit~).  Care is taken to not overfill the
 context, which is checked as it is filled via ~llm-count-tokens~.  We usually want
 to not fill the whole context, but instead leave room for the chat and
 subsequent terms.  The variable ~llm-prompt-default-max-pct~ controls how much of
-the context window we want to fill.
+the context window we want to fill.  The way we estimate the number of tokens
+used is quick but inaccurate, so limiting to less than the maximum context size
+is useful for guarding against a miscount leading to an error calling the LLM
+due to too many tokens.
 
 Variables are enclosed in double curly braces, like this: ={{instructions}}=.
 They can just be the variable, or they can also denote a number of tickets, like
@@ -229,8 +232,9 @@ tickets.  So if you have two variables, one with 1 ticket, one with 10 tickets,
 one will be filled 10 times more than the other.  If you have two variables, one
 with 1 ticket, one unspecified, the unspecified one will get 1 ticket, so each
 will have an even change to get filled.  If no variable has tickets specified,
-each will get an equal chance.  This algorithm is the contribution of David
-Petrou.
+each will get an equal chance.  If you have one variable, it could have any
+number of tickets, but the result would be the same, since it would win every
+round.  This algorithm is the contribution of David Petrou.
 
 The above is true of variables that are to be filled with a sequence of possible
 values.  A lot of LLM context filling is like this.  In the above example,
