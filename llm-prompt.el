@@ -169,25 +169,37 @@ a function, it should return values via a generator."
     (insert text)
     (let* ((final-vals nil)
            (vars (llm-prompt-variables-to-markers))
-           (total-specified-tickets (let ((actual (apply #'+ (mapcar (lambda (var)
-                                                                       (or (llm-prompt-variable-tickets var)                                                                             0))
-                                                                     vars))))
-                                      (if (= actual 0) 1 actual)))
+           (total-tokens (llm-count-tokens
+                          provider (buffer-substring-no-properties (point-min) (point-max))))
            (keys-alist (mapcar (lambda (var)
                                  (cons (llm-prompt-variable-name var)
                                        (plist-get keys
                                                   (intern (format ":%s" (llm-prompt-variable-name var))))))
-                               vars)))
+                               vars))
+           (total-specified-tickets
+            (let ((actual (apply
+                           #'+
+                           (mapcar (lambda (var)
+                                     (if (llm-prompt--simple-var-p
+                                          (assoc-default (llm-prompt-variable-name var)
+                                                         keys-alist))
+                                         0
+                                       (or (llm-prompt-variable-tickets var) 0)))
+                                   vars))))
+              (if (= actual 0) 1 actual)))
+           )
       ;; First, we'll populate any variable that is passed in as a string,
       ;; integer, or float value.
       (mapc (lambda (var) (when (llm-prompt--simple-var-p
                                  (assoc-default (llm-prompt-variable-name var)
                                                 keys-alist))
-                            (push (cons (llm-prompt-variable-name var)
-                                        (assoc-default (llm-prompt-variable-name var)
-                                                       keys-alist))
-                                  final-vals)))
-
+                            (let ((val (assoc-default (llm-prompt-variable-name var)
+                                                      keys-alist)))
+                              (push (cons (llm-prompt-variable-name var) val)
+                                    final-vals)
+                              (cl-incf total-tokens
+                                       (llm-count-tokens provider
+                                                         (format "%s" val))))))
             vars)
       (let ((ticket-gen (llm-prompt--select-tickets
                          (mapcan (lambda (var)
@@ -203,14 +215,15 @@ a function, it should return values via a generator."
                                                          total-specified-tickets)))))
                                  vars))))
         (condition-case nil
-            (let ((total-tokens (llm-count-tokens provider
-                                                  (buffer-substring-no-properties
-                                                   (point-min) (point-max)))))
-              (while (< total-tokens
-                        (* (/ llm-prompt-default-max-pct 100.0)
-                           (llm-chat-token-limit provider)))
-                (let* ((val-cons (iter-next ticket-gen))
-                       (sval (format "%s" (cdr val-cons))))
+            (while (< total-tokens
+                      (* (/ llm-prompt-default-max-pct 100.0)
+                         (llm-chat-token-limit provider)))
+              (let* ((val-cons (iter-next ticket-gen))
+                     (sval (format "%s" (cdr val-cons))))
+                ;; Only add if there is space, otherwise we ignore this value.
+                (when (<= (+ total-tokens (llm-count-tokens provider sval))
+                          (* (/ llm-prompt-default-max-pct 100.0)
+                             (llm-chat-token-limit provider)))
                   (cl-incf total-tokens (llm-count-tokens provider sval))
                   (if (assoc (car val-cons) final-vals)
                       (push sval (cdr (assoc (car val-cons) final-vals)))

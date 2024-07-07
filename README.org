@@ -250,9 +250,10 @@ So, to illustrate with this example, here's how the prompt will be filled:
   2. Check the context size we want to use (~llm-prompt-default-max-pct~
      multiplied by ~llm-chat-token-limit~) and exit if exceeded.
   3. Run a lottery with all tickets and choose one of the remaining variables to
-     fill.  Fill the variable with one entry retrieved from a supplied
-     generator.
-  4. Goto 2
+     fill.
+  4. If the variable won't make the text too large, fill the variable
+     with one entry retrieved from a supplied generator, otherwise ignore.
+  5. Goto 2
 
   The prompt can be filled two ways, one using predefined prompt template
   (~llm-defprompt~ and ~llm-prompt-fill~), the other using a prompt template that is
