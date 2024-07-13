@@ -172,6 +172,116 @@ for a function than "write-email".
 
 Examples can be found in =llm-tester=. There is also a function call to generate
 function calls from existing elisp functions in
-=utilities/elisp-to-function-call.el=. 
+=utilities/elisp-to-function-call.el=.
+** Advanced prompt creation
+The =llm-prompt= module provides helper functions to create prompts that can
+incorporate data from your application.  In particular, this should be very
+useful for application that need a lot of context.
+
+A prompt defined with =llm-prompt= is a template, with placeholders that the
+module will fill in.  Here's an example of a prompt definition, from the [[https://github.com/ahyatt/ekg][ekg]] package:
+
+#+begin_src emacs-lisp
+(llm-defprompt ekg-llm-fill-prompt
+  "The user has written a note, and would like you to append to it,
+to make it more useful.  This is important: only output your
+additions, and do not repeat anything in the user's note.  Write
+as a third party adding information to a note, so do not use the
+first person.
+
+First, I'll give you information about the note, then similar
+other notes that user has written, in JSON.  Finally, I'll give
+you instructions.  The user's note will be your input, all the
+rest, including this, is just context for it.  The notes given
+are to be used as background material, which can be referenced in
+your answer.
+
+The user's note uses tags: {{tags}}.  The notes with the same
+tags, listed here in reverse date order: {{tag-notes:10}}
+
+These are similar notes in general, which may have duplicates
+from the ones above: {{similar-notes:1}}
+
+This ends the section on useful notes as a background for the
+note in question.
+
+Your instructions on what content to add to the note:
+
+{{instructions}}
+")
+#+end_src
+
+When this is filled, it is done in the context of a provider, which has a known
+context size (via ~llm-chat-token-limit~).  Care is taken to not overfill the
+context, which is checked as it is filled via ~llm-count-tokens~.  We usually want
+to not fill the whole context, but instead leave room for the chat and
+subsequent terms.  The variable ~llm-prompt-default-max-pct~ controls how much of
+the context window we want to fill.  The way we estimate the number of tokens
+used is quick but inaccurate, so limiting to less than the maximum context size
+is useful for guarding against a miscount leading to an error calling the LLM
+due to too many tokens.
+
+Variables are enclosed in double curly braces, like this: ={{instructions}}=.
+They can just be the variable, or they can also denote a number of tickets, like
+so: ={{tag-notes:10}}=.  Tickets should be thought of like lottery tickets, where
+the prize is a single round of context filling for the variable.  So the
+variable =tag-notes= gets 10 tickets for a drawing.  Anything else where tickets
+are unspecified (unless it is just a single variable, which will be explained
+below) will get a number of tickets equal to the total number of specified
+tickets.  So if you have two variables, one with 1 ticket, one with 10 tickets,
+one will be filled 10 times more than the other.  If you have two variables, one
+with 1 ticket, one unspecified, the unspecified one will get 1 ticket, so each
+will have an even change to get filled.  If no variable has tickets specified,
+each will get an equal chance.  If you have one variable, it could have any
+number of tickets, but the result would be the same, since it would win every
+round.  This algorithm is the contribution of David Petrou.
+
+The above is true of variables that are to be filled with a sequence of possible
+values.  A lot of LLM context filling is like this.  In the above example,
+={{similar-notes}}= is a retrieval based on a similarity score.  It will continue
+to fill items from most similar to least similar, which is going to return
+almost everything the ekg app stores.  We want to retrieve only as needed.
+Because of this, the =llm-prompt= module takes in /generators/ to supply each
+variable.  However, a plain list is also acceptable, as is a single value.  Any
+single value will not enter into the ticket system, but rather be prefilled
+before any tickets are used.
+
+So, to illustrate with this example, here's how the prompt will be filled:
+
+  1. First, the ={{tags}}= and ={{instructions}}= will be filled first.  This will
+     happen regardless before we check the context size, so the module assumes
+     that these will be small and not blow up the context.
+  2. Check the context size we want to use (~llm-prompt-default-max-pct~
+     multiplied by ~llm-chat-token-limit~) and exit if exceeded.
+  3. Run a lottery with all tickets and choose one of the remaining variables to
+     fill.
+  4. If the variable won't make the text too large, fill the variable
+     with one entry retrieved from a supplied generator, otherwise ignore.
+  5. Goto 2
+
+  The prompt can be filled two ways, one using predefined prompt template
+  (~llm-defprompt~ and ~llm-prompt-fill~), the other using a prompt template that is
+  passed in (~llm-prompt-fill-text~).
+
+  #+begin_src emacs-lisp
+  (llm-defprompt my-prompt "My name is {{name}} and I'm here's to say {{messages}}")
+
+  (llm-prompt-fill 'my-prompt my-llm-provider :name "Pat" :messages #'my-message-retriever)
+
+  (iter-defun my-message-retriever ()
+    "Return the messages I like to say."
+    (my-message-reset-messages)
+    (while (my-has-next-message)
+      (iter-yield (my-get-next-message))))
+  #+end_src
+
+  Alternatively, you can just fill it directly:
+  #+begin_src emacs-lisp
+  (llm-prompt-fill-text "Hi, I'm {{name}} and I'm here to say {{messages}}"
+                        :name "John" :messages #'my-message-retriever)
+  #+end_src
+
+  As you can see in the examples, the variable values are passed in with matching keys.
+
 * Contributions
 If you are interested in creating a provider, please send a pull request, or open a bug.  This library is part of GNU ELPA, so any major provider that we include in this module needs to be written by someone with FSF papers.  However, you can always write a module and put it on a different package archive, such as MELPA.

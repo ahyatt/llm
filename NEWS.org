@@ -1,3 +1,8 @@
+* Version 0.17.0
+- Introduced =llm-prompt= for prompt management and creation from generators.
+- Removed Gemini and Vertex token counting, because =llm-prompt= uses token
+  counting often and it's best to have a quick estimate than a more expensive
+  more accurate count.
 * Version 0.16.2
 - Fix Open AI's gpt4-o context length, which is lower for most paying users than the max.
 * Version 0.16.1
