@@ -603,7 +603,7 @@ cons of functions called and their output."
 ;; This is a useful method for getting out of the request buffer when it's time
 ;; to make callbacks.
 (defun llm-provider-utils-callback-in-buffer (buf f &rest args)
-  "Run F with ARSG in the context of BUF.
+  "Run F with ARGS in the context of BUF.
 But if BUF has been killed, use a temporary buffer instead.
 If F is nil, nothing is done."
   (when f
