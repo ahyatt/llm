@@ -117,7 +117,9 @@
 (ert-deftest llm-test-chat-token-limit-ollama ()
   ;; The code is straightforward, so no need to test all the models.
   (should (= 8192 (llm-chat-token-limit
-                   (make-llm-ollama :chat-model "mistral:latest")))))
+                   (make-llm-ollama :chat-model "mistral:latest"))))
+  (should (= 2048 (llm-chat-token-limit
+                   (make-llm-ollama :chat-model "unknown")))))
 
 (ert-deftest llm-test-chat-token-limit-gpt4all ()
   ;; The code is straightforward, so no need to test all the models.
