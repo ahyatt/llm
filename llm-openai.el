@@ -259,7 +259,7 @@ RESPONSE can be nil if the response is complete."
         ;; models, but not for 32k models.
         (+ (* n 1024) (if (= n 16) 1 0))))
      ((equal model "gpt-4") 8192)
-     ((equal model "gpt-4o") 30000)
+     ((string-match-p "gpt-4o" model) 30000)
      ((string-match-p (rx (seq "gpt-4-" (+ ascii) "-preview")) model)
       128000)
      ((string-match-p (rx (seq "gpt-4-" (+ digit))) model)
@@ -269,6 +269,9 @@ RESPONSE can be nil if the response is complete."
      ((string-match-p (rx (seq "gpt-3.5-turbo" (opt "-instruct"))) model)
       4096)
      (t 4096))))
+
+(cl-defmethod llm-chat-token-limit ((_ llm-openai-compatible))
+  (llm-provider-utils-model-token-limit (llm-ollama-chat-model provider)))
 
 (cl-defmethod llm-capabilities ((_ llm-openai))
   (list 'streaming 'embeddings 'function-calls))

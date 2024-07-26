@@ -432,7 +432,10 @@ conversation history will follow."
      ((string-match-p "orca" model) 2048)
      ((string-match-p "llama\s*2" model) 4096)
      ((string-match-p "llama" model) 2048)
-     ((string-match-p "starcoder" model) 8192))))
+     ((string-match-p "starcoder" model) 8192)
+     ((string-match-p "gemma" model) 8192)
+     ;; default to the smallest context window, 2048
+     (t 2048))))
 
 (defun llm-provider-utils-openai-arguments (args)
   "Convert ARGS to the Open AI function calling spec.

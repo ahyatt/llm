@@ -81,7 +81,8 @@
   (cl-flet* ((token-limit-for (model)
                (llm-chat-token-limit (make-llm-openai :chat-model model)))
              (should-have-token-limit (model limit)
-               (should (equal limit (token-limit-for model)))))
+               (ert-info ((format "Testing %s" model))
+                 (should (equal limit (token-limit-for model))))))
     ;; From https://platform.openai.com/docs/models/gpt-3-5
     (should-have-token-limit "gpt-3.5-turbo-1106" 16385)
     (should-have-token-limit "gpt-3.5-turbo" 4096)
@@ -98,31 +99,39 @@
     (should-have-token-limit "gpt-4-32k" 32768)
     (should-have-token-limit "gpt-4-0613" 8192)
     (should-have-token-limit "gpt-4-32k-0613" 32768)
-    (should-have-token-limit "gpt-4o" 30000)))
+    (should-have-token-limit "gpt-4o" 30000)
+    (should-have-token-limit "gpt-4o-mini" 30000)
+    (should-have-token-limit "unknown" 4096)))
 
 (ert-deftest llm-test-chat-token-limit-gemini ()
   (should (= 30720 (llm-chat-token-limit (make-llm-gemini))))
   (should (= 12288 (llm-chat-token-limit
                     (make-llm-gemini :chat-model "gemini-pro-vision"))))
   (should (= 1048576 (llm-chat-token-limit
-                      (make-llm-gemini :chat-model "gemini-1.5-flash")))))
+                      (make-llm-gemini :chat-model "gemini-1.5-flash"))))
+  (should (= 2048 (llm-chat-token-limit
+                   (make-llm-vertex :chat-model "unknown")))))
 
 (ert-deftest llm-test-chat-token-limit-vertex ()
   (should (= 30720 (llm-chat-token-limit (make-llm-vertex))))
   (should (= 12288 (llm-chat-token-limit
                     (make-llm-vertex :chat-model "gemini-pro-vision"))))
   (should (= 1048576 (llm-chat-token-limit
-                      (make-llm-gemini :chat-model "gemini-1.5-flash")))))
+                      (make-llm-gemini :chat-model "gemini-1.5-flash"))))
+  (should (= 2048 (llm-chat-token-limit
+                   (make-llm-vertex :chat-model "unknown")))))
 
 (ert-deftest llm-test-chat-token-limit-ollama ()
   ;; The code is straightforward, so no need to test all the models.
   (should (= 8192 (llm-chat-token-limit
-                   (make-llm-ollama :chat-model "mistral:latest")))))
+                   (make-llm-ollama :chat-model "mistral:latest"))))
+  (should (= 2048 (llm-chat-token-limit
+                   (make-llm-ollama :chat-model "unknown")))))
 
 (ert-deftest llm-test-chat-token-limit-gpt4all ()
   ;; The code is straightforward, so no need to test all the models.
   (should (= 8192 (llm-chat-token-limit
-                   (make-llm-ollama :chat-model "Mistral")))))
+                   (make-llm-gpt4all :chat-model "Mistral")))))
 
 (provide 'llm-test)
 ;;; llm-test.el ends here
