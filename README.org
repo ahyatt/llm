@@ -61,7 +61,7 @@ In addition to the provider, which you may want multiple of (for example, to cha
 =:key=: The API key you get from [[https://console.anthropic.com/settings/keys][Claude's settings page]].  This is required.
 =:chat-model=: One of the [[https://docs.anthropic.com/claude/docs/models-overview][Claude models]].  Defaults to "claude-3-opus-20240229", the most powerful model.
 ** Ollama
-[[https://ollama.ai/][Ollama]] is a way to run large language models locally. There are [[https://ollama.ai/library][many different models]] you can use with it. You set it up with the following parameters:
+[[https://ollama.ai/][Ollama]] is a way to run large language models locally. There are [[https://ollama.ai/library][many different models]] you can use with it, and some of them support function calling. You set it up with the following parameters:
 - ~:scheme~: The scheme (http/https) for the connection to ollama.  This default to "http".
 - ~:host~: The host that ollama is run on.  This is optional and will default to localhost.
 - ~:port~: The port that ollama is run on.  This is optional and will default to the default ollama port.
