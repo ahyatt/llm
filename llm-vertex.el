@@ -283,10 +283,8 @@ If STREAMING is non-nil, use the URL for the streaming API."
   (cond ((equal "gemini-pro" model) 30720)
         ((equal "gemini-pro-vision" model) 12288)
         ((string-match-p (rx (seq "gemini-1.5")) model) 1048576)
-        ;; This shouldn't happen unless there's a new model, which could be a
-        ;; smaller or larger model.  We'll play it safe and choose a reasonable
-        ;; number.
-        (t 4096)))
+        ;; Vertex can run different models, so check the standard model names.
+        (t (llm-provider-utils-model-token-limit model))))
 
 (cl-defmethod llm-chat-token-limit ((provider llm-vertex))
   (llm-vertex--chat-token-limit (llm-vertex-chat-model provider)))
