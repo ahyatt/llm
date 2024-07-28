@@ -145,7 +145,22 @@
     (should-not (has-fc "gemma"))
     (should-not (has-fc "gemma2"))
     (should-not (has-fc "llama2"))
-    (should-not (has-fc "llama"))))
+    (should-not (has-fc "llama"))
+    (should-not (has-fc "unknown"))))
+
+(ert-deftest llm-test-ollama-embedding-capabilities ()
+  ;; tests subject to change as models may get function calling
+  (cl-flet ((has-emb (model)
+              (member 'embeddings
+                      (llm-capabilities (make-llm-ollama :embedding-model model
+                                                         :chat-model "mistral")))))
+    (should-not (has-emb "llama3.1"))
+    (should-not (has-emb "mistral"))
+    (should (has-emb "nomic-embed-text"))
+    (should (has-emb "mxbai-embed-large"))
+    (should-not (has-emb "mxbai-embed-small"))
+    (should-not (has-emb "unknown"))
+    (should-not (has-emb nil))))
 
 (provide 'llm-test)
 ;;; llm-test.el ends here

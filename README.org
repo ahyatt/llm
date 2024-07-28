@@ -66,7 +66,7 @@ In addition to the provider, which you may want multiple of (for example, to cha
 - ~:host~: The host that ollama is run on.  This is optional and will default to localhost.
 - ~:port~: The port that ollama is run on.  This is optional and will default to the default ollama port.
 - ~:chat-model~: The model name to use for chat.  This is not optional for chat use, since there is no default.
-- ~:embedding-model~: The model name to use for embeddings.  This is not optional for embedding use, since there is no default.
+- ~:embedding-model~: The model name to use for embeddings (only [some models](https://ollama.com/search?q=&c=embedding) can be used for embeddings.  This is not optional for embedding use, since there is no default.
 ** GPT4All
 [[https://gpt4all.io/index.html][GPT4All]] is a way to run large language models locally.  To use it with =llm= package, you must click "Enable API Server" in the settings.  It does not offer embeddings or streaming functionality, though, so Ollama might be a better fit for users who are not already set up with local models.  You can set it up with the following parameters:
 - ~:host~: The host that GPT4All is run on.  This is optional and will default to localhost.
