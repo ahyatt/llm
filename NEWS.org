@@ -1,4 +1,5 @@
 * Verseion 0.17.1
+- Support Ollama function calling, for models which support it.
 - Make sure every model, even unknown models, return some value for ~llm-chat-token-limit~.
 - Add token count for llama3.1 model.
 * Version 0.17.0

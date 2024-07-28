@@ -54,8 +54,8 @@
                              (if (eq (type-of embedding) 'vector)
                                  (if (> (length embedding) 0)
                                      (llm-tester-log "SUCCESS: Provider %s provided an embedding of length %d.  First 10 values: %S" (type-of provider)
-                                              (length embedding)
-                                              (seq-subseq embedding 0 (min 10 (length embedding))))
+                                                     (length embedding)
+                                                     (seq-subseq embedding 0 (min 10 (length embedding))))
                                    (llm-tester-log "ERROR: Provider %s returned an empty embedding" (type-of provider))))
                            (llm-tester-log "ERROR: Provider %s did not return any embedding" (type-of provider))))
                        (lambda (type message)
@@ -69,20 +69,20 @@
         (if (eq (type-of embedding) 'vector)
             (if (> (length embedding) 0)
                 (llm-tester-log "SUCCESS: Provider %s provided an embedding of length %d.  First 10 values: %S" (type-of provider)
-                         (length embedding)
-                         (seq-subseq embedding 0 (min 10 (length embedding))))
+                                (length embedding)
+                                (seq-subseq embedding 0 (min 10 (length embedding))))
               (llm-tester-log "ERROR: Provider %s returned an empty embedding" (type-of provider))))
       (llm-tester-log "ERROR: Provider %s did not return any embedding" (type-of provider)))))
 
 (defun llm-tester--tiny-prompt ()
   "Return prompt with a small amount of output, for testing purposes."
   (llm-make-chat-prompt
-      "Tell me a random cool feature of emacs."
-      :context "You must answer all questions as if you were the butler Jeeves from Jeeves and Wooster.  Start all interactions with the phrase, 'Very good, sir.'"
-      :examples '(("Tell me the capital of France." . "Very good, sir.  The capital of France is Paris, which I expect you to be familiar with, since you were just there last week with your Aunt Agatha.")
-                  ("Could you take me to my favorite place?" . "Very good, sir.  I believe you are referring to the Drone's Club, which I will take you to after you put on your evening attire."))
-      :temperature 0.5
-      :max-tokens 100))
+   "Tell me a random cool feature of emacs."
+   :context "You must answer all questions as if you were the butler Jeeves from Jeeves and Wooster.  Start all interactions with the phrase, 'Very good, sir.'"
+   :examples '(("Tell me the capital of France." . "Very good, sir.  The capital of France is Paris, which I expect you to be familiar with, since you were just there last week with your Aunt Agatha.")
+               ("Could you take me to my favorite place?" . "Very good, sir.  I believe you are referring to the Drone's Club, which I will take you to after you put on your evening attire."))
+   :temperature 0.5
+   :max-tokens 100))
 
 (defun llm-tester-chat-async (provider)
   "Test that PROVIDER can interact with the LLM chat."
@@ -92,15 +92,15 @@
      provider
      (llm-tester--tiny-prompt)
      (lambda (response)
-         (unless (eq buf (current-buffer))
-           (llm-tester-log "ERROR: Provider %s returned a response not in the original buffer" (type-of provider)))
-         (if response
-             (if (> (length response) 0)
-                 (llm-tester-log "SUCCESS: Provider %s provided a response %s" (type-of provider) response)
-               (llm-tester-log "ERROR: Provider %s returned an empty response" (type-of provider)))
-           (llm-tester-log "ERROR: Provider %s did not return any response" (type-of provider))))
-       (lambda (type message)
-         (llm-tester-log "ERROR: Provider %s returned an error of type %s with message %s" (type-of provider) type message)))))
+       (unless (eq buf (current-buffer))
+         (llm-tester-log "ERROR: Provider %s returned a response not in the original buffer" (type-of provider)))
+       (if response
+           (if (> (length response) 0)
+               (llm-tester-log "SUCCESS: Provider %s provided a response %s" (type-of provider) response)
+             (llm-tester-log "ERROR: Provider %s returned an empty response" (type-of provider)))
+         (llm-tester-log "ERROR: Provider %s did not return any response" (type-of provider))))
+     (lambda (type message)
+       (llm-tester-log "ERROR: Provider %s returned an error of type %s with message %s" (type-of provider) type message)))))
 
 (defun llm-tester-chat-sync (provider)
   "Test that PROVIDER can interact with the LLM chat."
@@ -134,9 +134,9 @@
        (llm-tester-log "SUCCESS: Provider %s provided a streamed response in %d parts:\n%s" (type-of provider) counter streamed)
        (when (and (member 'streaming (llm-capabilities provider))
                   (not (string= streamed text)))
-           (llm-tester-log "ERROR: Provider %s returned a streamed response that was not equal to the final response.  Streamed text:\n%sFinal response:\n%s" (type-of provider) streamed text))
+         (llm-tester-log "ERROR: Provider %s returned a streamed response that was not equal to the final response.  Streamed text:\n%sFinal response:\n%s" (type-of provider) streamed text))
        (when (and (member 'streaming (llm-capabilities provider)) (= 0 counter))
-           (llm-tester-log "WARNING: Provider %s returned no partial updates!" (type-of provider))))
+         (llm-tester-log "WARNING: Provider %s returned no partial updates!" (type-of provider))))
      (lambda (type message)
        (unless (eq buf (current-buffer))
          (llm-tester-log "ERROR: Provider %s returned a response not in the original buffer" (type-of provider)))
@@ -178,7 +178,7 @@
     (push (llm-chat provider prompt) outputs)
     (llm-tester-verify-prompt prompt)
     (llm-tester-log "SUCCESS: Provider %s provided a conversation with responses %s" (type-of provider)
-             (nreverse outputs))))
+                    (nreverse outputs))))
 
 (defun llm-tester-chat-conversation-async (provider)
   "Test that PROVIDER can handle a conversation."
@@ -262,10 +262,18 @@ of by calling the `describe_function' function."
 
 (defun llm-tester-function-calling-sync (provider)
   "Test that PROVIDER can call functions."
-  (let ((prompt (llm-tester-create-test-function-prompt)))
-    (llm-tester-log "SUCCESS: Provider %s called a function and got result %s"
-             (type-of provider)
-             (llm-chat provider prompt))))
+  (let ((prompt (llm-tester-create-test-function-prompt))
+        (result (llm-chat provider (llm-tester-create-test-function-prompt))))
+    (cond ((stringp result)
+           (llm-tester-log
+            "ERROR: Provider %s returned a string instead of a function result"
+            (type-of provider)))
+          ((and (listp result) (> (length result) 0))
+           (llm-tester-log "SUCCESS: Provider %s called a function and got a result %s"
+                           (type-of provider)
+                           result))
+          (t (llm-tester-log "ERROR: Provider %s returned a %s result: %s"
+                             (type-of provider) (type-of result) result)))))
 
 (defun llm-tester-function-calling-conversation-sync (provider)
   "Test that PROVIDER can call functions in a conversation."
@@ -280,8 +288,8 @@ of by calling the `describe_function' function."
     (push (llm-chat provider prompt) responses)
     (push (llm-chat provider prompt) responses)
     (llm-tester-log "SUCCESS: Provider %s had a function conversation and got results %s"
-             (type-of provider)
-             (nreverse responses))))
+                    (type-of provider)
+                    (nreverse responses))))
 
 (defun llm-tester-function-calling-async (provider)
   "Test that PROVIDER can call functions asynchronously."
@@ -289,10 +297,10 @@ of by calling the `describe_function' function."
     (llm-chat-async provider prompt
                     (lambda (result)
                       (llm-tester-log "SUCCESS: Provider %s called a function and got a result of %s"
-                               (type-of provider) result))
+                                      (type-of provider) result))
                     (lambda (type message)
                       (llm-tester-log "ERROR: Provider %s returned an error of type %s with message %s"
-                               (type-of provider) type message)))))
+                                      (type-of provider) type message)))))
 
 (defun llm-tester-function-calling-conversation-async (provider)
   "Test that PROVIDER can call functions in a conversation."
@@ -302,8 +310,8 @@ of by calling the `describe_function' function."
          (last-callback (lambda (result)
                           (push result responses)
                           (llm-tester-log "SUCCESS: Provider %s had an async function calling conversation, and got results %s"
-                                   (type-of provider)
-                                   (nreverse responses))))
+                                          (type-of provider)
+                                          (nreverse responses))))
          (third-callback (lambda (result) (push result responses)
                            (llm-chat-async provider prompt last-callback error-callback)))
          (second-callback (lambda (result) (push result responses)
@@ -323,12 +331,12 @@ of by calling the `describe_function' function."
        (cl-incf partial-counts))
      (lambda (text)
        (llm-tester-log "SUCCESS: Provider %s called a function and got a final result of %s"
-                (type-of provider) text)
+                       (type-of provider) text)
        (unless (= 0 partial-counts)
          (llm-tester-log "WARNING: Provider %s returned partial updates, but it shouldn't for function calling" (type-of provider))))
      (lambda (type message)
        (llm-tester-log "ERROR: Provider %s returned an error of type %s with message %s"
-                (type-of provider) type message)))))
+                       (type-of provider) type message)))))
 
 (defun llm-tester-cancel (provider)
   "Test that PROVIDER can do async which can be cancelled."
@@ -362,8 +370,8 @@ PROVIDER is the provider that is being tested."
       (llm-tester-log "ERROR: Provider %s returned an error on %s with a non-string message %s with type %s" (type-of provider) call message type))
      ((string-match-p "Unknown Error" message)
       (llm-tester-log "ERROR: Provider %s returned a message on %s with 'Unknown Error' instead of more specific error message" (type-of provider) call))
-      (t
-       (llm-tester-log "SUCCESS: Provider %s on %s returned an error of type %s with message %s" (type-of provider) call type message)))))
+     (t
+      (llm-tester-log "SUCCESS: Provider %s on %s returned an error of type %s with message %s" (type-of provider) call type message)))))
 
 (defun llm-tester-bad-provider-async (provider)
   "When PROVIDER is bad in a some way, test error handling."
