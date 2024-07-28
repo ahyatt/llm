@@ -161,8 +161,16 @@ PROVIDER is the llm-ollama provider."
 (cl-defmethod llm-chat-token-limit ((provider llm-ollama))
   (llm-provider-utils-model-token-limit (llm-ollama-chat-model provider)))
 
-(cl-defmethod llm-capabilities ((_ llm-ollama))
-  (list 'streaming 'embeddings 'function-calls))
+(cl-defmethod llm-capabilities ((provider llm-ollama))
+  (append (list 'streaming 'embeddings)
+          ;; see https://ollama.com/search?c=tools
+          (when (string-match
+                 (rx (or "llama3.1" "mistral-nemo" "mistral-large"
+                         "mistral" "mixtral" "command-r-plus"
+                         "llama3-groq-tool-use"
+                         "firefunction-v2"))
+                 (llm-ollama-chat-model provider))
+            (list 'function-calls))))
 
 (provide 'llm-ollama)
 
