@@ -114,6 +114,12 @@ PROVIDER is the llm-ollama provider."
             messages))
     (push `("messages" . ,messages) request-alist)
     (push `("model" . ,(llm-ollama-chat-model provider)) request-alist)
+    (when (and streaming (llm-chat-prompt-functions prompt))
+      (signal 'not-implemented
+              "Ollama does not support streaming with function calls"))
+    (when (llm-chat-prompt-functions prompt)
+      (push `("tools" . ,(mapcar #'llm-provider-utils-openai-function-spec
+                                 (llm-chat-prompt-functions prompt))) request-alist))
     (push `("stream" . ,(if streaming t :json-false)) request-alist)
     (when (llm-chat-prompt-temperature prompt)
       (push `("temperature" . ,(llm-chat-prompt-temperature prompt)) options))
@@ -122,6 +128,23 @@ PROVIDER is the llm-ollama provider."
     (setq options (append options (llm-chat-prompt-non-standard-params prompt)))
     (when options (push `("options" . ,options) request-alist))
     request-alist))
+
+(cl-defmethod llm-provider-extract-function-calls ((_ llm-ollama) response)
+  (mapcar (lambda (call)
+            (let ((function (cdar call)))
+              (make-llm-provider-utils-function-call
+               :name (assoc-default 'name function)
+               :args (assoc-default 'arguments function))))
+          (assoc-default 'tool_calls (assoc-default 'message response))))
+
+(cl-defmethod llm-provider-populate-function-calls ((_ llm-ollama) prompt calls)
+  (llm-provider-utils-append-to-prompt
+   prompt
+   (mapcar (lambda (call)
+             `((function (name . ,(llm-provider-utils-function-call-name call))
+                         (arguments . ,(json-encode
+                                        (llm-provider-utils-function-call-args call))))))
+           calls)))
 
 (cl-defmethod llm-provider-streaming-media-handler ((_ llm-ollama) msg-receiver _ _)
   (cons 'application/x-ndjson
@@ -139,7 +162,7 @@ PROVIDER is the llm-ollama provider."
   (llm-provider-utils-model-token-limit (llm-ollama-chat-model provider)))
 
 (cl-defmethod llm-capabilities ((_ llm-ollama))
-  (list 'streaming 'embeddings))
+  (list 'streaming 'embeddings 'function-calls))
 
 (provide 'llm-ollama)
 
