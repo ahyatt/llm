@@ -162,7 +162,16 @@ PROVIDER is the llm-ollama provider."
   (llm-provider-utils-model-token-limit (llm-ollama-chat-model provider)))
 
 (cl-defmethod llm-capabilities ((provider llm-ollama))
-  (append (list 'streaming 'embeddings)
+  (append (list 'streaming)
+          ;; See https://ollama.com/search?q=&c=embedding
+          (when (and (llm-ollama-embedding-model provider)
+                     (string-match
+                      (rx (or "nomic-embed-text"
+                              "mxbai-embed-large"
+                              "all-minilm"
+                              "snowflake-arctic-embed"))
+                      (llm-ollama-embedding-model provider)))
+            (list 'embeddings))
           ;; see https://ollama.com/search?c=tools
           (when (string-match
                  (rx (or "llama3.1" "mistral-nemo" "mistral-large"
