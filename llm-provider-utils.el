@@ -430,6 +430,7 @@ conversation history will follow."
      ((string-match-p "falcon" model) 2048)
      ((string-match-p "orca 2" model) 4096)
      ((string-match-p "orca" model) 2048)
+     ((string-match-p "llama\s*3" model) 131072)
      ((string-match-p "llama\s*2" model) 4096)
      ((string-match-p "llama" model) 2048)
      ((string-match-p "starcoder" model) 8192)

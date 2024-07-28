@@ -125,6 +125,8 @@
   ;; The code is straightforward, so no need to test all the models.
   (should (= 8192 (llm-chat-token-limit
                    (make-llm-ollama :chat-model "mistral:latest"))))
+  (should (= 131072 (llm-chat-token-limit
+                     (make-llm-vertex :chat-model "llama3.1-8b"))))
   (should (= 2048 (llm-chat-token-limit
                    (make-llm-ollama :chat-model "unknown")))))
 
