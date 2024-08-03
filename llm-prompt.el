@@ -120,8 +120,11 @@ Return an alist of variables to their corresponding markers."
     (nreverse results)))
 
 (defun llm-prompt--simple-var-p (var)
-  "Return t if VAR is a simple variable, not a possible function."
-  (and (not (functionp var))))
+  "Return t if VAR is a simple variable, not a possible function.
+
+Lists will be turned into generators, so they are not simple variables."
+  (and (not (functionp var))
+       (not (listp var))))
 
 (iter-defun llm-prompt--select-tickets (vars)
   "Return generator that select tickets and calls generators in VARS.
