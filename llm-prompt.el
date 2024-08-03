@@ -121,7 +121,8 @@ Return an alist of variables to their corresponding markers."
 
 (defun llm-prompt--simple-var-p (var)
   "Return t if VAR is a simple variable, not a possible function."
-  (and (not (eq (type-of var) 'function))
+  (and (not (eq (type-of var) 'compiled-function))
+       (not (eq (type-of var) 'function))
        (not (eq (type-of var) 'cons))))
 
 (iter-defun llm-prompt--select-tickets (vars)
