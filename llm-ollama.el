@@ -73,7 +73,7 @@ EMBEDDING-MODEL is the model to use for embeddings.  It is required."
           (llm-ollama-port provider) method))
 
 (cl-defmethod llm-provider-embedding-url ((provider llm-ollama))
-  (llm-ollama--url provider "embeddings"))
+  (llm-ollama--url provider "embed"))
 
 (cl-defmethod llm-provider-chat-url ((provider llm-ollama))
   (llm-ollama--url provider "chat"))
@@ -90,12 +90,12 @@ EMBEDDING-MODEL is the model to use for embeddings.  It is required."
 (cl-defmethod llm-provider-embedding-request ((provider llm-ollama) string)
   "Return the request to the server for the embedding of STRING.
 PROVIDER is the llm-ollama provider."
-  `(("prompt" . ,string)
+  `(("input" . ,string)
     ("model" . ,(llm-ollama-embedding-model provider))))
 
 (cl-defmethod llm-provider-embedding-extract-result ((_ llm-ollama) response)
   "Return the embedding from the server RESPONSE."
-  (assoc-default 'embedding response))
+  (aref (assoc-default 'embeddings response) 0))
 
 (cl-defmethod llm-provider-chat-extract-result ((_ llm-ollama) response)
   "Return the chat response from the server RESPONSE."
