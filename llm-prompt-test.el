@@ -154,6 +154,13 @@ to converge."
       (should (member 'a var2))
       (should (= 5 (+ (length var1) (length var2)))))))
 
+(ert-deftest llm-prompt-fill-with-compiled-function ()
+  (should (equal
+           (llm-prompt-fill-text "({{var1}})"
+                                 (make-prompt-test-llm)
+                                 :var1 (byte-compile (iter-lambda () (iter-yield 'a))))
+           "(a)")))
+
 (ert-deftest llm-prompt-fill-size-limit-after-initial-fill ()
   ;; After filling the intial var1 from a string, we don't have enough tokens to
   ;; do any more filling.
