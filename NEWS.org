@@ -1,10 +1,12 @@
+* Version 0.17.2
+- Fix compiled functions not being evaluated in =llm-prompt=.
+- Use Ollama's new =embed= API instead of the obsolete one.
+- Fix issue in Open AI streaming function calling.
 * Version 0.17.1
 - Support Ollama function calling, for models which support it.
 - Make sure every model, even unknown models, return some value for ~llm-chat-token-limit~.
 - Add token count for llama3.1 model.
 - Make =llm-capabilities= work model-by-model for embeddings and functions
-- Fix compiled functions not being evaluated in =llm-prompt=.
-- Use Ollama's new =embed= API instead of the obsolete one.
 * Version 0.17.0
 - Introduced =llm-prompt= for prompt management and creation from generators.
 - Removed Gemini and Vertex token counting, because =llm-prompt= uses token

@@ -220,8 +220,9 @@ RESPONSE can be nil if the response is complete."
                              (funcall (if (stringp response) msg-receiver fc-receiver) response))))))))))
 
 (cl-defmethod llm-provider-collect-streaming-function-data ((_ llm-openai) data)
-  (let ((cvec (make-vector (length (car data)) nil)))
-    (dotimes (i (length (car data)))
+  (let* ((num-index (+ 1 (assoc-default 'index (aref (car (last data)) 0))))
+         (cvec (make-vector num-index nil)))
+    (dotimes (i num-index)
       (setf (aref cvec i) (make-llm-provider-utils-function-call)))
     (cl-loop for part in data do
              (cl-loop for call in (append part nil) do
