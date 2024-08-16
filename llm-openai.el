@@ -162,7 +162,7 @@ STREAMING if non-nil, turn on response streaming."
     (push `("model" . ,(or (llm-openai-chat-model provider)
                            "gpt-3.5-turbo-0613")) request-alist)
     (when (llm-chat-prompt-temperature prompt)
-      (push `("temperature" . ,(/ (llm-chat-prompt-temperature prompt) 2.0)) request-alist))
+      (push `("temperature" . ,(* (llm-chat-prompt-temperature prompt) 2.0)) request-alist))
     (when (llm-chat-prompt-max-tokens prompt)
       (push `("max_tokens" . ,(llm-chat-prompt-max-tokens prompt)) request-alist))
     (when (llm-chat-prompt-functions prompt)
