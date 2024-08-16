@@ -515,9 +515,8 @@ ROLE will be `assistant' by default, but can be passed in for other roles."
   (setf (llm-chat-prompt-interactions prompt)
         (append (llm-chat-prompt-interactions prompt)
                 (list (make-llm-chat-prompt-interaction
-                       :role (if func-results
-                                 'function
-                               (or role 'assistant))
+                       :role (or role
+                                 (if func-results 'function 'assistant))
                        :content output
                        :function-call-result func-results)))))
 

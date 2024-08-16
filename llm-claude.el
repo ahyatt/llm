@@ -64,9 +64,7 @@
                                                ('user 'user)))
                                   ("content" . ,(or (llm-chat-prompt-interaction-content interaction)
                                                     (llm-chat-prompt-function-call-result-result
-                                                     (llm-chat-prompt-interaction-function-call-result interaction)))))
-                                (when-let ((r (llm-chat-prompt-interaction-function-call-result interaction)))
-                                  `(("tool_use_id" . ,(llm-chat-prompt-function-call-result-call-id r))))))
+                                                     (llm-chat-prompt-interaction-function-call-result interaction)))))))
                              (llm-chat-prompt-interactions prompt)))))
         (system (llm-provider-utils-get-system-prompt prompt)))
     (when (llm-chat-prompt-functions prompt)
@@ -146,6 +144,15 @@
 
 (cl-defmethod llm-capabilities ((_ llm-claude))
   (list 'streaming 'function-calls))
+
+(cl-defmethod llm-should-send-function-results-back ((_ llm-claude))
+  nil)
+
+(cl-defmethod llm-provider-append-to-prompt ((_ llm-claude) prompt result
+                                             &optional func-results)
+  ;; Claude doesn't have a 'function role, so we just always use assistant here.
+  (llm-provider-utils-append-to-prompt prompt result func-results 'assistant))
+
 
 (provide 'llm-claude)
 

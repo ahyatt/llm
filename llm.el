@@ -341,8 +341,16 @@ be passed to `llm-cancel-request'."
                                       new-error-callback)))
     result))
 
-(cl-defmethod llm-chat-function-call ((_ (eql nil)) _ _ _)
-  (error "LLM provider was nil.  Please set the provider in the application you are using"))
+(cl-defgeneric llm-should-send-function-result-back (provider)
+  "Return PROVIDER expects function results sent back.
+This should be called after `llm-chat' or similar function has
+been called with a function call.  If this returns nil, the next
+thing that happens is that the prompt can be added to with a
+`user'-role interaction.  Otherwise, the caller should just send
+the prompt back to the LLM as-is before proceeding. The LLM will
+then send back a generated textual response corresponding to the
+function call output."
+  (ignore provider))
 
 (cl-defgeneric llm-chat-streaming (provider prompt partial-callback response-callback error-callback)
   "Stream a response to PROMPT from PROVIDER.
