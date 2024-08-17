@@ -33,7 +33,7 @@
 ;; Models defined at https://docs.anthropic.com/claude/docs/models-overview
 (cl-defstruct (llm-claude (:include llm-standard-chat-provider))
   (key nil :read-only t)
-  (chat-model "claude-3-opus-20240229" :read-only t))
+  (chat-model "claude-3-5-sonnet-20240620" :read-only t))
 
 (cl-defmethod llm-nonfree-message-info ((_ llm-claude))
   "Return Claude's nonfree ToS."
