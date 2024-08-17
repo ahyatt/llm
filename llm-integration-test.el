@@ -27,9 +27,7 @@
 
 (require 'llm)
 (require 'ert)
-
-(defvar llm-integration-test-providers nil
-  "A list of providers to test against.")
+(require 'seq)
 
 (defconst llm-integration-test-chat-prompt
   "What is the capital of France?  Give me only one word, in English, with no punctuation."
@@ -39,8 +37,24 @@
   "Paris"
   "The correct answer to the chat prompt.")
 
+(defun llm-integration-test-providers ()
+  "Return a list of providers to test."
+  (let ((providers))
+    (when (getenv "OPENAI_KEY")
+      (require 'llm-openai)
+      (push (make-llm-openai :key (getenv "OPENAI_KEY")) providers))
+    (when (getenv "ANTHROPIC_KEY")
+      (require 'llm-claude)
+      (push (make-llm-claude :key (getenv "ANTHROPIC_KEY")) providers))
+    (when (getenv "GEMINI_KEY")
+      (require 'llm-gemini)
+      (push (make-llm-gemini :key (getenv "GEMINI_KEY")) providers))
+    (when (getenv "VERTEX_PROJECT")
+      (require 'llm-vertex)
+      (push (make-llm-vertex :project (getenv "VERTEX_PROJECT")) providers))))
+
 (ert-deftest llm-chat ()
-  (dolist (provider llm-integration-test-providers)
+  (dolist (provider (llm-integration-test-providers))
     (ert-info ((format "Using provider %s" (llm-name provider)))
       (should (equal
                (llm-chat
@@ -49,7 +63,7 @@
                llm-integration-test-chat-answer)))))
 
 (ert-deftest llm-chat-async ()
-  (dolist (provider llm-integration-test-providers)
+  (dolist (provider (llm-integration-test-providers))
     (ert-info ((format "Using provider %s" (llm-name provider)))
       (let ((result nil)
             (buf (current-buffer)))
@@ -66,7 +80,10 @@
         (should (equal result llm-integration-test-chat-answer))))))
 
 (ert-deftest llm-chat-streaming ()
-  (dolist (provider llm-integration-test-providers)
+  (dolist (provider (seq-filter
+                     (lambda (provider)
+                       (member 'streaming (llm-capabilities provider)))
+                     (llm-integration-test-providers)))
     (ert-info ((format "Using provider %s" (llm-name provider)))
       (let ((streamed-result "")
             (returned-result nil)
