@@ -19,9 +19,21 @@
 ;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
 
 ;;; Commentary:
-;; This tests the `llm' module by running against a real backend. It is designed
+;; This tests the `llm' module by running against real backends. It is designed
 ;; to be as fast and accurate as possible, but since LLMs are not deterministic,
 ;; some flakiness may happen.
+;;
+;; These tests will test multiple models, according to the environment variables
+;; set:
+;;
+;; - OPENAI_KEY: An OpenAI API key.
+;; - ANTHROPIC_KEY: An Anthropic API key, for Claude.
+;; - GEMINI_KEY: A Gemini API key.
+;; - VERTEX_PROJECT: A Google Cloud Vertex project.
+;; - OLLAMA_CHAT_MODELS: A list of Ollama models to test.
+;;
+;; If any of these are set, the corresponding provider will be tested.
+
 
 ;;; Code:
 
@@ -70,7 +82,12 @@
       (push (make-llm-gemini :key (getenv "GEMINI_KEY")) providers))
     (when (getenv "VERTEX_PROJECT")
       (require 'llm-vertex)
-      (push (make-llm-vertex :project (getenv "VERTEX_PROJECT")) providers))))
+      (push (make-llm-vertex :project (getenv "VERTEX_PROJECT")) providers))
+    (when (getenv "OLLAMA_MODELS")
+      (require 'llm-ollama)
+      ;; This variable is a list of models to test.
+      (dolist (model (split-string (getenv "OLLAMA_CHAT_MODELS") ", "))
+        (push (make-llm-ollama :chat-model model) providers)))))
 
 (ert-deftest llm-chat ()
   (dolist (provider (llm-integration-test-providers))
