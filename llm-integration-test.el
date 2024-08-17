@@ -37,6 +37,25 @@
   "Paris"
   "The correct answer to the chat prompt.")
 
+(defun llm-integration-test-fc-prompt ()
+  "Return a function call prompt for testing."
+  (llm-make-chat-prompt
+   "What is the capital of France?"
+   :functions
+   (list (make-llm-function-call
+          :function (lambda (f) f)
+          :name "capital_of_country"
+          :description "Get the capital of a country."
+          :args (list (make-llm-function-arg
+                       :name "country"
+                       :description "The country whose capital to look up."
+                       :type 'string
+                       :required t))))))
+
+(defconst llm-integration-test-fc-answer
+  '(("capital_of_country" . "France"))
+  "The correct answer to the function call prompt.")
+
 (defun llm-integration-test-providers ()
   "Return a list of providers to test."
   (let ((providers))
@@ -105,5 +124,12 @@
           (sleep-for 0.1))
         (should (equal returned-result llm-integration-test-chat-answer))
         (should (equal streamed-result llm-integration-test-chat-answer))))))
+
+(ert-deftest llm-function-call ()
+  (dolist (provider (llm-integration-test-providers))
+    (ert-info ((format "Using provider %s" (llm-name provider)))
+      (should (equal
+               (llm-chat provider (llm-integration-test-fc-prompt))
+               llm-integration-test-fc-answer)))))
 
 (provide 'llm-integration-test)

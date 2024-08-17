@@ -95,6 +95,8 @@ RESULT is the result of the function call.  This is required."
 (cl-defstruct llm-function-call
   "This is a struct to represent a function call the LLM can make.
 
+All fields are required.
+
 FUNCTION is a function to call.
 
 NAME is a human readable name of the function.
