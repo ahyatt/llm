@@ -74,18 +74,20 @@
 
 (ert-deftest llm-chat ()
   (dolist (provider (llm-integration-test-providers))
-    (ert-info ((format "Using provider %s" (llm-name provider)))
-      (should (equal
-               (llm-chat
-                provider
-                (llm-make-chat-prompt llm-integration-test-chat-prompt))
-               llm-integration-test-chat-answer)))))
+    (let ((llm-warn-on-nonfree nil))
+      (ert-info ((format "Using provider %s" (llm-name provider)))
+        (should (equal
+                 (llm-chat
+                  provider
+                  (llm-make-chat-prompt llm-integration-test-chat-prompt))
+                 llm-integration-test-chat-answer))))))
 
 (ert-deftest llm-chat-async ()
   (dolist (provider (llm-integration-test-providers))
     (ert-info ((format "Using provider %s" (llm-name provider)))
       (let ((result nil)
-            (buf (current-buffer)))
+            (buf (current-buffer))
+            (llm-warn-on-nonfree nil))
         (llm-chat-async
          provider
          (llm-make-chat-prompt llm-integration-test-chat-prompt)
@@ -106,6 +108,7 @@
     (ert-info ((format "Using provider %s" (llm-name provider)))
       (let ((streamed-result "")
             (returned-result nil)
+            (llm-warn-on-nonfree nil)
             (buf (current-buffer))
             (start-time (current-time)))
         (llm-chat-streaming
@@ -127,9 +130,10 @@
 
 (ert-deftest llm-function-call ()
   (dolist (provider (llm-integration-test-providers))
-    (ert-info ((format "Using provider %s" (llm-name provider)))
-      (should (equal
-               (llm-chat provider (llm-integration-test-fc-prompt))
-               llm-integration-test-fc-answer)))))
+    (let ((llm-warn-on-nonfree nil))
+      (ert-info ((format "Using provider %s" (llm-name provider)))
+        (should (equal
+                 (llm-chat provider (llm-integration-test-fc-prompt))
+                 llm-integration-test-fc-answer))))))
 
 (provide 'llm-integration-test)
