@@ -276,7 +276,7 @@ If STREAMING is non-nil, use the URL for the streaming API."
 
 (cl-defmethod llm-name ((_ llm-vertex))
   "Return the name of the provider."
-  "Gemini")
+  "Vertex Gemini")
 
 (defun llm-vertex--chat-token-limit (model)
   "Get token limit for MODEL."
