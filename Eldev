@@ -1,0 +1,7 @@
+                                        ; -*- mode: emacs-lisp; lexical-binding: t -*-
+
+(eldev-use-package-archive 'gnu-elpa)
+(eldev-use-plugin 'maintainer)
+
+(setq eldev-standard-excludes `(:or ,eldev-standard-excludes "plz*" "utilities/*"))
+(setq checkdoc-force-docstrings-flag nil)

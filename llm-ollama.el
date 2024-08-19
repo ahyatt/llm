@@ -1,6 +1,6 @@
-;;; llm-ollama.el --- llm module for integrating with Ollama. -*- lexical-binding: t -*-
+;;; llm-ollama.el --- llm module for integrating with Ollama. -*- lexical-binding: t; package-lint-main-file: "llm.el"; -*-
 
-;; Copyright (c) 2023  Free Software Foundation, Inc.
+;; Copyright (c) 2023, 2024  Free Software Foundation, Inc.
 
 ;; Author: Andrew Hyatt <ahyatt@gmail.com>
 ;; Homepage: https://github.com/ahyatt/llm
@@ -21,15 +21,15 @@
 
 ;;; Commentary:
 ;; This file implements the llm functionality defined in llm.el, for Ollama, an
-;; interface to running LLMs locally. Ollama can be found at https://ollama.ai/.
+;; interface to running LLMs locally.  Ollama can be found at https://ollama.ai/.
 
 ;;; Code:
 
 (require 'cl-lib)
 (require 'llm)
-(require 'llm-request)
 (require 'llm-provider-utils)
 (require 'json)
+(require 'plz-media-type)
 
 (defgroup llm-ollama nil
   "LLM implementation for Ollama."
@@ -45,23 +45,23 @@
   :type 'integer
   :group 'llm-ollama)
 
-(cl-defstruct llm-ollama
+(cl-defstruct (llm-ollama (:include llm-standard-full-provider))
   "A structure for holding information needed by Ollama's API.
 
-SCHEME is the http scheme to use, a string. It is optional and
+SCHEME is the http scheme to use, a string.  It is optional and
 default to `http'.
 
-HOST is the host that Ollama is running on. It is optional and
+HOST is the host that Ollama is running on.  It is optional and
 default to localhost.
 
 PORT is the localhost port that Ollama is running on.  It is optional.
 
-CHAT-MODEL is the model to use for chat queries. It is required.
+CHAT-MODEL is the model to use for chat queries.  It is required.
 
 EMBEDDING-MODEL is the model to use for embeddings.  It is required."
   (scheme "http") (host "localhost") (port 11434) chat-model embedding-model)
 
-;; Ollama's models may or may not be free, we have no way of knowing. There's no
+;; Ollama's models may or may not be free, we have no way of knowing.  There's no
 ;; way to tell, and no ToS to point out here.
 (cl-defmethod llm-nonfree-message-info ((provider llm-ollama))
   (ignore provider)
@@ -72,146 +72,114 @@ EMBEDDING-MODEL is the model to use for embeddings.  It is required."
   (format "%s://%s:%d/api/%s" (llm-ollama-scheme provider )(llm-ollama-host provider)
           (llm-ollama-port provider) method))
 
-(defun llm-ollama--embedding-request (provider string)
+(cl-defmethod llm-provider-embedding-url ((provider llm-ollama))
+  (llm-ollama--url provider "embed"))
+
+(cl-defmethod llm-provider-chat-url ((provider llm-ollama))
+  (llm-ollama--url provider "chat"))
+
+(cl-defmethod llm-provider-chat-timeout ((_ llm-ollama))
+  llm-ollama-chat-timeout)
+
+(cl-defmethod llm-provider-embedding-extract-error ((_ llm-ollama) response)
+  (assoc-default 'error response))
+
+(cl-defmethod llm-provider-chat-extract-error ((_ llm-ollama) response)
+  (assoc-default 'error response))
+
+(cl-defmethod llm-provider-embedding-request ((provider llm-ollama) string)
   "Return the request to the server for the embedding of STRING.
 PROVIDER is the llm-ollama provider."
-  `(("prompt" . ,string)
+  `(("input" . ,string)
     ("model" . ,(llm-ollama-embedding-model provider))))
 
-(defun llm-ollama--embedding-extract-response (response)
+(cl-defmethod llm-provider-embedding-extract-result ((_ llm-ollama) response)
   "Return the embedding from the server RESPONSE."
-  (assoc-default 'embedding response))
+  (aref (assoc-default 'embeddings response) 0))
 
-(cl-defmethod llm-embedding-async ((provider llm-ollama) string vector-callback error-callback)
-  (let ((buf (current-buffer)))
-    (llm-request-async (llm-ollama--url provider "embeddings")
-                     :data (llm-ollama--embedding-request provider string)
-                     :on-success (lambda (data)
-                                   (llm-request-callback-in-buffer
-                                    buf vector-callback (llm-ollama--embedding-extract-response data)))
-                     :on-error (lambda (_ _)
-                                 ;; The problem with ollama is that it doesn't
-                                 ;; seem to have an error response.
-                                 (llm-request-callback-in-buffer
-                                  buf error-callback 'error "Unknown error calling ollama")))))
+(cl-defmethod llm-provider-chat-extract-result ((_ llm-ollama) response)
+  "Return the chat response from the server RESPONSE."
+  (assoc-default 'content (assoc-default 'message response)))
 
-(cl-defmethod llm-embedding ((provider llm-ollama) string)
-  (llm-ollama--embedding-extract-response
-   (llm-request-sync (format "http://localhost:%d/api/embeddings" (or (llm-ollama-port provider) 11434))
-                     :data (llm-ollama--embedding-request provider string))))
-
-(defun llm-ollama--chat-request (provider prompt)
-  "From PROMPT, create the chat request data to send.
-PROVIDER is the llm-ollama provider to use.
-RETURN-JSON-SPEC is the optional specification for the JSON to return.
-STREAMING if non-nil, turn on response streaming." 
-  (let (request-alist options)
+(cl-defmethod llm-provider-chat-request ((provider llm-ollama) prompt streaming)
+  (let (request-alist messages options)
+    (setq messages
+          (mapcar (lambda (interaction)
+                    `(("role" . ,(symbol-name (llm-chat-prompt-interaction-role interaction)))
+                      ("content" . ,(llm-chat-prompt-interaction-content interaction))))
+                  (llm-chat-prompt-interactions prompt)))
     (when (llm-chat-prompt-context prompt)
-      (push `("system" . ,(llm-provider-utils-get-system-prompt prompt llm-ollama-example-prelude)) request-alist))
-    ;; If the first item isn't an interaction, then it's a conversation which
-    ;; we'll set as the chat context.
-    (when (not (eq (type-of (car (llm-chat-prompt-interactions prompt)))
-                   'llm-chat-prompt-interaction))
-      (push `("context" . ,(car (llm-chat-prompt-interactions prompt))) request-alist))
-    (push `("prompt" . ,(string-trim (llm-chat-prompt-interaction-content
-                                      (car (last (llm-chat-prompt-interactions prompt))))))
-          request-alist)
+      (push `(("role" . "system")
+              ("content" . ,(llm-provider-utils-get-system-prompt prompt llm-ollama-example-prelude)))
+            messages))
+    (push `("messages" . ,messages) request-alist)
     (push `("model" . ,(llm-ollama-chat-model provider)) request-alist)
+    (when (and streaming (llm-chat-prompt-functions prompt))
+      (signal 'not-implemented
+              "Ollama does not support streaming with function calls"))
+    (when (llm-chat-prompt-functions prompt)
+      (push `("tools" . ,(mapcar #'llm-provider-utils-openai-function-spec
+                                 (llm-chat-prompt-functions prompt))) request-alist))
+    (push `("stream" . ,(if streaming t :json-false)) request-alist)
     (when (llm-chat-prompt-temperature prompt)
       (push `("temperature" . ,(llm-chat-prompt-temperature prompt)) options))
     (when (llm-chat-prompt-max-tokens prompt)
       (push `("num_predict" . ,(llm-chat-prompt-max-tokens prompt)) options))
+    (setq options (append options (llm-chat-prompt-non-standard-params prompt)))
     (when options (push `("options" . ,options) request-alist))
     request-alist))
 
-(defvar-local llm-ollama-current-response ""
-  "The response so far from the server.")
+(cl-defmethod llm-provider-extract-function-calls ((_ llm-ollama) response)
+  (mapcar (lambda (call)
+            (let ((function (cdar call)))
+              (make-llm-provider-utils-function-call
+               :name (assoc-default 'name function)
+               :args (assoc-default 'arguments function))))
+          (assoc-default 'tool_calls (assoc-default 'message response))))
 
-(defvar-local llm-ollama-last-response 0
-  "The last response number we've read.")
+(cl-defmethod llm-provider-populate-function-calls ((_ llm-ollama) prompt calls)
+  (llm-provider-utils-append-to-prompt
+   prompt
+   (mapcar (lambda (call)
+             `((function (name . ,(llm-provider-utils-function-call-name call))
+                         (arguments . ,(json-encode
+                                        (llm-provider-utils-function-call-args call))))))
+           calls)))
 
-(defun llm-ollama--get-partial-chat-response (response)
-  "Return the text in the partial chat response from RESPONSE."
-  ;; To begin with, we should still be in the buffer with the actual response.
-  (let ((current-response llm-ollama-current-response)
-        (last-response llm-ollama-last-response))
-    (with-temp-buffer
-      (insert response)
-      ;; Responses in ollama are always one per line.
-      (let* ((end-pos (save-excursion (goto-char (point-max))
-                                      (when (search-backward-regexp
-                                             (rx (seq "done\":false}" line-end))
-                                             nil t)
-                                        (line-end-position)))))
-        (when end-pos
-          (let ((all-lines (seq-filter
-                            (lambda (line) (string-match-p (rx (seq string-start ?{)) line))
-                            (split-string (buffer-substring-no-properties 1 end-pos) "\n" t))))
-            (setq
-             current-response
-             (concat current-response
-                     (mapconcat
-                      (lambda (line) (assoc-default 'response (json-read-from-string line)))
-                      ;; Take from response output last-response to the end. This
-                      ;; counts only valid responses, so we need to throw out all
-                      ;; other lines that aren't valid JSON.
-                      (seq-subseq all-lines last-response) "")))
-            (setq last-response (length all-lines))))))
-    ;; If there is no new content, don't manipulate anything.
-    (when (> (length current-response) (length llm-ollama-current-response))
-      (setq llm-ollama-last-response last-response)
-      (setq llm-ollama-current-response current-response))
-    current-response))
-
-(defun llm-ollama--get-final-response (response)
-  "Return the final post-streaming json output from RESPONSE."
-  (with-temp-buffer
-    (insert response)
-    ;; Find the last json object in the buffer.
-    (goto-char (point-max))
-    (search-backward "{" nil t)
-    (json-read)))
-
-(cl-defmethod llm-chat ((provider llm-ollama) prompt)
-  ;; We expect to be in a new buffer with the response, which we use to store
-  ;; local variables. The temp buffer won't have the response, but that's fine,
-  ;; we really just need it for the local variables.
-  (with-temp-buffer
-    (let ((output (llm-request-sync-raw-output 
-                   (llm-ollama--url provider "generate")
-                   :data (llm-ollama--chat-request provider prompt)
-                   ;; ollama is run on a user's machine, and it can take a while.
-                   :timeout llm-ollama-chat-timeout)))
-      (setf (llm-chat-prompt-interactions prompt)
-	        (list (assoc-default 'context (llm-ollama--get-final-response output))))
-      (llm-ollama--get-partial-chat-response output))))
-
-(cl-defmethod llm-chat-async ((provider llm-ollama) prompt response-callback error-callback)
-  (llm-chat-streaming provider prompt (lambda (_)) response-callback error-callback))
-
-(cl-defmethod llm-chat-streaming ((provider llm-ollama) prompt partial-callback response-callback error-callback)
-  (let ((buf (current-buffer)))
-    (llm-request-async (llm-ollama--url provider "generate")
-      :data (llm-ollama--chat-request provider prompt)
-      :on-success-raw (lambda (response)
-                        (setf (llm-chat-prompt-interactions prompt)
-                              (list (assoc-default 'context (llm-ollama--get-final-response response))))
-                        (llm-request-callback-in-buffer
-                         buf response-callback
-                         (llm-ollama--get-partial-chat-response response)))
-      :on-partial (lambda (data)
-                    (when-let ((response (llm-ollama--get-partial-chat-response data)))
-                      (llm-request-callback-in-buffer buf partial-callback response)))
-      :on-error (lambda (_ _)
-                  ;; The problem with ollama is that it doesn't
-                  ;; seem to have an error response.
-                  (llm-request-callback-in-buffer buf error-callback "Unknown error calling ollama")))))
+(cl-defmethod llm-provider-streaming-media-handler ((_ llm-ollama) msg-receiver _ _)
+  (cons 'application/x-ndjson
+        (plz-media-type:application/x-ndjson
+         :handler (lambda (data)
+                    (when-let ((response (assoc-default
+                                          'content
+                                          (assoc-default 'message data))))
+                      (funcall msg-receiver response))))))
 
 (cl-defmethod llm-name ((provider llm-ollama))
   (llm-ollama-chat-model provider))
 
 (cl-defmethod llm-chat-token-limit ((provider llm-ollama))
   (llm-provider-utils-model-token-limit (llm-ollama-chat-model provider)))
+
+(cl-defmethod llm-capabilities ((provider llm-ollama))
+  (append (list 'streaming)
+          ;; See https://ollama.com/search?q=&c=embedding
+          (when (and (llm-ollama-embedding-model provider)
+                     (string-match
+                      (rx (or "nomic-embed-text"
+                              "mxbai-embed-large"
+                              "all-minilm"
+                              "snowflake-arctic-embed"))
+                      (llm-ollama-embedding-model provider)))
+            (list 'embeddings))
+          ;; see https://ollama.com/search?c=tools
+          (when (string-match
+                 (rx (or "llama3.1" "mistral-nemo" "mistral-large"
+                         "mistral" "mixtral" "command-r-plus"
+                         "llama3-groq-tool-use"
+                         "firefunction-v2"))
+                 (llm-ollama-chat-model provider))
+            (list 'function-calls))))
 
 (provide 'llm-ollama)
 

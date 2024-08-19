@@ -1,6 +1,6 @@
-;;; llm-fake.el --- Use for developers looking at llm calls. -*- lexical-binding: t -*-
+;;; llm-fake.el --- Use for developers looking at llm calls. -*- lexical-binding: t; package-lint-main-file: "llm.el"; -*-
 
-;; Copyright (c) 2023  Free Software Foundation, Inc.
+;; Copyright (c) 2023, 2024  Free Software Foundation, Inc.
 
 ;; Author: Andrew Hyatt <ahyatt@gmail.com>
 ;; Homepage: https://github.com/ahyatt/llm
@@ -21,8 +21,8 @@
 
 ;;; Commentary:
 ;; This file implements the llm functionality defined in llm.el, for developers
-;; who want to just understand what llm calls are made, and with what data. Or,
-;; to test out various functionality they have. The functions return something,
+;; who want to just understand what llm calls are made, and with what data.  Or,
+;; to test out various functionality they have.  The functions return something,
 ;; or throw errors, depending on how the `llm-fake' provider is configured.
 
 (require 'cl-lib)
@@ -34,16 +34,16 @@
  "A provider for the fake LLM provider.
 
 OUTPUT-TO-BUFFER can be nil, in which case, nothing will be
-output. If a string or a buffer, it will append the request as
+output.  If a string or a buffer, it will append the request as
 text to that buffer.
 
 CHAT-ACTION-FUNC will be called with no arguments to produce
 either a string response for the chat, or a signal symbol and
-message cons. If nil, the response will be a short text string.
+message cons.  If nil, the response will be a short text string.
 
 EMBEDDING-ACTION-FUNC will be called with no arguments to produce
 either a vector response for the chat, or a signal symbol and
-message cons. If nil, the response will be a simple vector."
+message cons.  If nil, the response will be a simple vector."
  output-to-buffer chat-action-func embedding-action-func)
 
 (cl-defmethod llm-chat-async ((provider llm-fake) prompt response-callback error-callback)
@@ -89,7 +89,7 @@ message cons. If nil, the response will be a simple vector."
               (setq accum (concat accum word " "))
               (funcall partial-callback accum)
               (sleep-for 0 100))
-            (string-split text))
+            (split-string text))
       (setf (llm-chat-prompt-interactions prompt)
             (append (llm-chat-prompt-interactions prompt)
                     (list (make-llm-chat-prompt-interaction :role 'assistant :content text))))
@@ -116,6 +116,11 @@ message cons. If nil, the response will be a simple vector."
   nil)
 
 (cl-defmethod llm-name ((_ llm-fake))
+  "The name of the provider."
   "Fake")
 
+(cl-defmethod llm-capabilities ((_ llm-fake))
+  (list 'streaming 'embeddings))
+
 (provide 'llm-fake)
+;;; llm-fake.el ends here

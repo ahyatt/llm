@@ -1,6 +1,6 @@
-;;; llm-provider-utils-test.el --- Tests for llm-provider-utils -*- lexical-binding: t -*-
+;;; llm-provider-utils-test.el --- Tests for llm-provider-utils -*- lexical-binding: t; package-lint-main-file: "llm.el"; -*-
 
-;; Copyright (c) 2023  Free Software Foundation, Inc.
+;; Copyright (c) 2023, 2024  Free Software Foundation, Inc.
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -23,21 +23,14 @@
 
 (require 'llm-provider-utils)
 
-(ert-deftest test-llm-provider-utils-combine-to-system-prompt ()
+(ert-deftest llm-provider-utils-combine-to-system-prompt ()
   (let* ((interaction1 (make-llm-chat-prompt-interaction :role 'user :content "Hello"))
-         (interaction2 (make-llm-chat-prompt-interaction :role 'assistant :content "Hi! How can I assist you?"))
          (example1 (cons "Request 1" "Response 1"))
          (example2 (cons "Request 2" "Response 2"))
          (prompt-for-first-request
           (make-llm-chat-prompt
            :context "Example context"
            :interactions (list (copy-llm-chat-prompt-interaction interaction1))
-           :examples (list example1 example2)))
-         (prompt-for-second-request
-          (make-llm-chat-prompt
-           :context "An example context"
-           :interactions (list (copy-llm-chat-prompt-interaction interaction1)
-                               (copy-llm-chat-prompt-interaction interaction2))
            :examples (list example1 example2)))
          (prompt-with-existing-system-prompt
           (make-llm-chat-prompt
@@ -51,12 +44,8 @@
     (should (equal "Example context\nHere are 2 examples of how to respond:\n\nUser: Request 1\nAssistant: Response 1\nUser: Request 2\nAssistant: Response 2"
                    (llm-chat-prompt-interaction-content (nth 0 (llm-chat-prompt-interactions prompt-for-first-request)))))
     (should (equal "Hello" (llm-chat-prompt-interaction-content (nth 1 (llm-chat-prompt-interactions prompt-for-first-request)))))
-
-    ;; Nothing should be done on the second request.
-    (should (= 2 (length (llm-chat-prompt-interactions prompt-for-second-request))))
-    (llm-provider-utils-combine-to-system-prompt prompt-for-second-request)
-    (should (equal interaction1 (nth 0 (llm-chat-prompt-interactions prompt-for-second-request))))
-    (should (equal interaction2 (nth 1 (llm-chat-prompt-interactions prompt-for-second-request))))
+    (should-not (llm-chat-prompt-context prompt-for-first-request))
+    (should-not (llm-chat-prompt-examples prompt-for-first-request))
 
     ;; On the request with the existing system prompt, it should append the new
     ;; text to the existing system prompt.
@@ -65,35 +54,24 @@
     (should (equal "Existing system prompt.\nExample context\nHere are 2 examples of how to respond:\n\nUser: Request 1\nAssistant: Response 1\nUser: Request 2\nAssistant: Response 2"
                    (llm-chat-prompt-interaction-content (nth 0 (llm-chat-prompt-interactions prompt-with-existing-system-prompt)))))))
 
-(ert-deftest test-llm-provider-utils-combine-to-user-prompt ()
+(ert-deftest llm-provider-utils-combine-to-user-prompt ()
   (let* ((interaction1 (make-llm-chat-prompt-interaction :role 'user :content "Hello"))
-         (interaction2 (make-llm-chat-prompt-interaction :role 'assistant :content "Hi! How can I assist you?"))
          (example1 (cons "Request 1" "Response 1"))
          (example2 (cons "Request 2" "Response 2"))
          (prompt-for-first-request
           (make-llm-chat-prompt
            :context "Example context"
            :interactions (list (copy-llm-chat-prompt-interaction interaction1))
-           :examples (list example1 example2)))
-         (prompt-for-second-request
-          (make-llm-chat-prompt
-           :context "An example context"
-           :interactions (list (copy-llm-chat-prompt-interaction interaction1)
-                               (copy-llm-chat-prompt-interaction interaction2))
            :examples (list example1 example2))))
     ;; In the first request, the system prompt should be prepended to the user request.
     (llm-provider-utils-combine-to-user-prompt prompt-for-first-request)
     (should (= 1 (length (llm-chat-prompt-interactions prompt-for-first-request))))
+    (should-not (llm-chat-prompt-context prompt-for-first-request))
+    (should-not (llm-chat-prompt-examples prompt-for-first-request))
     (should (equal "Example context\nHere are 2 examples of how to respond:\n\nUser: Request 1\nAssistant: Response 1\nUser: Request 2\nAssistant: Response 2\nHello"
-                   (llm-chat-prompt-interaction-content (nth 0 (llm-chat-prompt-interactions prompt-for-first-request)))))
+                   (llm-chat-prompt-interaction-content (nth 0 (llm-chat-prompt-interactions prompt-for-first-request)))))))
 
-    ;; Nothing should be done on the second request.
-    (should (= 2 (length (llm-chat-prompt-interactions prompt-for-second-request))))
-    (llm-provider-utils-combine-to-user-prompt prompt-for-second-request)
-    (should (equal interaction1 (nth 0 (llm-chat-prompt-interactions prompt-for-second-request))))
-    (should (equal interaction2 (nth 1 (llm-chat-prompt-interactions prompt-for-second-request))))))
-
-(ert-deftest test-provider-utils-collapse-history ()
+(ert-deftest llm-provider-utils-collapse-history ()
   (let* ((interaction1 (make-llm-chat-prompt-interaction :role 'user :content "Hello"))
          (interaction2 (make-llm-chat-prompt-interaction :role 'assistant :content "Hi! How can I assist you?"))
          (interaction3 (make-llm-chat-prompt-interaction :role 'assistant :content "Earl Grey, hot."))

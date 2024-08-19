@@ -1,6 +1,6 @@
-;;; llm-test.el --- Unit tests for the llm module -*- lexical-binding: t -*-
+;;; llm-test.el --- Unit tests for the llm module -*- lexical-binding: t; package-lint-main-file: "llm.el"; -*-
 
-;; Copyright (c) 2023  Free Software Foundation, Inc.
+;; Copyright (c) 2023, 2024  Free Software Foundation, Inc.
 
 ;; Author: Andrew Hyatt <ahyatt@gmail.com>
 ;; SPDX-License-Identifier: GPL-3.0-or-later
@@ -58,11 +58,31 @@
            (llm-chat (make-llm-fake :chat-action-func (lambda () "Response"))
                      (make-llm-chat-prompt)))))
 
+(ert-deftest llm-make-chat-prompt ()
+  (should-error (llm-make-chat-prompt nil))
+  (should-error (llm-make-chat-prompt '("a" "b")))
+  (should (equal (llm-make-chat-prompt
+                  '("a" "b" "c")
+                  :temperature 0.2)
+                 (make-llm-chat-prompt
+                  :interactions (list (make-llm-chat-prompt-interaction
+                                       :role 'user :content "a")
+                                      (make-llm-chat-prompt-interaction
+                                       :role 'assistant :content "b")
+                                      (make-llm-chat-prompt-interaction
+                                       :role 'user :content "c"))
+                  :temperature 0.2)))
+  (should (equal (llm-make-chat-prompt "a")
+                 (make-llm-chat-prompt
+                  :interactions (list (make-llm-chat-prompt-interaction
+                                       :role 'user :content "a"))))))
+
 (ert-deftest llm-test-chat-token-limit-openai ()
   (cl-flet* ((token-limit-for (model)
                (llm-chat-token-limit (make-llm-openai :chat-model model)))
              (should-have-token-limit (model limit)
-               (should (equal limit (token-limit-for model)))))
+               (ert-info ((format "Testing %s" model))
+                 (should (equal limit (token-limit-for model))))))
     ;; From https://platform.openai.com/docs/models/gpt-3-5
     (should-have-token-limit "gpt-3.5-turbo-1106" 16385)
     (should-have-token-limit "gpt-3.5-turbo" 4096)
@@ -78,27 +98,69 @@
     (should-have-token-limit "gpt-4" 8192)
     (should-have-token-limit "gpt-4-32k" 32768)
     (should-have-token-limit "gpt-4-0613" 8192)
-    (should-have-token-limit "gpt-4-32k-0613" 32768)))
+    (should-have-token-limit "gpt-4-32k-0613" 32768)
+    (should-have-token-limit "gpt-4o" 30000)
+    (should-have-token-limit "gpt-4o-mini" 30000)
+    (should-have-token-limit "unknown" 4096)))
 
 (ert-deftest llm-test-chat-token-limit-gemini ()
   (should (= 30720 (llm-chat-token-limit (make-llm-gemini))))
   (should (= 12288 (llm-chat-token-limit
-                    (make-llm-gemini :chat-model "gemini-pro-vision")))))
+                    (make-llm-gemini :chat-model "gemini-pro-vision"))))
+  (should (= 1048576 (llm-chat-token-limit
+                      (make-llm-gemini :chat-model "gemini-1.5-flash"))))
+  (should (= 2048 (llm-chat-token-limit
+                   (make-llm-vertex :chat-model "unknown")))))
 
 (ert-deftest llm-test-chat-token-limit-vertex ()
   (should (= 30720 (llm-chat-token-limit (make-llm-vertex))))
   (should (= 12288 (llm-chat-token-limit
-                    (make-llm-vertex :chat-model "gemini-pro-vision")))))
+                    (make-llm-vertex :chat-model "gemini-pro-vision"))))
+  (should (= 1048576 (llm-chat-token-limit
+                      (make-llm-gemini :chat-model "gemini-1.5-flash"))))
+  (should (= 2048 (llm-chat-token-limit
+                   (make-llm-vertex :chat-model "unknown")))))
 
 (ert-deftest llm-test-chat-token-limit-ollama ()
   ;; The code is straightforward, so no need to test all the models.
   (should (= 8192 (llm-chat-token-limit
-                   (make-llm-ollama :chat-model "mistral:latest")))))
+                   (make-llm-ollama :chat-model "mistral:latest"))))
+  (should (= 131072 (llm-chat-token-limit
+                     (make-llm-vertex :chat-model "llama3.1-8b"))))
+  (should (= 2048 (llm-chat-token-limit
+                   (make-llm-ollama :chat-model "unknown")))))
 
 (ert-deftest llm-test-chat-token-limit-gpt4all ()
   ;; The code is straightforward, so no need to test all the models.
   (should (= 8192 (llm-chat-token-limit
-                   (make-llm-ollama :chat-model "Mistral")))))
+                   (make-llm-gpt4all :chat-model "Mistral")))))
 
+(ert-deftest llm-test-ollama-function-calling-capabilities ()
+  ;; tests subject to change as models may get function calling
+  (cl-flet ((has-fc (model)
+              (member 'function-calls (llm-capabilities (make-llm-ollama :chat-model model)))))
+    (should (has-fc "llama3.1"))
+    (should (has-fc "llama3.1:8b-instruct-q8_0"))
+    (should (has-fc "mistral"))
+    (should-not (has-fc "gemma"))
+    (should-not (has-fc "gemma2"))
+    (should-not (has-fc "llama2"))
+    (should-not (has-fc "llama"))
+    (should-not (has-fc "unknown"))))
 
+(ert-deftest llm-test-ollama-embedding-capabilities ()
+  ;; tests subject to change as models may get function calling
+  (cl-flet ((has-emb (model)
+              (member 'embeddings
+                      (llm-capabilities (make-llm-ollama :embedding-model model
+                                                         :chat-model "mistral")))))
+    (should-not (has-emb "llama3.1"))
+    (should-not (has-emb "mistral"))
+    (should (has-emb "nomic-embed-text"))
+    (should (has-emb "mxbai-embed-large"))
+    (should-not (has-emb "mxbai-embed-small"))
+    (should-not (has-emb "unknown"))
+    (should-not (has-emb nil))))
+
+(provide 'llm-test)
 ;;; llm-test.el ends here

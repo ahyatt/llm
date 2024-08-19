@@ -1,3 +1,67 @@
+* Version 0.17.2
+- Fix compiled functions not being evaluated in =llm-prompt=.
+- Use Ollama's new =embed= API instead of the obsolete one.
+- Fix issue in Open AI streaming function calling.
+- Update Open AI and Claude default chat models to the later models.
+* Version 0.17.1
+- Support Ollama function calling, for models which support it.
+- Make sure every model, even unknown models, return some value for ~llm-chat-token-limit~.
+- Add token count for llama3.1 model.
+- Make =llm-capabilities= work model-by-model for embeddings and functions
+* Version 0.17.0
+- Introduced =llm-prompt= for prompt management and creation from generators.
+- Removed Gemini and Vertex token counting, because =llm-prompt= uses token
+  counting often and it's best to have a quick estimate than a more expensive
+  more accurate count.
+* Version 0.16.2
+- Fix Open AI's gpt4-o context length, which is lower for most paying users than the max.
+* Version 0.16.1
+- Add support for HTTP / HTTPS proxies.
+* Version 0.16.0
+- Add "non-standard params" to set per-provider options.
+- Add default parameters for chat providers.
+* Version 0.15.0
+- Move to =plz= backend, which uses =curl=.  This helps move this package to a
+  stronger foundation backed by parsing to spec.  Thanks to Roman Scherer for
+  contributing the =plz= extensions that enable this, which are currently bundled
+  in this package but will eventually become their own separate package.
+- Add model context information for Open AI's GPT 4-o.
+- Add model context information for Gemini's 1.5 models.
+* Version 0.14.2
+- Fix mangled copyright line (needed to get ELPA version unstuck).
+- Fix Vertex response handling bug.
+* Version 0.14.1
+- Fix various issues with the 0.14 release
+* Version 0.14
+- Introduce new way of creating prompts: llm-make-chat-prompt, deprecating the older ways.
+- Improve Vertex error handling
+* Version 0.13
+- Add Claude's new support for function calling.
+- Refactor of providers to centralize embedding and chat logic.
+- Remove connection buffers after use.
+- Fixes to provider more specific error messages for most providers.
+* Verson 0.12.3
+- Refactor of warn-non-nonfree methods.
+- Add non-free warnings for Gemini and Claude.
+* Version 0.12.2
+- Send connection issues to error callbacks, and fix an error handling issue in Ollama.
+- Fix issue where, in some cases, streaming does not work the first time attempted.
+* Version 0.12.1
+- Fix issue in =llm-ollama= with not using provider host for sync embeddings.
+- Fix issue in =llm-openai= where were incompatible with some Open AI-compatible backends due to assumptions about inconsequential JSON details.
+* Version 0.12.0
+- Add provider =llm-claude=, for Anthropic's Claude.
+* Version 0.11.0
+- Introduce function calling, now available only in Open AI and Gemini.
+- Introduce =llm-capabilities=, which returns a list of extra capabilities for each backend.
+- Fix issue with logging when we weren't supposed to.
+* Version 0.10.0
+- Introduce llm logging (for help with developing against =llm=), set ~llm-log~ to non-nil to enable logging of all interactions with the =llm= package.
+- Change the default interaction with ollama to one more suited for converesations (thanks to Thomas Allen).
+* Version 0.9.1
+- Default to the new "text-embedding-3-small" model for Open AI.  *Important*: Anyone who has stored embeddings should either regenerate embeddings (recommended) or hard-code the old embedding model ("text-embedding-ada-002").
+- Fix response breaking when prompts run afoul of Gemini / Vertex's safety checks.
+- Change Gemini streaming to be the correct URL.  This doesn't seem to have an effect on behavior.
 * Version 0.9
 - Add =llm-chat-token-limit= to find the token limit based on the model.
 - Add request timeout customization.

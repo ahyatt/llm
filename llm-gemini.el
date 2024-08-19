@@ -1,6 +1,6 @@
-;;; llm-gemini.el --- LLM implementation of Google Cloud Gemini AI -*- lexical-binding: t -*-
+;;; llm-gemini.el --- LLM implementation of Google Cloud Gemini AI -*- lexical-binding: t; package-lint-main-file: "llm.el"; -*-
 
-;; Copyright (c) 2023  Free Software Foundation, Inc.
+;; Copyright (c) 2023, 2024  Free Software Foundation, Inc.
 
 ;; Author: Andrew Hyatt <ahyatt@gmail.com>
 ;; Homepage: https://github.com/ahyatt/llm
@@ -21,105 +21,72 @@
 
 ;;; Commentary:
 ;; This file implements the llm functionality defined in llm.el, for Google's
-;; Gemini AI. The documentation is at
+;; Gemini AI.  he documentation is at
 ;; https://ai.google.dev/tutorials/rest_quickstart.
 
 ;;; Code:
 
 (require 'cl-lib)
 (require 'llm)
-(require 'llm-request)
 (require 'llm-vertex)
+(require 'llm-provider-utils)
 (require 'json)
 
-(cl-defstruct llm-gemini
+(cl-defstruct (llm-gemini (:include llm-google))
   "A struct representing a Gemini client.
 
 KEY is the API key for the client.
 You can get this at https://makersuite.google.com/app/apikey."
   key (embedding-model "embedding-001") (chat-model "gemini-pro"))
 
-(defun llm-gemini--embedding-url (provider)
+(cl-defmethod llm-nonfree-message-info ((_ llm-gemini))
+  "Return nonfree terms of service for Gemini."
+  "https://policies.google.com/terms/generative-ai")
+
+(cl-defmethod llm-provider-embedding-url ((provider llm-gemini))
   "Return the URL for the EMBEDDING request for STRING from PROVIDER."
   (format "https://generativelanguage.googleapis.com/v1beta/models/%s:embedContent?key=%s"
           (llm-gemini-embedding-model provider)
           (llm-gemini-key provider)))
 
-(defun llm-gemini--embedding-request (provider string)
-  "Return the embedding request for STRING, using PROVIDER."
+(cl-defmethod llm-provider-embedding-request ((provider llm-gemini) string)
   `((model . ,(llm-gemini-embedding-model provider))
     (content . ((parts . (((text . ,string))))))))
 
-(defun llm-gemini--embedding-response-handler (response)
-  "Handle the embedding RESPONSE from Gemini."
+(cl-defmethod llm-provider-embedding-extract-result ((_ llm-gemini) response)
   (assoc-default 'values (assoc-default 'embedding response)))
 
-(cl-defmethod llm-embedding ((provider llm-gemini) string)
-  (llm-vertex--handle-response
-   (llm-request-sync (llm-gemini--embedding-url provider)
-                     :data (llm-gemini--embedding-request provider string))
-   #'llm-gemini--embedding-response-handler))
-
-(cl-defmethod llm-embedding-async ((provider llm-gemini) string vector-callback error-callback)
-  (let ((buf (current-buffer)))
-    (llm-request-async (llm-gemini--embedding-url provider)
-                       :data (llm-gemini--embedding-request provider string)
-                       :on-success (lambda (data)
-                                     (llm-request-callback-in-buffer
-                                      buf vector-callback (llm-gemini--embedding-response-handler data)))
-                       :on-error (lambda (_ data)
-                                   (llm-request-callback-in-buffer
-                                    buf error-callback
-                                    'error (llm-vertex--error-message data))))))
-
-(defun llm-gemini--chat-url (provider)
-  "Return the URL for the chat request, using PROVIDER."
-  (format "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s"
+;; from https://ai.google.dev/tutorials/rest_quickstart
+(defun llm-gemini--chat-url (provider streaming-p)
+  "Return the URL for the chat request, using PROVIDER.
+If STREAMING-P is non-nil, use the streaming endpoint."
+  (format "https://generativelanguage.googleapis.com/v1beta/models/%s:%s?key=%s"
           (llm-gemini-chat-model provider)
+          (if streaming-p "streamGenerateContent" "generateContent")
           (llm-gemini-key provider)))
 
-(defun llm-gemini--get-chat-response (response)
-  "Get the chat response from RESPONSE."
-  ;; Response is a series of the form "text: <some text>\n", which we will concatenate.
-  (mapconcat (lambda (x) (read (substring-no-properties (string-trim x) 8))) (split-string response "\n" t "\\s*") ""))
+(cl-defmethod llm-provider-chat-url ((provider llm-gemini))
+  (llm-gemini--chat-url provider nil))
 
-(cl-defmethod llm-chat ((provider llm-gemini) prompt)
-  (let ((response (llm-vertex--get-chat-response-streaming
-                   (llm-request-sync (llm-gemini--chat-url provider)
-                                     :data (llm-vertex--chat-request-streaming prompt)))))
-    (setf (llm-chat-prompt-interactions prompt)
-          (append (llm-chat-prompt-interactions prompt)
-                  (list (make-llm-chat-prompt-interaction :role 'assistant :content response))))
-    response))
+(cl-defmethod llm-provider-chat-streaming-url ((provider llm-gemini))
+  (llm-gemini--chat-url provider t))
 
-(cl-defmethod llm-chat-streaming ((provider llm-gemini) prompt partial-callback response-callback error-callback)
-  (let ((buf (current-buffer)))
-    (llm-request-async (llm-gemini--chat-url provider)
-                       :data (llm-vertex--chat-request-streaming prompt)
-                       :on-partial (lambda (partial)
-                                     (when-let ((response (llm-vertex--get-partial-chat-ui-repsonse partial)))
-                                       (llm-request-callback-in-buffer buf partial-callback response)))
-                       :on-success (lambda (data)
-                                     (let ((response (llm-vertex--get-chat-response-streaming data)))
-                                     (setf (llm-chat-prompt-interactions prompt)
-                                           (append (llm-chat-prompt-interactions prompt)
-                                                   (list (make-llm-chat-prompt-interaction :role 'assistant :content response))))
-                                     (llm-request-callback-in-buffer buf response-callback response)))
-                       :on-error (lambda (_ data)
-                                 (llm-request-callback-in-buffer buf error-callback 'error
-                                                                 (llm-vertex--error-message data))))))
+(cl-defmethod llm-provider-populate-function-calls ((_ llm-gemini) prompt calls)
+  (llm-provider-utils-append-to-prompt
+   prompt
+   ;; For Vertex there is just going to be one call
+   (mapcar (lambda (fc)
+             `((functionCall
+                .
+                ((name . ,(llm-provider-utils-function-call-name fc))
+                 (args . ,(llm-provider-utils-function-call-args fc))))))
+           calls)))
 
-(defun llm-gemini--count-token-url (provider)
-  "Return the URL for the count token call, using PROVIDER."
-  (format "https://generativelanguage.googleapis.com/v1beta/models/%s:countTokens?key=%s"
-          (llm-gemini-chat-model provider)
-          (llm-gemini-key provider)))
-
-(cl-defmethod llm-count-tokens ((provider llm-gemini) string)
-  (llm-vertex--handle-response
-   (llm-request-sync (llm-gemini--count-token-url provider)
-                     :data (llm-vertex--to-count-token-request (llm-vertex--chat-request-streaming (llm-make-simple-chat-prompt string))))
-   #'llm-vertex--count-tokens-extract-response))
+(cl-defmethod llm-provider-chat-request ((_ llm-gemini) _ _)
+  (mapcar (lambda (c) (if (eq (car c) 'generation_config)
+                          (cons 'generationConfig (cdr c))
+                        c))
+          (cl-call-next-method)))
 
 (cl-defmethod llm-name ((_ llm-gemini))
   "Return the name of PROVIDER."
@@ -128,6 +95,9 @@ You can get this at https://makersuite.google.com/app/apikey."
 ;; From https://ai.google.dev/models/gemini.
 (cl-defmethod llm-chat-token-limit ((provider llm-gemini))
   (llm-vertex--chat-token-limit (llm-gemini-chat-model provider)))
+
+(cl-defmethod llm-capabilities ((_ llm-gemini))
+  (list 'streaming 'embeddings 'function-calls))
 
 (provide 'llm-gemini)
 
