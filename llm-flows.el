@@ -86,11 +86,11 @@ ON-SUCCESS.  It does not take any arguments."
             :states
             ((:chat
               (:enter (llm-chat-async (llm-flows-state-provider state)
-                                        (llm-flows-state-prompt state)
-                                        (lambda (result)
-                                          (fsm-send fsm (cons :success result)))
-                                        (lambda (_ errmsg)
-                                          (fsm-send fsm (cons :error errmsg))))
+                                      (llm-flows-state-prompt state)
+                                      (lambda (result)
+                                        (fsm-send fsm (cons :success result)))
+                                      (lambda (_ errmsg)
+                                        (fsm-send fsm (cons :error errmsg))))
                       (list state nil))
               (:event
                (ignore callback)
@@ -99,7 +99,7 @@ ON-SUCCESS.  It does not take any arguments."
               (:event
                (ignore callback)
                (llm-flows-json-extract-and-verify fsm state event)))
-             (:user-verifier              
+             (:user-verifier
               (:event
                (ignore callback)
                (if (llm-flows-state-user-verifier state)
@@ -121,7 +121,7 @@ ON-SUCCESS.  It does not take any arguments."
   (if (eq event :revise)
       (progn (when-let ((undof (llm-flows-state-on-undo state)))
                (funcall undof))
-             (llm-flows-revise state))                 
+             (llm-flows-revise state))
     (list :end state)))
 
 (defun llm-flows-handle-llm-response (fsm state event)
@@ -142,8 +142,8 @@ FSM, STATE, and EVENT, and the return value is the same as in
   "Ask for revision and set the next state to be :chat."
   (setf (llm-flows-state-run-count state) 0)
   (llm-chat-prompt-append-response
-      (llm-flows-state-prompt state)
-      (read-from-minibuffer "Revision prompt: "))
+   (llm-flows-state-prompt state)
+   (read-from-minibuffer "Revision prompt: "))
   (list :chat state))
 
 (defun llm-flows-handle-verification (state event)
@@ -171,7 +171,7 @@ Return is as expected from `fsm-define-state'."
       (if (and json (funcall (llm-flows-state-json-verifier state) json))
           (progn
             (fsm-send fsm json)
-            (list :user-verifier state))                        
+            (list :user-verifier state))
         (list :chat state)))))
 
 (defun llm-flows-verify-result-diff (fsm before after)
@@ -188,15 +188,15 @@ Return is as expected from `fsm-define-state'."
         (erase-buffer)
         (insert after))
       (add-hook 'ediff-quit-hook
-                  (lambda ()
-                    (setq ediff-quit-hook orig-ediff-quit-hook)
-                    (llm-flows-verify-query-user
-                     fsm ""
-                     (with-current-buffer buf-end
-                       (buffer-substring-no-properties (point-min) (point-max)))
-                     (lambda ()
-                       (kill-buffer buf-begin)
-                       (kill-buffer buf-end)))))
+                (lambda ()
+                  (setq ediff-quit-hook orig-ediff-quit-hook)
+                  (llm-flows-verify-query-user
+                   fsm ""
+                   (with-current-buffer buf-end
+                     (buffer-substring-no-properties (point-min) (point-max)))
+                   (lambda ()
+                     (kill-buffer buf-begin)
+                     (kill-buffer buf-end)))))
       (ediff-buffers buf-begin buf-end))))
 
 (defun llm-flows--fill-template (text var-alist)
