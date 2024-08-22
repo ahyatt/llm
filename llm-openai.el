@@ -279,9 +279,6 @@ RESPONSE can be nil if the response is complete."
 (cl-defmethod llm-capabilities ((_ llm-openai-compatible))
   (list 'streaming 'embeddings))
 
-(cl-defmethod llm-should-send-function-results-back ((_ llm-openai))
-  t)
-
 (provide 'llm-openai)
 
 ;;; llm-openai.el ends here

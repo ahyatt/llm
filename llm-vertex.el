@@ -292,9 +292,6 @@ If STREAMING is non-nil, use the URL for the streaming API."
 (cl-defmethod llm-capabilities ((_ llm-vertex))
   (list 'streaming 'embeddings 'function-calls))
 
-(cl-defmethod llm-should-send-function-results-back ((_ llm-google))
-  t)
-
 (provide 'llm-vertex)
 
 ;;; llm-vertex.el ends here
