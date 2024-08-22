@@ -162,13 +162,12 @@ return values.
 
 After sending a function call, the client could use the result, but if you want
 to proceed with the conversation, or get a textual response that accompany the
-function you should call ~llm-should-send-function-result-back~, and if the result
-is non-~nil~, then you should call back into the LLM with ~llm-chat~ or equivalent
-without modifying the prompt (which has already been set up for this in the
-function call).  If ~llm-should-send-function-result-back~ is ~nil~, then the prompt
-can be appended to as normal.  The results vary by provider; some, like Open AI,
-require this to happen, others like Claude, will break if you try to send again
-with modifying the prompt.
+function you should just send the prompt back with no modifications.  This is
+because the LLM gives the function call to make as a response, and then expects
+to get back the results of that function call.  The results were already
+executed at the end of the previous call, which also stores the result of that
+execution in the prompt.  This is why it should be sent back without further
+modifications.
 
 Be aware that there is no gaurantee that the function will be called correctly.
 While the LLMs mostly get this right, they are trained on Javascript functions,
