@@ -323,8 +323,9 @@ return a list of `llm-chat-function-call' structs.")
         (llm-provider-utils-process-result
          provider prompt
          current-text
-         (llm-provider-collect-streaming-function-data
-          provider (nreverse fc)))))
+         (when fc
+           (llm-provider-collect-streaming-function-data
+            provider (nreverse fc))))))
      :on-error (lambda (_ data)
                  (llm-provider-utils-callback-in-buffer
                   buf error-callback 'error

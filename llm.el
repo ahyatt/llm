@@ -5,7 +5,7 @@
 ;; Author: Andrew Hyatt <ahyatt@gmail.com>
 ;; Homepage: https://github.com/ahyatt/llm
 ;; Package-Requires: ((emacs "28.1") (plz "0.8"))
-;; Package-Version: 0.17.0
+;; Package-Version: 0.17.1
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;
 ;; This program is free software; you can redistribute it and/or
@@ -94,6 +94,8 @@ RESULT is the result of the function call.  This is required."
 
 (cl-defstruct llm-function-call
   "This is a struct to represent a function call the LLM can make.
+
+All fields are required.
 
 FUNCTION is a function to call.
 

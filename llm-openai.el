@@ -159,10 +159,9 @@ STREAMING if non-nil, turn on response streaming."
                            `(("name" . ,(llm-chat-prompt-function-call-result-function-name fc)))))))
                      (llm-chat-prompt-interactions prompt)))
           request-alist)
-    (push `("model" . ,(or (llm-openai-chat-model provider)
-                           "gpt-3.5-turbo-0613")) request-alist)
+    (push `("model" . ,(or (llm-openai-chat-model provider) "gpt-4o")) request-alist)
     (when (llm-chat-prompt-temperature prompt)
-      (push `("temperature" . ,(/ (llm-chat-prompt-temperature prompt) 2.0)) request-alist))
+      (push `("temperature" . ,(* (llm-chat-prompt-temperature prompt) 2.0)) request-alist))
     (when (llm-chat-prompt-max-tokens prompt)
       (push `("max_tokens" . ,(llm-chat-prompt-max-tokens prompt)) request-alist))
     (when (llm-chat-prompt-functions prompt)
@@ -220,8 +219,9 @@ RESPONSE can be nil if the response is complete."
                              (funcall (if (stringp response) msg-receiver fc-receiver) response))))))))))
 
 (cl-defmethod llm-provider-collect-streaming-function-data ((_ llm-openai) data)
-  (let ((cvec (make-vector (length (car data)) nil)))
-    (dotimes (i (length (car data)))
+  (let* ((num-index (+ 1 (assoc-default 'index (aref (car (last data)) 0))))
+         (cvec (make-vector num-index nil)))
+    (dotimes (i num-index)
       (setf (aref cvec i) (make-llm-provider-utils-function-call)))
     (cl-loop for part in data do
              (cl-loop for call in (append part nil) do
