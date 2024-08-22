@@ -89,68 +89,67 @@
       (dolist (model (split-string (getenv "OLLAMA_CHAT_MODELS") ", "))
         (push (make-llm-ollama :chat-model model) providers)))))
 
-(ert-deftest llm-chat ()
-  (dolist (provider (llm-integration-test-providers))
-    (let ((llm-warn-on-nonfree nil))
-      (ert-info ((format "Using provider %s" (llm-name provider)))
-        (should (equal
-                 (llm-chat
-                  provider
-                  (llm-make-chat-prompt llm-integration-test-chat-prompt))
-                 llm-integration-test-chat-answer))))))
+(defmacro llm-def-integration-test (name arglist &rest body)
+  "Define an integration test."
+  (declare (indent defun))
+  `(ert-deftest ,name ()
+     (dolist (,(car arglist) (llm-integration-test-providers))
+       (ert-info ((format "Using provider %s" (llm-name provider)))
+         ,@body))))
 
-(ert-deftest llm-chat-async ()
-  (dolist (provider (llm-integration-test-providers))
-    (ert-info ((format "Using provider %s" (llm-name provider)))
-      (let ((result nil)
-            (buf (current-buffer))
-            (llm-warn-on-nonfree nil))
-        (llm-chat-async
-         provider
-         (llm-make-chat-prompt llm-integration-test-chat-prompt)
-         (lambda (response)
-           (should (eq (current-buffer) buf))
-           (setq result response))
-         (lambda (error)
-           (error "Error: %s" error)))
-        (while (null result)
-          (sleep-for 0.1))
-        (should (equal result llm-integration-test-chat-answer))))))
+(llm-def-integration-test llm-chat (provider)
+  (should (equal
+           (llm-chat
+            provider
+            (llm-make-chat-prompt llm-integration-test-chat-prompt))
+           llm-integration-test-chat-answer)))
 
-(ert-deftest llm-chat-streaming ()
-  (dolist (provider (seq-filter
-                     (lambda (provider)
-                       (member 'streaming (llm-capabilities provider)))
-                     (llm-integration-test-providers)))
-    (ert-info ((format "Using provider %s" (llm-name provider)))
-      (let ((streamed-result "")
-            (returned-result nil)
-            (llm-warn-on-nonfree nil)
-            (buf (current-buffer))
-            (start-time (current-time)))
-        (llm-chat-streaming
-         provider
-         (llm-make-chat-prompt llm-integration-test-chat-prompt)
-         (lambda (partial-response)
-           (should (eq (current-buffer) buf))
-           (setq streamed-result (concat streamed-result partial-response)))
-         (lambda (response)
-           (should (eq (current-buffer) buf))
-           (setq returned-result response))
-         (lambda (error)
-           (error "Error: %s" error)))
-        (while (and (null returned-result)
-                    (time-less-p (time-subtract (current-time) start-time) 10))
-          (sleep-for 0.1))
-        (should (equal returned-result llm-integration-test-chat-answer))
-        (should (equal streamed-result llm-integration-test-chat-answer))))))
+(llm-def-integration-test llm-chat-async (provider)
+  (let ((result nil)
+        (buf (current-buffer))
+        (llm-warn-on-nonfree nil))
+    (llm-chat-async
+     provider
+     (llm-make-chat-prompt llm-integration-test-chat-prompt)
+     (lambda (response)
+       (should (eq (current-buffer) buf))
+       (setq result response))
+     (lambda (error)
+       (error "Error: %s" error)))
+    (while (null result)
+      (sleep-for 0.1))
+    (should (equal result llm-integration-test-chat-answer))))
 
-(ert-deftest llm-function-call ()
-  (dolist (provider (llm-integration-test-providers))
-    (let ((llm-warn-on-nonfree nil))
-      (ert-info ((format "Using provider %s" (llm-name provider)))
-        (should (equal
-                 (llm-chat provider (llm-integration-test-fc-prompt))
-                 llm-integration-test-fc-answer))))))
+(llm-def-integration-test llm-chat-streaming (provider)
+  (when (member 'streaming (llm-capabilities provider))
+    (let ((streamed-result "")
+          (returned-result nil)
+          (llm-warn-on-nonfree nil)
+          (buf (current-buffer))
+          (start-time (current-time)))
+      (llm-chat-streaming
+       provider
+       (llm-make-chat-prompt llm-integration-test-chat-prompt)
+       (lambda (partial-response)
+         (should (eq (current-buffer) buf))
+         (setq streamed-result (concat streamed-result partial-response)))
+       (lambda (response)
+         (should (eq (current-buffer) buf))
+         (setq returned-result response))
+       (lambda (error)
+         (error "Error: %s" error)))
+      (while (and (null returned-result)
+                  (time-less-p (time-subtract (current-time) start-time) 10))
+        (sleep-for 0.1))
+      (should (equal returned-result llm-integration-test-chat-answer))
+      (should (equal streamed-result llm-integration-test-chat-answer)))))
+
+(llm-def-integration-test llm-function-call (provider)
+  (should (equal
+           (llm-chat provider (llm-integration-test-fc-prompt))
+           llm-integration-test-fc-answer))
+  ;; Test that we can send the function back to the provider without error.
+  (llm-chat provider (llm-integration-test-fc-prompt)))
+
 
 (provide 'llm-integration-test)

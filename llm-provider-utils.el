@@ -197,7 +197,7 @@ function call results, return a list of
 
 (cl-defgeneric llm-provider-populate-function-calls (provider prompt calls)
   "For PROVIDER, in PROMPT, record function call execution.
-This is the recording before the calls were executed.
+This is the recording before the calls were executed, in the prompt.
 CALLS are a list of `llm-provider-utils-function-call'.")
 
 (cl-defgeneric llm-provider-collect-streaming-function-data (provider data)
@@ -516,10 +516,13 @@ ROLE will be `assistant' by default, but can be passed in for other roles."
   (setf (llm-chat-prompt-interactions prompt)
         (append (llm-chat-prompt-interactions prompt)
                 (list (make-llm-chat-prompt-interaction
-                       :role (if func-results
-                                 'function
-                               (or role 'assistant))
-                       :content output
+                       :role (or role
+                                 (if func-results 'function 'assistant))
+                       ;; If it is a structure, it will get converted to JSON,
+                       ;; otherwise make sure it is a string.
+                       :content (if (listp output)
+                                    output
+                                  (format "%s" output))
                        :function-call-result func-results)))))
 
 (cl-defstruct llm-provider-utils-function-call

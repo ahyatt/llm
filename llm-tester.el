@@ -280,9 +280,6 @@ of by calling the `describe_function' function."
   (let ((prompt (llm-tester-create-test-function-prompt))
         (responses nil))
     (push (llm-chat provider prompt) responses)
-    ;; The expectation (a requirement for Gemini) is we call back into the LLM
-    ;; with the results of the previous call to get a text response based on the
-    ;; function call results.
     (push (llm-chat provider prompt) responses)
     (llm-chat-prompt-append-response prompt "I'm now looking for a function that will return the directory of a filename")
     (push (llm-chat provider prompt) responses)

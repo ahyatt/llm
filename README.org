@@ -160,10 +160,14 @@ with the arguments supplied by the LLM. Instead of returning (or passing to a
 callback) a string, instead an alist will be returned of function names and
 return values.
 
-The client must then send this back to the LLM, to get a textual response from
-the LLM based on the results of the function call. These have already been added
-to the prompt, so the client only has to call the LLM again. Gemini and Vertex
-require this extra call to the LLM, but Open AI does not.
+After sending a function call, the client could use the result, but if you want
+to proceed with the conversation, or get a textual response that accompany the
+function you should just send the prompt back with no modifications.  This is
+because the LLM gives the function call to make as a response, and then expects
+to get back the results of that function call.  The results were already
+executed at the end of the previous call, which also stores the result of that
+execution in the prompt.  This is why it should be sent back without further
+modifications.
 
 Be aware that there is no gaurantee that the function will be called correctly.
 While the LLMs mostly get this right, they are trained on Javascript functions,

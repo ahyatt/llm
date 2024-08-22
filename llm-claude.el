@@ -57,16 +57,19 @@
                    ("max_tokens" . ,(or (llm-chat-prompt-max-tokens prompt) 4096))
                    ("messages" .
                     ,(mapcar (lambda (interaction)
-                               (append
-                                `(("role" . ,(pcase (llm-chat-prompt-interaction-role interaction)
-                                               ('function 'user)
-                                               ('assistant 'assistant)
-                                               ('user 'user)))
-                                  ("content" . ,(or (llm-chat-prompt-interaction-content interaction)
-                                                    (llm-chat-prompt-function-call-result-result
-                                                     (llm-chat-prompt-interaction-function-call-result interaction)))))
-                                (when-let ((r (llm-chat-prompt-interaction-function-call-result interaction)))
-                                  `(("tool_use_id" . ,(llm-chat-prompt-function-call-result-call-id r))))))
+                               `(("role" . ,(pcase (llm-chat-prompt-interaction-role interaction)
+                                              ('function 'user)
+                                              ('assistant 'assistant)
+                                              ('user 'user)))
+                                 ("content" .
+                                  ,(if (llm-chat-prompt-interaction-function-call-result interaction)
+                                       `((("type" . "tool_result")
+                                          ("tool_use_id" .
+                                           ,(llm-chat-prompt-function-call-result-call-id
+                                             (llm-chat-prompt-interaction-function-call-result interaction)))
+                                          ("content" .
+                                           ,(llm-chat-prompt-interaction-content interaction))))
+                                     (llm-chat-prompt-interaction-content interaction)))))
                              (llm-chat-prompt-interactions prompt)))))
         (system (llm-provider-utils-get-system-prompt prompt)))
     (when (llm-chat-prompt-functions prompt)
@@ -87,10 +90,15 @@
                       :name (assoc-default 'name item)
                       :args (assoc-default 'input item)))))
 
-(cl-defmethod llm-provider-populate-function-calls ((_ llm-claude) _ _)
-  ;; Claude does not need to be sent back the function calls it sent in the
-  ;; first place.
-  nil)
+(cl-defmethod llm-provider-populate-function-calls ((_ llm-claude) prompt calls)
+  (llm-provider-utils-append-to-prompt
+   prompt
+   (mapcar (lambda (call)
+             `((type . "tool_use")
+               (id . ,(llm-provider-utils-function-call-id call))
+               (name . ,(llm-provider-utils-function-call-name call))
+               (input . ,(llm-provider-utils-function-call-args call))))
+           calls)))
 
 (cl-defmethod llm-provider-chat-extract-result ((_ llm-claude) response)
   (let ((content (aref (assoc-default 'content response) 0)))
@@ -146,6 +154,16 @@
 
 (cl-defmethod llm-capabilities ((_ llm-claude))
   (list 'streaming 'function-calls))
+
+(cl-defmethod llm-provider-append-to-prompt ((_ llm-claude) prompt result
+                                             &optional func-results)
+  ;; Claude doesn't have a 'function role, so we just always use assistant here.
+  ;; But if it's a function result, it considers that a 'user response, which
+  ;; needs to be sent back.
+  (llm-provider-utils-append-to-prompt prompt result func-results (if func-results
+                                                                      'user
+                                                                    'assistant)))
+
 
 (provide 'llm-claude)
 

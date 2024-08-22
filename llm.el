@@ -343,9 +343,6 @@ be passed to `llm-cancel-request'."
                                       new-error-callback)))
     result))
 
-(cl-defmethod llm-chat-function-call ((_ (eql nil)) _ _ _)
-  (error "LLM provider was nil.  Please set the provider in the application you are using"))
-
 (cl-defgeneric llm-chat-streaming (provider prompt partial-callback response-callback error-callback)
   "Stream a response to PROMPT from PROVIDER.
 PROMPT is a `llm-chat-prompt'.
