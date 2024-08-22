@@ -92,7 +92,7 @@
 (defmacro llm-def-integration-test (name arglist &rest body)
   "Define an integration test."
   (declare (indent defun))
-  `(ert-deftest name ()
+  `(ert-deftest ,name ()
      (dolist (,(car arglist) (llm-integration-test-providers))
        (ert-info ((format "Using provider %s" (llm-name provider)))
          ,@body))))
