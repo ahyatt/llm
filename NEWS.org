@@ -4,7 +4,7 @@
 - Fix Claude function calling conversations
 - Fix issue in Open AI streaming function calling.
 - Update Open AI and Claude default chat models to the later models.
- Version 0.17.1
+* Version 0.17.1
 - Support Ollama function calling, for models which support it.
 - Make sure every model, even unknown models, return some value for ~llm-chat-token-limit~.
 - Add token count for llama3.1 model.
