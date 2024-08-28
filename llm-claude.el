@@ -55,7 +55,8 @@
 
 Currently this flattens consecutive user tool results, for reasons
 explained in the final couple sentences of URL
-`https://docs.anthropic.com/en/docs/build-with-claude/tool-use#multiple-tool-example'
+`https://docs.anthropic.com/en/docs/build-with-claude/\
+tool-use#multiple-tool-example'
 
 Example input:
 
