@@ -427,8 +427,18 @@ be passed to `llm-cancel-request'."
                     (with-current-buffer (marker-buffer start)
                       (save-excursion
                         (goto-char start)
-                        (delete-region start end)
-                        (insert text)))))
+                        (let* ((current-text
+                                (buffer-substring-no-properties start end))
+                               (common-prefix
+                                (fill-common-string-prefix current-text text))
+                               (prefix-length (length common-prefix)))
+                          ;; Skip over common prefix of current text
+                          ;; and new text.
+                          (when (> prefix-length 0)
+                            (goto-char (+ start prefix-length)))
+                          (delete-region (point) end)
+                          ;; Insert new text, minus common prefix.
+                          (insert (substring text prefix-length)))))))
           (llm-chat-streaming provider prompt
                               (lambda (text) (insert-text text))
                               (lambda (text) (insert-text text)
