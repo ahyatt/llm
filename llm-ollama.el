@@ -106,7 +106,11 @@ PROVIDER is the llm-ollama provider."
     (setq messages
           (mapcar (lambda (interaction)
                     `(("role" . ,(symbol-name (llm-chat-prompt-interaction-role interaction)))
-                      ("content" . ,(llm-chat-prompt-interaction-content interaction))))
+                      ("content" . ,(let ((content
+                                           (llm-chat-prompt-interaction-content interaction)))
+                                      (if (stringp content)
+                                          content
+                                        (json-encode content))))))
                   (llm-chat-prompt-interactions prompt)))
     (when (llm-chat-prompt-context prompt)
       (push `(("role" . "system")
