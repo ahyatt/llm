@@ -50,27 +50,102 @@
     ("input_schema" . ,(llm-provider-utils-openai-arguments
                         (llm-function-call-args call)))))
 
+(defun llm-claude--postprocess-messages (messages)
+  "Post-process MESSAGES, as in `llm-provider-chat-request'.
+
+Currently this flattens consecutive user tool results, for reasons
+explained in the final couple sentences of URL
+`https://docs.anthropic.com/en/docs/build-with-claude/\
+tool-use#multiple-tool-example'
+
+Example input:
+
+ (((\"role\" . user) (\"content\" . \"Compute 2+3 and 4+5.\"))
+  ((\"role\" . assistant)
+   (\"content\"
+    ((type . \"tool_use\") (id . \"toolu_017epyv32yDx5zwhNPVprRrQ\")
+     (name . \"add\") (input (a . 2) (b . 3)))
+    ((type . \"tool_use\") (id . \"toolu_01EPALH8MdwuWVxzX8ErNKWM\")
+     (name . \"add\") (input (a . 4) (b . 5)))))
+  ((\"role\" . user)
+   (\"content\"
+    ((\"type\" . \"tool_result\")
+     (\"tool_use_id\" . \"toolu_017epyv32yDx5zwhNPVprRrQ\")
+     (\"content\" . \"5\"))))
+  ((\"role\" . user)
+   (\"content\"
+    ((\"type\" . \"tool_result\")
+     (\"tool_use_id\" . \"toolu_01EPALH8MdwuWVxzX8ErNKWM\")
+     (\"content\" . \"9\")))))
+
+Example output:
+
+ (((\"role\" . user) (\"content\" . \"Compute 2+3 and 4+5.\"))
+  ((\"role\" . assistant)
+   (\"content\"
+    ((type . \"tool_use\") (id . \"toolu_017epyv32yDx5zwhNPVprRrQ\")
+     (name . \"add\") (input (a . 2) (b . 3)))
+    ((type . \"tool_use\") (id . \"toolu_01EPALH8MdwuWVxzX8ErNKWM\")
+     (name . \"add\") (input (a . 4) (b . 5)))))
+  ((\"role\" . \"user\")
+   (\"content\"
+    ((\"type\" . \"tool_result\")
+     (\"tool_use_id\" . \"toolu_017epyv32yDx5zwhNPVprRrQ\")
+     (\"content\" . \"5\"))
+    ((\"type\" . \"tool_result\")
+     (\"tool_use_id\" . \"toolu_01EPALH8MdwuWVxzX8ErNKWM\")
+     (\"content\" . \"9\")))))"
+  (let ((result '())
+        (tool-results '()))
+    (dolist (message messages)
+      (let* ((role (alist-get "role" message nil nil #'equal))
+             (content (alist-get "content" message nil nil #'equal))
+             (is-tool-result
+              (and (equal role 'user)
+                   (listp content)
+                   (let ((type
+                          (alist-get "type" (car content) nil nil #'equal)))
+                     (equal type "tool_result")))))
+        (cond
+         (is-tool-result
+          (setq tool-results (append tool-results content)))
+
+         ;; End of segment of user tool-results
+         ((and (null is-tool-result) tool-results)
+          (push `(("role" . "user") ("content" . ,tool-results)) result)
+          (setq tool-results '())
+          (push message result))
+
+         (t
+          (push message result)))))
+
+    (when tool-results
+      (push `(("role" . "user") ("content" . ,tool-results)) result))
+
+    (nreverse result)))
+
 (cl-defmethod llm-provider-chat-request ((provider llm-claude) prompt stream)
   (let ((request `(("model" . ,(llm-claude-chat-model provider))
                    ("stream" . ,(if stream t :json-false))
                    ;; Claude requires max_tokens
                    ("max_tokens" . ,(or (llm-chat-prompt-max-tokens prompt) 4096))
                    ("messages" .
-                    ,(mapcar (lambda (interaction)
-                               `(("role" . ,(pcase (llm-chat-prompt-interaction-role interaction)
-                                              ('function 'user)
-                                              ('assistant 'assistant)
-                                              ('user 'user)))
-                                 ("content" .
-                                  ,(if (llm-chat-prompt-interaction-function-call-result interaction)
-                                       `((("type" . "tool_result")
-                                          ("tool_use_id" .
-                                           ,(llm-chat-prompt-function-call-result-call-id
-                                             (llm-chat-prompt-interaction-function-call-result interaction)))
-                                          ("content" .
-                                           ,(llm-chat-prompt-interaction-content interaction))))
-                                     (llm-chat-prompt-interaction-content interaction)))))
-                             (llm-chat-prompt-interactions prompt)))))
+                    ,(llm-claude--postprocess-messages
+                      (mapcar (lambda (interaction)
+                                `(("role" . ,(pcase (llm-chat-prompt-interaction-role interaction)
+                                               ('function 'user)
+                                               ('assistant 'assistant)
+                                               ('user 'user)))
+                                  ("content" .
+                                   ,(if (llm-chat-prompt-interaction-function-call-result interaction)
+                                        `((("type" . "tool_result")
+                                           ("tool_use_id" .
+                                            ,(llm-chat-prompt-function-call-result-call-id
+                                              (llm-chat-prompt-interaction-function-call-result interaction)))
+                                           ("content" .
+                                            ,(llm-chat-prompt-interaction-content interaction))))
+                                      (llm-chat-prompt-interaction-content interaction)))))
+                              (llm-chat-prompt-interactions prompt))))))
         (system (llm-provider-utils-get-system-prompt prompt)))
     (when (llm-chat-prompt-functions prompt)
       (push `("tools" . ,(mapcar (lambda (f) (llm-claude--tool-call f))
