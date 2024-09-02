@@ -390,7 +390,6 @@ be passed to `llm-cancel-request'."
   ;; We need to wrap the callbacks before we set llm-log to nil.
   (let* ((new-partial-callback (lambda (response)
                                  (when partial-callback
-                                   (llm--log 'api-receive-partial :provider provider :msg response)
                                    (let ((llm-log nil))
                                      (funcall partial-callback response)))))
          (new-response-callback (lambda (response)
