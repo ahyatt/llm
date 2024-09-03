@@ -262,8 +262,7 @@ of by calling the `describe_function' function."
 
 (defun llm-tester-function-calling-sync (provider)
   "Test that PROVIDER can call functions."
-  (let ((prompt (llm-tester-create-test-function-prompt))
-        (result (llm-chat provider (llm-tester-create-test-function-prompt))))
+  (let ((result (llm-chat provider (llm-tester-create-test-function-prompt))))
     (cond ((stringp result)
            (llm-tester-log
             "ERROR: Provider %s returned a string instead of a function result"

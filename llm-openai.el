@@ -270,8 +270,8 @@ RESPONSE can be nil if the response is complete."
       4096)
      (t 4096))))
 
-(cl-defmethod llm-chat-token-limit ((_ llm-openai-compatible))
-  (llm-provider-utils-model-token-limit (llm-ollama-chat-model provider)))
+(cl-defmethod llm-chat-token-limit ((provider llm-openai-compatible))
+  (llm-provider-utils-model-token-limit (llm-openai-chat-model provider)))
 
 (cl-defmethod llm-capabilities ((_ llm-openai))
   (list 'streaming 'embeddings 'function-calls))

@@ -31,6 +31,10 @@ jobs:
     - name: Check out the source code
       uses: actions/checkout@v4
 
+    - name: Byte-compile the project
+      run: |
+        eldev -dtT compile --warnings-as-errors
+
     - name: Lint the project
       run: |
         eldev -p -dtT lint
