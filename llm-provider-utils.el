@@ -564,6 +564,8 @@ be either FUNCALLS or TEXT."
 (defun llm-provider-utils-populate-function-results (provider prompt results-alist)
   "Append the results in RESULTS-ALIST to the prompt.
 
+PROMPT is the prompt to populate into.
+
 RESULTS-ALIST is a list of cons of function
 calls (`llm-provider-utils-function-call' structs) and their
 results.
