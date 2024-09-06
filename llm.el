@@ -76,11 +76,11 @@ Use of this directly is deprecated, instead use `llm-make-chat-prompt'."
   "This defines a single interaction given as part of a chat prompt.
 ROLE can a symbol, of either `user', `assistant', or `function'.
 
-FUNCTION-CALL-RESULTS is a struct of type
+FUNCTION-CALL-RESULTS is a list of structs of type
 `llm-chat-prompt-function-call-results', which is only populated
-if `role' is `function'.  It stores the results of just one
-function call."
-  role content function-call-result)
+if `role' is `function'.  It stores the results of the function
+calls."
+  role content  function-call-results)
 
 (cl-defstruct llm-chat-prompt-function-call-result
   "This defines the result from a function call.
