@@ -56,24 +56,23 @@
                    ;; Claude requires max_tokens
                    ("max_tokens" . ,(or (llm-chat-prompt-max-tokens prompt) 4096))
                    ("messages" .
-                    ,(llm-claude--postprocess-messages
-                      (mapcar (lambda (interaction)
-                                `(("role" . ,(pcase (llm-chat-prompt-interaction-role interaction)
-                                               ('function 'user)
-                                               ('assistant 'assistant)
-                                               ('user 'user)))
-                                  ("content" .
-                                   ,(if (llm-chat-prompt-interaction-function-call-results interaction)
-                                        (mapcar (lambda (result)
-                                                  `(("type" . "tool_result")
-                                                    ("tool_use_id" .
-                                                     ,(llm-chat-prompt-function-call-result-call-id
-                                                       result))
-                                                    ("content" .
-                                                     ,(llm-chat-prompt-function-call-result-result result))))
-                                                (llm-chat-prompt-interaction-function-call-results interaction))
-                                      (llm-chat-prompt-interaction-content interaction)))))
-                              (llm-chat-prompt-interactions prompt))))))
+                    ,(mapcar (lambda (interaction)
+                               `(("role" . ,(pcase (llm-chat-prompt-interaction-role interaction)
+                                              ('function 'user)
+                                              ('assistant 'assistant)
+                                              ('user 'user)))
+                                 ("content" .
+                                  ,(if (llm-chat-prompt-interaction-function-call-results interaction)
+                                       (mapcar (lambda (result)
+                                                 `(("type" . "tool_result")
+                                                   ("tool_use_id" .
+                                                    ,(llm-chat-prompt-function-call-result-call-id
+                                                      result))
+                                                   ("content" .
+                                                    ,(llm-chat-prompt-function-call-result-result result))))
+                                               (llm-chat-prompt-interaction-function-call-results interaction))
+                                     (llm-chat-prompt-interaction-content interaction)))))
+                             (llm-chat-prompt-interactions prompt)))))
         (system (llm-provider-utils-get-system-prompt prompt)))
     (when (llm-chat-prompt-functions prompt)
       (push `("tools" . ,(mapcar (lambda (f) (llm-claude--tool-call f))
