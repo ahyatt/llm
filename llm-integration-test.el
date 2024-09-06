@@ -68,6 +68,25 @@
   '(("capital_of_country" . "France"))
   "The correct answer to the function call prompt.")
 
+(defun llm-integration-test-fc-multiple-prompt ()
+  (llm-make-chat-prompt
+   "What is the capital of France, and also what is the capital of Italy?"
+   :functions
+   (list (make-llm-function-call
+          :function (lambda (f) f)
+          :name "capital_of_country"
+          :description "Get the capital of a country."
+          :args (list (make-llm-function-arg
+                       :name "country"
+                       :description "The country whose capital to look up."
+                       :type 'string
+                       :required t))))))
+
+(defconst llm-integration-test-fc-multiple-answer
+  '(("capital_of_country" . "France")
+    ("capital_of_country" . "Italy"))
+  "The correct answer to the function call prompt.")
+
 (defun llm-integration-test-providers ()
   "Return a list of providers to test."
   (let ((providers))
@@ -87,7 +106,8 @@
       (require 'llm-ollama)
       ;; This variable is a list of models to test.
       (dolist (model (split-string (getenv "OLLAMA_CHAT_MODELS") ", "))
-        (push (make-llm-ollama :chat-model model) providers)))))
+        (push (make-llm-ollama :chat-model model) providers)))
+    providers))
 
 (defmacro llm-def-integration-test (name arglist &rest body)
   "Define an integration test."
@@ -145,11 +165,24 @@
       (should (equal streamed-result llm-integration-test-chat-answer)))))
 
 (llm-def-integration-test llm-function-call (provider)
-  (should (equal
-           (llm-chat provider (llm-integration-test-fc-prompt))
-           llm-integration-test-fc-answer))
-  ;; Test that we can send the function back to the provider without error.
-  (llm-chat provider (llm-integration-test-fc-prompt)))
+  (let ((prompt (llm-integration-test-fc-prompt)))
+    (should (equal
+             (llm-chat provider prompt)
+             llm-integration-test-fc-answer))
+    ;; Test that we can send the function back to the provider without error.
+    (llm-chat provider prompt)))
 
+(llm-def-integration-test llm-function-call-multiple (provider)
+  (let ((prompt (llm-integration-test-fc-multiple-prompt)))
+    ;; Sending back multiple answers often doesn't happen, so we can't reliably
+    ;; check for this yet.
+    (llm-chat provider prompt)
+    ;; Test that we can send the function back to the provider without error.
+    (llm-chat provider prompt)))
+
+(llm-def-integration-test llm-count-tokens (provider)
+  (let ((result (llm-count-tokens provider "What is the capital of France?")))
+    (should (integerp result))
+    (should (> result 0))))
 
 (provide 'llm-integration-test)

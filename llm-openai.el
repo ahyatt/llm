@@ -144,19 +144,23 @@ STREAMING if non-nil, turn on response streaming."
     (llm-provider-utils-combine-to-system-prompt prompt llm-openai-example-prelude)
     (when streaming (push `("stream" . ,t) request-alist))
     (push `("messages" .
-            ,(mapcar (lambda (p)
-                       (append
-                        `(("role" . ,(llm-chat-prompt-interaction-role p))
-                          ("content" . ,(let ((content
-                                               (llm-chat-prompt-interaction-content p)))
-                                          (if (stringp content) content
-                                            (json-encode content)))))
-                        (when-let ((fc (llm-chat-prompt-interaction-function-call-result p)))
+            ,(mapcan (lambda (i)
+                       (if (llm-chat-prompt-interaction-function-call-results i)
+                           (mapcar (lambda (fc)
+                                     (append
+                                      (when (llm-chat-prompt-function-call-result-call-id fc)
+                                        `(("tool_call_id" .
+                                           ,(llm-chat-prompt-function-call-result-call-id fc))))
+                                      `(("role" . "tool")
+                                        ("name" . ,(llm-chat-prompt-function-call-result-function-name fc))
+                                        ("content" . ,(llm-chat-prompt-function-call-result-result fc)))))
+                                   (llm-chat-prompt-interaction-function-call-results i))
+                         (list
                           (append
-                           (when (llm-chat-prompt-function-call-result-call-id fc)
-                             `(("tool_call_id" .
-                                ,(llm-chat-prompt-function-call-result-call-id fc))))
-                           `(("name" . ,(llm-chat-prompt-function-call-result-function-name fc)))))))
+                           `(("role" . ,(llm-chat-prompt-interaction-role i)))
+                           (when-let ((content (llm-chat-prompt-interaction-content i)))
+                             (if (stringp content) `(("content" . ,content))
+                               (llm-openai-function-call-to-response content)))))))
                      (llm-chat-prompt-interactions prompt)))
           request-alist)
     (push `("model" . ,(or (llm-openai-chat-model provider) "gpt-4o")) request-alist)
@@ -185,15 +189,20 @@ STREAMING if non-nil, turn on response streaming."
                          (assoc-default 'message
                                         (aref (assoc-default 'choices response) 0)))))
 
+(defun llm-openai-function-call-to-response (fcs)
+  "Convert back from the generic representation to the Open AI.
+FCS is a list of `make-llm-provider-utils-function-call'"
+  `(("tool_calls" .
+     ,(mapcar (lambda (fc)
+                `(("id" . ,(llm-provider-utils-function-call-id fc))
+                  ("type" . "function")
+                  ("function" .
+                   (("arguments" . ,(json-encode (llm-provider-utils-function-call-args fc)))
+                    ("name" . ,(llm-provider-utils-function-call-name fc))))))
+              fcs))))
+
 (cl-defmethod llm-provider-populate-function-calls ((_ llm-openai) prompt calls)
-  (llm-provider-utils-append-to-prompt
-   prompt
-   (mapcar (lambda (call)
-             `((id . ,(llm-provider-utils-function-call-id call))
-               (function (name . ,(llm-provider-utils-function-call-name call))
-                         (arguments . ,(json-encode
-                                        (llm-provider-utils-function-call-args call))))))
-           calls)))
+  (llm-provider-utils-append-to-prompt prompt calls))
 
 (defun llm-openai--get-partial-chat-response (response)
   "Return the text in the partial chat response from RESPONSE.

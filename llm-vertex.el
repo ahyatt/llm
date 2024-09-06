@@ -193,14 +193,16 @@ the key must be regenerated every hour."
                                             interaction))))
                              (if (eq 'function
                                      (llm-chat-prompt-interaction-role interaction))
-                                 (let ((fc (llm-chat-prompt-interaction-function-call-result interaction)))
-                                   `(((functionResponse
-                                       .
-                                       ((name . ,(llm-chat-prompt-function-call-result-function-name fc))
-                                        (response
-                                         .
-                                         ((name . ,(llm-chat-prompt-function-call-result-function-name fc))
-                                          (content . ,(llm-chat-prompt-function-call-result-result fc)))))))))
+                                 (mapcar (lambda (fc)
+                                           `(((functionResponse
+                                               .
+                                               ((name . ,(llm-chat-prompt-function-call-result-function-name fc))
+                                                (response
+                                                 .
+                                                 ((name . ,(llm-chat-prompt-function-call-result-function-name fc))
+                                                  (content . ,(llm-chat-prompt-function-call-result-result fc)))))))))
+                                         (llm-chat-prompt-interaction-function-call-results interaction))
+
                                (llm-chat-prompt-interaction-content interaction))))))
                (llm-chat-prompt-interactions prompt))))
    (when (llm-chat-prompt-functions prompt)
@@ -233,7 +235,6 @@ nothing to add, in which case it is nil."
 (cl-defmethod llm-provider-populate-function-calls ((_ llm-vertex) prompt calls)
   (llm-provider-utils-append-to-prompt
    prompt
-   ;; For Vertex there is just going to be one call
    (mapcar (lambda (fc)
              `((functionCall
                 .

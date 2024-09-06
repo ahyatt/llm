@@ -512,6 +512,9 @@ This returns a JSON object (a list that can be converted to JSON)."
 
 OUTPUT can be a string or a structure in the case of function calls.
 
+FUNC-RESULTS is a list of function results resulting from the LLM
+output, if any.
+
 ROLE will be `assistant' by default, but can be passed in for other roles."
   (setf (llm-chat-prompt-interactions prompt)
         (append (llm-chat-prompt-interactions prompt)
@@ -523,7 +526,7 @@ ROLE will be `assistant' by default, but can be passed in for other roles."
                        :content (if (listp output)
                                     output
                                   (format "%s" output))
-                       :function-call-result func-results)))))
+                       :function-call-results func-results)))))
 
 (cl-defstruct llm-provider-utils-function-call
   "A struct to hold information about a function call.
@@ -547,25 +550,34 @@ be either FUNCALLS or TEXT."
   (if-let ((funcalls funcalls))
       ;; If we have function calls, execute them and return the results, and
       ;; it talso takes care of updating the prompt.
-      (llm-provider-utils-execute-function-calls provider prompt funcalls)
+      (let ((results-alist
+             (llm-provider-utils-execute-function-calls provider prompt funcalls)))
+        (llm-provider-utils-populate-function-results
+         provider prompt results-alist)
+        (mapcar #'cdr results-alist))
     ;; We probably shouldn't be called if text is nil, but if we do,
     ;; we shouldn't add something invalid to the prompt.
     (when text
       (llm-provider-append-to-prompt provider prompt text))
     text))
 
-(defun llm-provider-utils-populate-function-results (provider prompt func result)
-  "Append the RESULT of FUNC to PROMPT.
+(defun llm-provider-utils-populate-function-results (provider prompt results-alist)
+  "Append the results in RESULTS-ALIST to the prompt.
 
-FUNC is a `llm-provider-utils-function-call' struct.
+PROMPT is the prompt to populate into.
+
+RESULTS-ALIST is a list of cons of function
+calls (`llm-provider-utils-function-call' structs) and their
+results.
 
 PROVIDER is the struct that configures the user of the LLM."
   (llm-provider-append-to-prompt
-   provider prompt result
-   (make-llm-chat-prompt-function-call-result
-    :call-id (llm-provider-utils-function-call-id func)
-    :function-name (llm-provider-utils-function-call-name func)
-    :result result)))
+   provider prompt nil
+   (mapcar (lambda (c) (make-llm-chat-prompt-function-call-result
+                        :call-id (llm-provider-utils-function-call-id (car c))
+                        :function-name (llm-provider-utils-function-call-name (car c))
+                        :result (cddr c)))
+           results-alist)))
 
 (defun llm-provider-utils-execute-function-calls (provider prompt funcalls)
   "Execute FUNCALLS, a list of `llm-provider-utils-function-calls'.
@@ -581,31 +593,32 @@ function call, the result.
 This returns the response suitable for output to the client; a
 cons of functions called and their output."
   (llm-provider-populate-function-calls provider prompt funcalls)
-  (cl-loop for func in funcalls collect
-           (let* ((name (llm-provider-utils-function-call-name func))
-                  (arguments (llm-provider-utils-function-call-args func))
-                  (function (seq-find
-                             (lambda (f) (equal name (llm-function-call-name f)))
-                             (llm-chat-prompt-functions prompt))))
-             (cons name
-                   (let* ((args (cl-loop for arg in (llm-function-call-args function)
-                                         collect (cdr (seq-find (lambda (a)
-                                                                  (eq (intern
-                                                                       (llm-function-arg-name arg))
-                                                                      (car a)))
-                                                                arguments))))
-                          (result (apply (llm-function-call-function function) args)))
-                     (llm-provider-utils-populate-function-results
-                      provider prompt func result)
-                     (llm--log
-                      'api-funcall
-                      :provider provider
-                      :msg (format "%s --> %s"
-                                   (format "%S"
-                                           (cons (llm-function-call-name function)
-                                                 args))
-                                   (format "%s" result)))
-                     result)))))
+  (cl-loop
+   for func in funcalls collect
+   (cons
+    func
+    (let* ((name (llm-provider-utils-function-call-name func))
+           (arguments (llm-provider-utils-function-call-args func))
+           (function (seq-find
+                      (lambda (f) (equal name (llm-function-call-name f)))
+                      (llm-chat-prompt-functions prompt))))
+      (cons name
+            (let* ((args (cl-loop for arg in (llm-function-call-args function)
+                                  collect (cdr (seq-find (lambda (a)
+                                                           (eq (intern
+                                                                (llm-function-arg-name arg))
+                                                               (car a)))
+                                                         arguments))))
+                   (result (apply (llm-function-call-function function) args)))
+              (llm--log
+               'api-funcall
+               :provider provider
+               :msg (format "%s --> %s"
+                            (format "%S"
+                                    (cons (llm-function-call-name function)
+                                          args))
+                            (format "%s" result)))
+              result))))))
 
 
 ;; This is a useful method for getting out of the request buffer when it's time
