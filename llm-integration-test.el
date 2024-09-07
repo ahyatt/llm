@@ -102,7 +102,7 @@
     (when (getenv "VERTEX_PROJECT")
       (require 'llm-vertex)
       (push (make-llm-vertex :project (getenv "VERTEX_PROJECT")) providers))
-    (when (getenv "OLLAMA_MODELS")
+    (when (getenv "OLLAMA_CHAT_MODELS")
       (require 'llm-ollama)
       ;; This variable is a list of models to test.
       (dolist (model (split-string (getenv "OLLAMA_CHAT_MODELS") ", "))
