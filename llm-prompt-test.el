@@ -181,6 +181,19 @@ to converge."
                   :var1 '("this is a completely oversized item"
                           "a" "b" "c" "d")))))
 
+(ert-deftest llm-prompt--max-tokens ()
+  (cl-flet ((should-have-max-tokens (expected max-pct max-tokens)
+              (let ((llm-prompt-default-max-pct max-pct)
+                    (llm-prompt-default-max-tokens max-tokens))
+                (should (equal expected (llm-prompt--max-tokens
+                                         (make-prompt-test-llm)))))))
+    ;; The test LLM has a 20 token limit
+    (should-have-max-tokens 10 50 nil)
+    (should-have-max-tokens 20 100 nil)
+    (should-have-max-tokens 5 50 5)
+    (should-have-max-tokens 10 50 10)
+    (should-have-max-tokens 10 50 20)))
+
 (provide 'llm-prompt-test)
 
 ;;; llm-prompt-test.el ends here
