@@ -223,7 +223,9 @@ subsequent terms.  The variable ~llm-prompt-default-max-pct~ controls how much o
 the context window we want to fill.  The way we estimate the number of tokens
 used is quick but inaccurate, so limiting to less than the maximum context size
 is useful for guarding against a miscount leading to an error calling the LLM
-due to too many tokens.
+due to too many tokens.  If you want to have a hard limit as well that doesn't
+depend on the context window size, you can use ~llm-prompt-default-max-tokens~.
+We will use the minimum of either value.
 
 Variables are enclosed in double curly braces, like this: ={{instructions}}=.
 They can just be the variable, or they can also denote a number of tickets, like
