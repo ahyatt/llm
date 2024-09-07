@@ -63,10 +63,10 @@
   :group 'llm)
 
 (defcustom llm-prompt-default-max-pct 50
-  "The default maximum percentage of the context window to use for a
-prompt.  The minimum of this and `llm-prompt-default-max-tokens'
-will be used.  For an example, at the time of this writing,
-using Claude 3.5 Sonnet will cost, at 50% tokens, $0.30 USD.
+  "Default max percentage of context window to use for a prompt.
+The minimum of this and `llm-prompt-default-max-tokens' will be
+used.  For an example, at the time of this writing, using Claude
+3.5 Sonnet will cost, at 50% tokens, $0.30 USD.
 
 Using 100% or close to it is not recommended, as space is needed
 for conversation, and token counting is not exact."
@@ -75,7 +75,7 @@ for conversation, and token counting is not exact."
 
 (defcustom llm-prompt-default-max-tokens nil
   "The default maximum number of tokens to use for a prompt.
-Set to `nil' to use `llm-prompt-default-max-pct' instead."
+Set to nil to use `llm-prompt-default-max-pct' instead."
   :type 'integer
   :group 'llm-prompt)
 
@@ -172,7 +172,9 @@ executed with no arguments to return an iterator."
                               (iter-yield el)))))))
 
 (defun llm-prompt--max-tokens (provider)
-  "Return the maximum number of tokens to use for a prompt."
+  "Return the maximum number of tokens to use for a prompt.
+PROVIDER is the provider which will be used, and which has a
+maximum number of tokens."
   (floor
    (min (or llm-prompt-default-max-tokens
             (llm-chat-token-limit provider))
