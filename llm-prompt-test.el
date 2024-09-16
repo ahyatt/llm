@@ -181,6 +181,13 @@ to converge."
                   :var1 '("this is a completely oversized item"
                           "a" "b" "c" "d")))))
 
+(ert-deftest llm-prompt-reverse-filling ()
+  (should (equal "(d c a b)"
+                 (llm-prompt-fill-text
+                  "({{var1}})"
+                  (make-prompt-test-llm)
+                  :var1 '("a" "b" ("c" . back) ("d" . back))))))
+
 (ert-deftest llm-prompt--max-tokens ()
   (cl-flet ((should-have-max-tokens (expected max-pct max-tokens)
               (let ((llm-prompt-default-max-pct max-pct)

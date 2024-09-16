@@ -252,6 +252,12 @@ variable.  However, a plain list is also acceptable, as is a single value.  Any
 single value will not enter into the ticket system, but rather be prefilled
 before any tickets are used.
 
+Values supplied in either the list or generators can be the values themselves,
+or conses.  If a cons, the variable to fill is the =car= of the cons, and the =cdr=
+is the place to fill the new value, =front= or =back=.  The =front= is the default:
+new values will be appended to the end.  =back= will add new values to the start
+of the filled text for the variable instead.
+
 So, to illustrate with this example, here's how the prompt will be filled:
 
   1. First, the ={{tags}}= and ={{instructions}}= will be filled first.  This will
@@ -261,8 +267,12 @@ So, to illustrate with this example, here's how the prompt will be filled:
      multiplied by ~llm-chat-token-limit~) and exit if exceeded.
   3. Run a lottery with all tickets and choose one of the remaining variables to
      fill.
-  4. If the variable won't make the text too large, fill the variable
-     with one entry retrieved from a supplied generator, otherwise ignore.
+  4. If the variable won't make the text too large, fill the variable with one
+     entry retrieved from a supplied generator, otherwise ignore.  These are
+     values are not conses, so values will be appended to the end of the
+     generated text for each variable (so a new variable generated for tags will
+     append after other generated tags but before the subsequent "and" in the
+     text.
   5. Goto 2
 
   The prompt can be filled two ways, one using predefined prompt template
