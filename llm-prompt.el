@@ -184,9 +184,14 @@ maximum number of tokens."
 (defun llm-prompt-fill-text (text provider &rest keys)
   "Fill TEXT prompt, with the llm PROVIDER, values from KEYS.
 
-PROVIER is an LLM provider.  KEYS is a plist of variables and
+PROVIDER is an LLM provider.  KEYS is a plist of variables and
 their values, either an actual value, or a list or function.  If
-a function, it should return values via a generator."
+a function, it should return values via a generator.
+
+The values can be strings, or conses.  If conses, the value to use is
+the car, and the cdr can be `front' (the default), or `back', signifying
+where to append the new text to, relative to the already filled values
+from the variable."
   (with-temp-buffer
     (insert text)
     (let* ((final-vals nil)
@@ -239,17 +244,27 @@ a function, it should return values via a generator."
             (while (< total-tokens
                       (llm-prompt--max-tokens provider))
               (let* ((val-cons (iter-next ticket-gen))
-                     (sval (format "%s" (cdr val-cons))))
+                     (var (car val-cons))
+                     (sval (format "%s" (if (consp (cdr val-cons))
+                                            (cadr val-cons)
+                                          (cdr val-cons))))
+                     (add-location (if (consp (cdr val-cons))
+                                       (cddr val-cons) 'front)))
+                (unless (member add-location '(front back))
+                  (error "Add location specification must be one of 'front or 'back"))
                 ;; Only add if there is space, otherwise we ignore this value.
                 (when (<= (+ total-tokens (llm-count-tokens provider sval))
                           (* (/ llm-prompt-default-max-pct 100.0)
                              (llm-chat-token-limit provider)))
                   (cl-incf total-tokens (llm-count-tokens provider sval))
-                  (if (assoc (car val-cons) final-vals)
-                      (push sval (cdr (assoc (car val-cons) final-vals)))
-                    (push (cons (car val-cons)
-                                (list sval))
-                          final-vals)))))
+                  (if (assoc var final-vals)
+                      (if (eq add-location 'back)
+                          (setf
+                           (cdr (assoc var final-vals))
+                           (nconc (assoc-default var final-vals)
+                                  (list sval)))
+                        (push sval (cdr (assoc var final-vals))))
+                    (push (cons var (list sval)) final-vals)))))
           (iter-end-of-sequence nil)))
       (cl-loop for (var-name . val) in final-vals
                do
@@ -264,6 +279,12 @@ a function, it should return values via a generator."
                                                    (reverse val) " ")
                                       val)))))
     (buffer-substring-no-properties (point-min) (point-max))))
+
+(defun llm-prompt-get (name)
+  "Return the raw prompt with the given NAME, a symbol.
+The prompt may have variables to fill in, so if so, it should be
+processed with `llm-prompt-fill-text'."
+  (gethash name llm-prompt-prompts))
 
 (defun llm-prompt-fill (name provider &rest keys)
   "Get and fill the prompt for NAME given llm PROVIDER.
