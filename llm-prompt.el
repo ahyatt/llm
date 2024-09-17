@@ -251,7 +251,7 @@ from the variable."
                      (add-location (if (consp (cdr val-cons))
                                        (cddr val-cons) 'front)))
                 (unless (member add-location '(front back))
-                  (error "add location specification must be one of 'front or 'back"))
+                  (error "Add location specification must be one of 'front or 'back"))
                 ;; Only add if there is space, otherwise we ignore this value.
                 (when (<= (+ total-tokens (llm-count-tokens provider sval))
                           (* (/ llm-prompt-default-max-pct 100.0)
