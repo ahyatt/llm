@@ -1,3 +1,5 @@
+* Version 0.17.5
+- Update list of Ollama models for function calling.
 * Version 0.17.4
 - Fix problem with Open AI's =llm-chat-token-limit=.
 - Fix Open AI and Gemini's parallel function calling.
