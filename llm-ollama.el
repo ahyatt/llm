@@ -178,8 +178,10 @@ PROVIDER is the llm-ollama provider."
             (list 'embeddings))
           ;; see https://ollama.com/search?c=tools
           (when (string-match
-                 (rx (or "llama3.1" "mistral-nemo" "mistral-large"
-                         "mistral" "mixtral" "command-r-plus"
+                 (rx (or "llama3." "mistral-nemo" "qwen2.5"
+                         "nemotron-mini" "mistral-small"
+                         "mistral-large"
+                         "mistral" "mixtral" "command-r"
                          "llama3-groq-tool-use"
                          "firefunction-v2"))
                  (llm-ollama-chat-model provider))
