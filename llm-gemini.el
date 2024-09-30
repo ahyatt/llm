@@ -37,7 +37,7 @@
 
 KEY is the API key for the client.
 You can get this at https://makersuite.google.com/app/apikey."
-  key (embedding-model "embedding-001") (chat-model "gemini-pro"))
+  key (embedding-model "embedding-001") (chat-model "gemini-1.5-pro"))
 
 (cl-defmethod llm-nonfree-message-info ((_ llm-gemini))
   "Return nonfree terms of service for Gemini."
@@ -92,12 +92,16 @@ If STREAMING-P is non-nil, use the streaming endpoint."
   "Return the name of PROVIDER."
   "Gemini")
 
-;; From https://ai.google.dev/models/gemini.
 (cl-defmethod llm-chat-token-limit ((provider llm-gemini))
-  (llm-vertex--chat-token-limit (llm-gemini-chat-model provider)))
+  (llm-provider-utils-model-token-limit (llm-gemini-chat-model provider)
+                                        1048576))
 
-(cl-defmethod llm-capabilities ((_ llm-gemini))
-  (list 'streaming 'embeddings 'function-calls))
+(cl-defmethod llm-capabilities ((provider llm-gemini))
+  (append
+   (list 'streaming 'embeddings)
+   (let ((model (llm-models-match (llm-gemini-chat-model provider))))
+     (when (and model (member 'tool-use (llm-model-capabilities model)))
+       (list 'function-calls)))))
 
 (provide 'llm-gemini)
 
