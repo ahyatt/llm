@@ -59,7 +59,7 @@ and there is no default.  The maximum value possible here is 2049."
   :type 'integer
   :group 'llm-vertex)
 
-(defcustom llm-vertex-default-chat-model "gemini-pro"
+(defcustom llm-vertex-default-chat-model "gemini-1.5-pro"
   "The default model to ask for.
 This should almost certainly be a chat model, other models are
 for more specialized uses."
@@ -279,19 +279,15 @@ If STREAMING is non-nil, use the URL for the streaming API."
   "Return the name of the provider."
   "Vertex Gemini")
 
-(defun llm-vertex--chat-token-limit (model)
-  "Get token limit for MODEL."
-  (cond ((equal "gemini-pro" model) 30720)
-        ((equal "gemini-pro-vision" model) 12288)
-        ((string-match-p (rx (seq "gemini-1.5")) model) 1048576)
-        ;; Vertex can run different models, so check the standard model names.
-        (t (llm-provider-utils-model-token-limit model))))
-
 (cl-defmethod llm-chat-token-limit ((provider llm-vertex))
-  (llm-vertex--chat-token-limit (llm-vertex-chat-model provider)))
+  (llm-provider-utils-model-token-limit (llm-vertex-chat-model provider)))
 
-(cl-defmethod llm-capabilities ((_ llm-vertex))
-  (list 'streaming 'embeddings 'function-calls))
+(cl-defmethod llm-capabilities ((provider llm-vertex))
+  (append
+   (list 'streaming 'embeddings)
+   (let ((model (llm-models-match (llm-vertex-chat-model provider))))
+     (when (and model (member 'tool-use (llm-model-capabilities model)))
+       (list 'function-calls)))))
 
 (provide 'llm-vertex)
 

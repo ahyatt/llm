@@ -23,6 +23,7 @@
 
 (require 'llm)
 (require 'llm-request-plz)
+(require 'llm-models)
 (require 'seq)
 
 (cl-defstruct llm-standard-provider
@@ -420,24 +421,14 @@ conversation history will follow."
                          "\n\nThe current conversation follows:\n\n"
                          (llm-chat-prompt-interaction-content (car (last (llm-chat-prompt-interactions prompt))))))))))
 
-(defun llm-provider-utils-model-token-limit (model)
-  "Return the token limit for MODEL."
-  (let ((model (downcase model)))
-    (cond
-     ((string-match-p "mistral-7b" model) 8192)
-     ((string-match-p "mistral" model) 8192)
-     ((string-match-p "mixtral-45b" model) 131072)
-     ((string-match-p "mixtral" model) 131072)
-     ((string-match-p "falcon" model) 2048)
-     ((string-match-p "orca 2" model) 4096)
-     ((string-match-p "orca" model) 2048)
-     ((string-match-p "llama\s*3" model) 131072)
-     ((string-match-p "llama\s*2" model) 4096)
-     ((string-match-p "llama" model) 2048)
-     ((string-match-p "starcoder" model) 8192)
-     ((string-match-p "gemma" model) 8192)
-     ;; default to the smallest context window, 2048
-     (t 2048))))
+(defun llm-provider-utils-model-token-limit (model &optional default)
+  "Return the token limit for MODEL.
+If MODEL cannot be found, warn and return DEFAULT, which by default is 4096."
+  (let ((model (llm-models-match model)))
+    (if model
+        (llm-model-context-length model)
+      (warn "No model predefined for model %s, using restrictive defaults" model)
+      (or default 4096))))
 
 (defun llm-provider-utils-openai-arguments (args)
   "Convert ARGS to the Open AI function calling spec.

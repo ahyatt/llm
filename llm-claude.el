@@ -143,12 +143,8 @@
   "Return the URL for the Claude API."
   "https://api.anthropic.com/v1/messages")
 
-;; See https://docs.anthropic.com/claude/docs/models-overview
 (cl-defmethod llm-chat-token-limit ((provider llm-claude))
-  (pcase (llm-claude-chat-model provider)
-    ("claude-2.0" 100000)
-    ("claude-instant-1.2" 100000)
-    (_ 200000)))
+  (llm-provider-utils-model-token-limit (llm-claude-chat-model provider)))
 
 (cl-defmethod llm-name ((_ llm-claude))
   "Return the name of the provider."

@@ -28,6 +28,7 @@
 (require 'cl-lib)
 (require 'llm)
 (require 'llm-provider-utils)
+(require 'llm-models)
 (require 'json)
 (require 'plz-media-type)
 
@@ -163,29 +164,22 @@ PROVIDER is the llm-ollama provider."
   (llm-ollama-chat-model provider))
 
 (cl-defmethod llm-chat-token-limit ((provider llm-ollama))
-  (llm-provider-utils-model-token-limit (llm-ollama-chat-model provider)))
+  (llm-provider-utils-model-token-limit (llm-ollama-chat-model provider)
+                                        2048))
 
 (cl-defmethod llm-capabilities ((provider llm-ollama))
-  (append (list 'streaming)
-          ;; See https://ollama.com/search?q=&c=embedding
+  (append '(streaming)
           (when (and (llm-ollama-embedding-model provider)
-                     (string-match
-                      (rx (or "nomic-embed-text"
-                              "mxbai-embed-large"
-                              "all-minilm"
-                              "snowflake-arctic-embed"))
-                      (llm-ollama-embedding-model provider)))
-            (list 'embeddings))
-          ;; see https://ollama.com/search?c=tools
-          (when (string-match
-                 (rx (or "llama3." "mistral-nemo" "qwen2.5"
-                         "nemotron-mini" "mistral-small"
-                         "mistral-large"
-                         "mistral" "mixtral" "command-r"
-                         "llama3-groq-tool-use"
-                         "firefunction-v2"))
-                 (llm-ollama-chat-model provider))
-            (list 'function-calls))))
+                     (let ((embedding-model (llm-models-match
+                                             (llm-ollama-embedding-model provider))))
+                       (and embedding-model
+                            (member 'embedding (llm-model-capabilities embedding-model)))))
+            '(embeddings))
+          (when (let ((chat-model (llm-models-match
+                                   (llm-ollama-chat-model provider))))
+                  (and chat-model
+                       (member 'tool-use (llm-model-capabilities chat-model))))
+            '(function-calls))))
 
 (provide 'llm-ollama)
 
