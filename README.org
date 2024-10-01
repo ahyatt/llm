@@ -81,6 +81,23 @@ This is a client that makes no call, but it just there for testing and debugging
 - ~:output-to-buffer~: if non-nil, the buffer or buffer name to append the request sent to the LLM to.
 - ~:chat-action-func~: a function that will be called to provide a string or symbol and message cons which are used to raise an error.
 - ~:embedding-action-func~: a function that will be called to provide a vector or symbol and message cons which are used to raise an error.
+* Models
+When picking a chat or embedding model, anything can be used, as long as the service thinks it is valid.  However, models vary on context size and capabilities.  The =llm-prompt= module, and any client, can depend on the context size of the model via ~llm-chat-token-limit~.  Similarly, some models have different capabilities, exposed in ~llm-capabilities~.  The =llm-models= module defines a list of popular models, but this isn't a comprehensive list.  If you want to add a model, it is fairly easy to do, for example here is adding the Mistral model (which is already included, though):
+
+#+begin_src emacs-lisp
+(require 'llm-models)
+(add-to-list
+ 'llm-models
+ (make-llm-model
+  :name "Mistral" :symbol 'mistral
+  :capabilities '(generation tool-use free-software)
+  :context-length 8192
+  :regex "mistral"))
+#+end_src
+
+The =:regex= needs to uniquely identify the model passed in from a provider's chat or embedding model.
+
+Once this is done, the model will be recognized to have the given context length and capabilities.
 * =llm= and the use of non-free LLMs
 The =llm= package is part of GNU Emacs by being part of GNU ELPA.  Unfortunately, the most popular LLMs in use are non-free, which is not what GNU software should be promoting by inclusion.  On the other hand, by use of the =llm= package, the user can make sure that any client that codes against it will work with free models that come along.  It's likely that sophisticated free LLMs will, emerge, although it's unclear right now what free software means with respsect to LLMs.  Because of this tradeoff, we have decided to warn the user when using non-free LLMs (which is every LLM supported right now except the fake one).  You can turn this off the same way you turn off any other warning, by clicking on the left arrow next to the warning when it comes up.  Alternatively, you can set ~llm-warn-on-nonfree~ to ~nil~.  This can be set via customization as well.
 
