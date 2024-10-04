@@ -160,8 +160,19 @@ STREAMING if non-nil, turn on response streaming."
                           (append
                            `(("role" . ,(llm-chat-prompt-interaction-role i)))
                            (when-let ((content (llm-chat-prompt-interaction-content i)))
-                             (if (stringp content) `(("content" . ,content))
-                               (llm-openai-function-call-to-response content)))))))
+			     (if (eq 'tool (llm-chat-prompt-interaction-role i))
+			       (llm-openai-function-call-to-response content)
+			       (if (stringp content) `(("content" . ,content))
+				 `(("content" .
+				    ,(mapcar (lambda (c)
+					       (pcase (car c)
+						 ('text `(("type" . "text")
+							  ("text" . ,(cdr c))))
+						 ('image `(("type" . "image_url")
+							   ("image_url" .
+							    (("url" . ,(llm-png-to-image-url (cdr c)))))))))
+					     content)))
+                               )))))))
                      (llm-chat-prompt-interactions prompt)))
           request-alist)
     (push `("model" . ,(or (llm-openai-chat-model provider) "gpt-4o")) request-alist)

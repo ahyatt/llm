@@ -623,5 +623,8 @@ If F is nil, nothing is done."
         (with-current-buffer buf (apply f args))
       (with-temp-buffer (apply f args)))))
 
+(defun llm-png-to-image-url (image)
+  (concat "data:image/png;base64," (base64-encode-string image)))
+
 (provide 'llm-provider-utils)
 ;;; llm-provider-utils.el ends here
