@@ -181,7 +181,7 @@ the key must be regenerated every hour."
    `((system_instruction
       . ((parts
 	   . ,(mapcar (lambda (interaction)
-			`(text . ,(llm-chat-prompt-interaction-content interaction)))
+			`((text . ,(llm-chat-prompt-interaction-content interaction))))
 		      (seq-filter (lambda (interaction) (eq (llm-chat-prompt-interaction-role interaction) 'system))
 				  (llm-chat-prompt-interactions prompt)))))))
    `((contents
@@ -209,7 +209,13 @@ the key must be regenerated every hour."
                                                   (content . ,(llm-chat-prompt-function-call-result-result fc)))))))))
                                          (llm-chat-prompt-interaction-function-call-results interaction))
 
-                               (llm-chat-prompt-interaction-content interaction))))))
+                               (mapcar (lambda (part)
+					 (if (llm-provider-utils-image-p part)
+					     `((inline_data
+					       . ((mime_type . ,(llm-provider-utils-image-mime-type part))
+						  (data . ,(base64url-encode-string (llm-provider-utils-image-data part))))))
+					   `((text . ,part))))
+				       (llm-chat-prompt-interaction-content interaction)))))))
                (seq-filter
 		(lambda (interaction) (not (eq 'system (llm-chat-prompt-interaction-role interaction))))
 		(llm-chat-prompt-interactions prompt)))))
