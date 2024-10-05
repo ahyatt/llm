@@ -176,8 +176,14 @@ the key must be regenerated every hour."
   (llm-provider-extract-function-calls provider (json-read-from-string response)))
 
 (cl-defmethod llm-provider-chat-request ((_ llm-google) prompt _)
-  (llm-provider-utils-combine-to-user-prompt prompt llm-vertex-example-prelude)
+  (llm-provider-utils-combine-to-system-prompt prompt llm-vertex-example-prelude)
   (append
+   `((system_instruction
+      . ((parts
+	   . ,(mapcar (lambda (interaction)
+			`(text . ,(llm-chat-prompt-interaction-content interaction)))
+		      (seq-filter (lambda (interaction) (eq (llm-chat-prompt-interaction-role interaction) 'system))
+				  (llm-chat-prompt-interactions prompt)))))))
    `((contents
       .
       ,(mapcar (lambda (interaction)
@@ -204,7 +210,9 @@ the key must be regenerated every hour."
                                          (llm-chat-prompt-interaction-function-call-results interaction))
 
                                (llm-chat-prompt-interaction-content interaction))))))
-               (llm-chat-prompt-interactions prompt))))
+               (seq-filter
+		(lambda (interaction) (not (eq 'system (llm-chat-prompt-interaction-role interaction))))
+		(llm-chat-prompt-interactions prompt)))))
    (when (llm-chat-prompt-functions prompt)
      ;; Although Gemini claims to be compatible with Open AI's function declaration,
      ;; it's only somewhat compatible.
