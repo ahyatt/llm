@@ -164,15 +164,19 @@ STREAMING if non-nil, turn on response streaming."
 			       (llm-openai-function-call-to-response content)
 			       (if (stringp content) `(("content" . ,content))
 				 `(("content" .
-				    ,(mapcar (lambda (c)
-					       (pcase (car c)
-						 ('text `(("type" . "text")
-							  ("text" . ,(cdr c))))
-						 ('image `(("type" . "image_url")
-							   ("image_url" .
-							    (("url" . ,(llm-png-to-image-url (cdr c)))))))))
-					     content)))
-                               )))))))
+				    ,(mapcar (lambda (part)
+					       (if (llm-provider-utils-image-p part)
+						   `(("type" . "image_url")
+						     ("image_url"
+						      . (("url"
+							 . ,(concat
+							     "data:"
+							     (llm-provider-utils-image-mime-type part)
+							     ";base64,"
+							     (base64-encode-string (llm-provider-utils-image-data part)))))))
+						 `(("type" . "text")
+						   ("text" . ,part))))
+					     content))) )))))))
                      (llm-chat-prompt-interactions prompt)))
           request-alist)
     (push `("model" . ,(or (llm-openai-chat-model provider) "gpt-4o")) request-alist)
