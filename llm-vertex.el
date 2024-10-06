@@ -176,8 +176,13 @@ the key must be regenerated every hour."
   (llm-provider-extract-function-calls provider (json-read-from-string response)))
 
 (cl-defmethod llm-provider-chat-request ((_ llm-google) prompt _)
-  (llm-provider-utils-combine-to-user-prompt prompt llm-vertex-example-prelude)
+  (llm-provider-utils-combine-to-system-prompt prompt llm-vertex-example-prelude)
   (append
+   (when-let ((first (car (llm-chat-prompt-interactions prompt))))
+     ;; System prompts for vertex only really make sense when they are the first interaction, since they are sent separately
+     (when (eq (llm-chat-prompt-interaction-role first) 'system)
+       `((system_instruction
+	  . ((parts . (((text . ,(llm-chat-prompt-interaction-content first))))))))))
    `((contents
       .
       ,(mapcar (lambda (interaction)
@@ -203,8 +208,20 @@ the key must be regenerated every hour."
                                                   (content . ,(llm-chat-prompt-function-call-result-result fc)))))))))
                                          (llm-chat-prompt-interaction-function-call-results interaction))
 
-                               (llm-chat-prompt-interaction-content interaction))))))
-               (llm-chat-prompt-interactions prompt))))
+			       ;; If role is user and content is not a string, assume it is a list of parts
+                               (if (eq 'user (llm-chat-prompt-interaction-role interaction))
+				   (mapcar (lambda (part)
+					 (if (llm-provider-utils-image-p part)
+					     `((inline_data
+					       . ((mime_type . ,(llm-provider-utils-image-mime-type part))
+						  (data . ,(base64url-encode-string (llm-provider-utils-image-data part))))))
+					   `((text . ,part))))
+					   (llm-chat-prompt-interaction-content interaction))
+				 ;; If assistant interaction is a list, it is a list of function calls and can be used directly
+				 (llm-chat-prompt-interaction-content interaction)))))))
+               (seq-filter
+		(lambda (interaction) (not (eq 'system (llm-chat-prompt-interaction-role interaction))))
+		(llm-chat-prompt-interactions prompt)))))
    (when (llm-chat-prompt-functions prompt)
      ;; Although Gemini claims to be compatible with Open AI's function declaration,
      ;; it's only somewhat compatible.

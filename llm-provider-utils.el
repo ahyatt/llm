@@ -623,5 +623,7 @@ If F is nil, nothing is done."
         (with-current-buffer buf (apply f args))
       (with-temp-buffer (apply f args)))))
 
+(cl-defstruct llm-provider-utils-image mime-type data)
+
 (provide 'llm-provider-utils)
 ;;; llm-provider-utils.el ends here
