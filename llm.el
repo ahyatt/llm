@@ -128,6 +128,24 @@ REQUIRED is whether this is required or not."
   type
   required)
 
+(cl-defstruct llm-media mime-type data)
+
+(defun llm--image-to-media (image)
+  (make-llm-provider-utils-media
+   :mime-type (pcase (image-property image :type)
+		('svg "image/svg+xml")
+		('webp "image/webp")
+		('png "image/png")
+		('gif "image/gif")
+		('tiff "image/tiff")
+		('jpeg "image/jpeg")
+		('xpm "image/x-xpixmap")
+		('xbm "image/x-xbitmap"))
+   :data (if-let ((data (image-property image :data))) data
+	   (with-temp-buffer
+	     (insert-file-contents-literally (image-property image :file))
+	     (buffer-string)))))
+
 (cl-defun llm--log (type &key provider prompt msg)
   "Log a MSG of TYPE, given PROVIDER, PROMPT, and MSG.
 These are all optional, each one should be the normal meaning of
