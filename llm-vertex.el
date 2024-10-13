@@ -211,10 +211,10 @@ the key must be regenerated every hour."
 			       ;; If role is user and content is not a string, assume it is a list of parts
                                (if (eq 'user (llm-chat-prompt-interaction-role interaction))
 				   (mapcar (lambda (part)
-					 (if (llm-provider-utils-image-p part)
+					 (if (llm-provider-utils-media-p part)
 					     `((inline_data
-					       . ((mime_type . ,(llm-provider-utils-image-mime-type part))
-						  (data . ,(base64url-encode-string (llm-provider-utils-image-data part))))))
+					       . ((mime_type . ,(llm-provider-utils-media-mime-type part))
+						  (data . ,(base64url-encode-string (llm-provider-utils-media-data part))))))
 					   `((text . ,part))))
 					   (llm-chat-prompt-interaction-content interaction))
 				 ;; If assistant interaction is a list, it is a list of function calls and can be used directly

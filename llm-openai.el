@@ -165,15 +165,15 @@ STREAMING if non-nil, turn on response streaming."
 				     ;; If a user interaction is a list, assume it is a multipart message
 				     `(("content" .
 					,(mapcar (lambda (part)
-						   (if (llm-provider-utils-image-p part)
+						   (if (llm-provider-utils-media-p part)
 						       `(("type" . "image_url")
 							 ("image_url"
 							  . (("url"
 							      . ,(concat
 								  "data:"
-								  (llm-provider-utils-image-mime-type part)
+								  (llm-provider-utils-media-mime-type part)
 								  ";base64,"
-								  (base64-encode-string (llm-provider-utils-image-data part)))))))
+								  (base64-encode-string (llm-provider-utils-media-data part)))))))
 						     `(("type" . "text")
 						       ("text" . ,part))))
 						 content)))
