@@ -106,12 +106,26 @@ PROVIDER is the llm-ollama provider."
   (let (request-alist messages options)
     (setq messages
           (mapcar (lambda (interaction)
-                    `(("role" . ,(symbol-name (llm-chat-prompt-interaction-role interaction)))
-                      ("content" . ,(let ((content
-                                           (llm-chat-prompt-interaction-content interaction)))
-                                      (if (stringp content)
-                                          content
-                                        (json-encode content))))))
+		    (let* ((role (llm-chat-prompt-interaction-role interaction))
+			   (content (llm-chat-prompt-interaction-content interaction))
+			   (content-text "")
+			   (images nil))
+		      (if (stringp content)
+			  (setq content-text content)
+			(if (eq 'user role)
+			    (dolist (part content)
+			      (if (llm-media-p part)
+				  (setq images (append images (list part)))
+				(setq content-text (concat content-text part))))
+			  (setq content-text (json-encode content))))
+		      (append
+		       `(("role" . ,(symbol-name role)))
+		       `(("content" . ,content-text))
+		       (when images
+			 `(("images" .
+			    ,(mapcar (lambda (img) (base64-encode-string (llm-media-data img) t))
+				     images))))
+		       )))
                   (llm-chat-prompt-interactions prompt)))
     (when (llm-chat-prompt-context prompt)
       (push `(("role" . "system")
