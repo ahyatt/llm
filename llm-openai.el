@@ -160,11 +160,10 @@ STREAMING if non-nil, turn on response streaming."
                           (append
                            `(("role" . ,(llm-chat-prompt-interaction-role i)))
                            (when-let ((content (llm-chat-prompt-interaction-content i)))
-			     (if (listp content)
-				 (if (eq 'user (llm-chat-prompt-interaction-role i))
-				     ;; If a user interaction is a list, assume it is a multipart message
-				     `(("content" .
-					,(mapcar (lambda (part)
+			     `(("content"
+				. ,(pcase content
+				    ((pred llm-multipart-p)
+				     (mapcar (lambda (part)
 						   (if (llm-media-p part)
 						       `(("type" . "image_url")
 							 ("image_url"
@@ -176,11 +175,10 @@ STREAMING if non-nil, turn on response streaming."
 								  (base64-encode-string (llm-media-data part)))))))
 						     `(("type" . "text")
 						       ("text" . ,part))))
-						 content)))
-				   ;; If an assistant interaction is a list, assume it is function calls
-				   (llm-openai-function-call-to-response content))
-			       `(("content" . ,content)) ;; Should only happen when content is a string
-			       ))))))
+					     (llm-multipart-parts content)))
+				    ((pred listp) (llm-openai-function-call-to-response content))
+				    (_ content))))
+			       )))))
                      (llm-chat-prompt-interactions prompt)))
           request-alist)
     (push `("model" . ,(or (llm-openai-chat-model provider) "gpt-4o")) request-alist)

@@ -208,16 +208,14 @@ the key must be regenerated every hour."
                                                   (content . ,(llm-chat-prompt-function-call-result-result fc)))))))))
                                          (llm-chat-prompt-interaction-function-call-results interaction))
 
-			       ;; If role is user and content is not a string, assume it is a list of parts
-                               (if (eq 'user (llm-chat-prompt-interaction-role interaction))
+                               (if (llm-multipart-p (llm-chat-prompt-interaction-content interaction))
 				   (mapcar (lambda (part)
 					 (if (llm-media-p part)
 					     `((inline_data
 					       . ((mime_type . ,(llm-media-mime-type part))
 						  (data . ,(base64url-encode-string (llm-media-data part))))))
 					   `((text . ,part))))
-					   (llm-chat-prompt-interaction-content interaction))
-				 ;; If assistant interaction is a list, it is a list of function calls and can be used directly
+					   (llm-multipart-parts (llm-chat-prompt-interaction-content interaction)))
 				 (llm-chat-prompt-interaction-content interaction)))))))
                (seq-filter
 		(lambda (interaction) (not (eq 'system (llm-chat-prompt-interaction-role interaction))))

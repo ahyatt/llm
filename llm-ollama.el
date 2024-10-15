@@ -113,7 +113,7 @@ PROVIDER is the llm-ollama provider."
 		      (if (stringp content)
 			  (setq content-text content)
 			(if (eq 'user role)
-			    (dolist (part content)
+			    (dolist (part (llm-multipart-parts content))
 			      (if (llm-media-p part)
 				  (setq images (append images (list part)))
 				(setq content-text (concat content-text part))))

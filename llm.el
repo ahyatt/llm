@@ -146,6 +146,16 @@ REQUIRED is whether this is required or not."
 	     (insert-file-contents-literally (image-property image :file))
 	     (buffer-string)))))
 
+(cl-defstruct llm-multipart parts)
+
+(defun llm-make-multipart (&rest parts)
+  (make-llm-multipart
+   :parts (mapcar (lambda (part)
+		    (if (or (stringp part) (llm-media-p part))
+			part
+		      (llm--image-to-media part)))
+		  parts)))
+
 (cl-defun llm--log (type &key provider prompt msg)
   "Log a MSG of TYPE, given PROVIDER, PROMPT, and MSG.
 These are all optional, each one should be the normal meaning of
@@ -593,13 +603,13 @@ This should only be used for logging or debugging."
                           ('system "System")
                           ('assistant "Assistant"))
 			(let ((content (llm-chat-prompt-interaction-content i)))
-			  (if (listp content)
+			  (if (llm-multipart-p content)
 			      (mapcar (lambda (part) (if (llm-media-p part)
 							 (format "[%s data, %d bytes]"
 								 (llm-media-mime-type part)
 								 (length (llm-media-data part)))
 						       part))
-				      content)
+				      (llm-multipart-parts content))
 			    content))
                         ))
               (llm-chat-prompt-interactions prompt) "\n")
