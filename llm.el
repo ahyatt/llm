@@ -131,7 +131,7 @@ REQUIRED is whether this is required or not."
 (cl-defstruct llm-media mime-type data)
 
 (defun llm--image-to-media (image)
-  (make-llm-provider-utils-media
+  (make-llm-media
    :mime-type (pcase (image-property image :type)
 		('svg "image/svg+xml")
 		('webp "image/webp")
