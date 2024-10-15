@@ -592,7 +592,16 @@ This should only be used for logging or debugging."
                           ('user "User")
                           ('system "System")
                           ('assistant "Assistant"))
-                        (llm-chat-prompt-interaction-content i)))
+			(let ((content (llm-chat-prompt-interaction-content i)))
+			  (if (listp content)
+			      (mapcar (lambda (part) (if (llm-media-p part)
+							 (format "[%s data, %d bytes]"
+								 (llm-media-mime-type part)
+								 (length (llm-media-data part)))
+						       part))
+				      content)
+			    content))
+                        ))
               (llm-chat-prompt-interactions prompt) "\n")
    "\n"
    (when (llm-chat-prompt-temperature prompt)
