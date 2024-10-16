@@ -174,8 +174,8 @@ multipart message."
    :parts (mapcar (lambda (part)
 		    (if (imagep part)
 			(llm--image-to-media part)
-		      part)
-		    parts))))
+		      part))
+		    parts)))
 
 (cl-defun llm--log (type &key provider prompt msg)
   "Log a MSG of TYPE, given PROVIDER, PROMPT, and MSG.
