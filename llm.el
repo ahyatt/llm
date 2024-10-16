@@ -151,10 +151,10 @@ REQUIRED is whether this is required or not."
 (defun llm-make-multipart (&rest parts)
   (make-llm-multipart
    :parts (mapcar (lambda (part)
-		    (if (or (stringp part) (llm-media-p part))
-			part
-		      (llm--image-to-media part)))
-		  parts)))
+		    (if (imagep part)
+			(llm--image-to-media part)
+		      part)
+		    parts)))
 
 (cl-defun llm--log (type &key provider prompt msg)
   "Log a MSG of TYPE, given PROVIDER, PROMPT, and MSG.
