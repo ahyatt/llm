@@ -81,6 +81,23 @@ This is a client that makes no call, but it just there for testing and debugging
 - ~:output-to-buffer~: if non-nil, the buffer or buffer name to append the request sent to the LLM to.
 - ~:chat-action-func~: a function that will be called to provide a string or symbol and message cons which are used to raise an error.
 - ~:embedding-action-func~: a function that will be called to provide a vector or symbol and message cons which are used to raise an error.
+* Models
+When picking a chat or embedding model, anything can be used, as long as the service thinks it is valid.  However, models vary on context size and capabilities.  The =llm-prompt= module, and any client, can depend on the context size of the model via ~llm-chat-token-limit~.  Similarly, some models have different capabilities, exposed in ~llm-capabilities~.  The =llm-models= module defines a list of popular models, but this isn't a comprehensive list.  If you want to add a model, it is fairly easy to do, for example here is adding the Mistral model (which is already included, though):
+
+#+begin_src emacs-lisp
+(require 'llm-models)
+(add-to-list
+ 'llm-models
+ (make-llm-model
+  :name "Mistral" :symbol 'mistral
+  :capabilities '(generation tool-use free-software)
+  :context-length 8192
+  :regex "mistral"))
+#+end_src
+
+The =:regex= needs to uniquely identify the model passed in from a provider's chat or embedding model.
+
+Once this is done, the model will be recognized to have the given context length and capabilities.
 * =llm= and the use of non-free LLMs
 The =llm= package is part of GNU Emacs by being part of GNU ELPA.  Unfortunately, the most popular LLMs in use are non-free, which is not what GNU software should be promoting by inclusion.  On the other hand, by use of the =llm= package, the user can make sure that any client that codes against it will work with free models that come along.  It's likely that sophisticated free LLMs will, emerge, although it's unclear right now what free software means with respsect to LLMs.  Because of this tradeoff, we have decided to warn the user when using non-free LLMs (which is every LLM supported right now except the fake one).  You can turn this off the same way you turn off any other warning, by clicking on the left arrow next to the warning when it comes up.  Alternatively, you can set ~llm-warn-on-nonfree~ to ~nil~.  This can be set via customization as well.
 
@@ -223,7 +240,9 @@ subsequent terms.  The variable ~llm-prompt-default-max-pct~ controls how much o
 the context window we want to fill.  The way we estimate the number of tokens
 used is quick but inaccurate, so limiting to less than the maximum context size
 is useful for guarding against a miscount leading to an error calling the LLM
-due to too many tokens.
+due to too many tokens.  If you want to have a hard limit as well that doesn't
+depend on the context window size, you can use ~llm-prompt-default-max-tokens~.
+We will use the minimum of either value.
 
 Variables are enclosed in double curly braces, like this: ={{instructions}}=.
 They can just be the variable, or they can also denote a number of tickets, like
@@ -250,6 +269,12 @@ variable.  However, a plain list is also acceptable, as is a single value.  Any
 single value will not enter into the ticket system, but rather be prefilled
 before any tickets are used.
 
+Values supplied in either the list or generators can be the values themselves,
+or conses.  If a cons, the variable to fill is the =car= of the cons, and the =cdr=
+is the place to fill the new value, =front= or =back=.  The =front= is the default:
+new values will be appended to the end.  =back= will add new values to the start
+of the filled text for the variable instead.
+
 So, to illustrate with this example, here's how the prompt will be filled:
 
   1. First, the ={{tags}}= and ={{instructions}}= will be filled first.  This will
@@ -259,8 +284,12 @@ So, to illustrate with this example, here's how the prompt will be filled:
      multiplied by ~llm-chat-token-limit~) and exit if exceeded.
   3. Run a lottery with all tickets and choose one of the remaining variables to
      fill.
-  4. If the variable won't make the text too large, fill the variable
-     with one entry retrieved from a supplied generator, otherwise ignore.
+  4. If the variable won't make the text too large, fill the variable with one
+     entry retrieved from a supplied generator, otherwise ignore.  These are
+     values are not conses, so values will be appended to the end of the
+     generated text for each variable (so a new variable generated for tags will
+     append after other generated tags but before the subsequent "and" in the
+     text.
   5. Goto 2
 
   The prompt can be filled two ways, one using predefined prompt template

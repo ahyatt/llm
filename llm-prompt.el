@@ -63,11 +63,21 @@
   :group 'llm)
 
 (defcustom llm-prompt-default-max-pct 50
-  "The default mode for all new notes.
+  "Default max percentage of context window to use for a prompt.
+The minimum of this and `llm-prompt-default-max-tokens' will be
+used.  For an example, at the time of this writing, using Claude
+3.5 Sonnet will cost, at 50% tokens, $0.30 USD.
 
 Using 100% or close to it is not recommended, as space is needed
-for conversation."
-  :type 'integer)
+for conversation, and token counting is not exact."
+  :type 'integer
+  :group 'llm-prompt)
+
+(defcustom llm-prompt-default-max-tokens nil
+  "The default maximum number of tokens to use for a prompt.
+Set to nil to use `llm-prompt-default-max-pct' instead."
+  :type 'integer
+  :group 'llm-prompt)
 
 (cl-defstruct llm-prompt piece text truncator)
 
@@ -90,7 +100,7 @@ arguments with other tickets.  If not specified, it's assumed
 that this will have as many tickets as the rest of all the other
 arguments put together.  If no one specifies the number of
 tickets, we will pull evenly (but randomly) into each of the
-variables until we reach `prompt-default-max-pct'."
+variables until we reach the desired context window size."
   (declare (indent defun))
   `(puthash (quote ,name) ,text llm-prompt-prompts))
 
@@ -161,12 +171,27 @@ executed with no arguments to return an iterator."
          (t (iter-lambda () (dolist (el var)
                               (iter-yield el)))))))
 
+(defun llm-prompt--max-tokens (provider)
+  "Return the maximum number of tokens to use for a prompt.
+PROVIDER is the provider which will be used, and which has a
+maximum number of tokens."
+  (floor
+   (min (or llm-prompt-default-max-tokens
+            (llm-chat-token-limit provider))
+        (* (/ llm-prompt-default-max-pct 100.0)
+           (llm-chat-token-limit provider)))))
+
 (defun llm-prompt-fill-text (text provider &rest keys)
   "Fill TEXT prompt, with the llm PROVIDER, values from KEYS.
 
-PROVIER is an LLM provider.  KEYS is a plist of variables and
+PROVIDER is an LLM provider.  KEYS is a plist of variables and
 their values, either an actual value, or a list or function.  If
-a function, it should return values via a generator."
+a function, it should return values via a generator.
+
+The values can be strings, or conses.  If conses, the value to use is
+the car, and the cdr can be `front' (the default), or `back', signifying
+where to append the new text to, relative to the already filled values
+from the variable."
   (with-temp-buffer
     (insert text)
     (let* ((final-vals nil)
@@ -217,20 +242,29 @@ a function, it should return values via a generator."
                                  vars))))
         (condition-case nil
             (while (< total-tokens
-                      (* (/ llm-prompt-default-max-pct 100.0)
-                         (llm-chat-token-limit provider)))
+                      (llm-prompt--max-tokens provider))
               (let* ((val-cons (iter-next ticket-gen))
-                     (sval (format "%s" (cdr val-cons))))
+                     (var (car val-cons))
+                     (sval (format "%s" (if (consp (cdr val-cons))
+                                            (cadr val-cons)
+                                          (cdr val-cons))))
+                     (add-location (if (consp (cdr val-cons))
+                                       (cddr val-cons) 'front)))
+                (unless (member add-location '(front back))
+                  (error "Add location specification must be one of 'front or 'back"))
                 ;; Only add if there is space, otherwise we ignore this value.
                 (when (<= (+ total-tokens (llm-count-tokens provider sval))
                           (* (/ llm-prompt-default-max-pct 100.0)
                              (llm-chat-token-limit provider)))
                   (cl-incf total-tokens (llm-count-tokens provider sval))
-                  (if (assoc (car val-cons) final-vals)
-                      (push sval (cdr (assoc (car val-cons) final-vals)))
-                    (push (cons (car val-cons)
-                                (list sval))
-                          final-vals)))))
+                  (if (assoc var final-vals)
+                      (if (eq add-location 'back)
+                          (setf
+                           (cdr (assoc var final-vals))
+                           (nconc (assoc-default var final-vals)
+                                  (list sval)))
+                        (push sval (cdr (assoc var final-vals))))
+                    (push (cons var (list sval)) final-vals)))))
           (iter-end-of-sequence nil)))
       (cl-loop for (var-name . val) in final-vals
                do
@@ -245,6 +279,12 @@ a function, it should return values via a generator."
                                                    (reverse val) " ")
                                       val)))))
     (buffer-substring-no-properties (point-min) (point-max))))
+
+(defun llm-prompt-get (name)
+  "Return the raw prompt with the given NAME, a symbol.
+The prompt may have variables to fill in, so if so, it should be
+processed with `llm-prompt-fill-text'."
+  (gethash name llm-prompt-prompts))
 
 (defun llm-prompt-fill (name provider &rest keys)
   "Get and fill the prompt for NAME given llm PROVIDER.

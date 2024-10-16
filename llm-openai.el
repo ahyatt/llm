@@ -28,6 +28,7 @@
 (require 'cl-lib)
 (require 'llm)
 (require 'llm-provider-utils)
+(require 'llm-models)
 (require 'json)
 (require 'plz-event-source)
 
@@ -144,19 +145,23 @@ STREAMING if non-nil, turn on response streaming."
     (llm-provider-utils-combine-to-system-prompt prompt llm-openai-example-prelude)
     (when streaming (push `("stream" . ,t) request-alist))
     (push `("messages" .
-            ,(mapcar (lambda (p)
-                       (append
-                        `(("role" . ,(llm-chat-prompt-interaction-role p))
-                          ("content" . ,(let ((content
-                                               (llm-chat-prompt-interaction-content p)))
-                                          (if (stringp content) content
-                                            (json-encode content)))))
-                        (when-let ((fc (llm-chat-prompt-interaction-function-call-result p)))
+            ,(mapcan (lambda (i)
+                       (if (llm-chat-prompt-interaction-function-call-results i)
+                           (mapcar (lambda (fc)
+                                     (append
+                                      (when (llm-chat-prompt-function-call-result-call-id fc)
+                                        `(("tool_call_id" .
+                                           ,(llm-chat-prompt-function-call-result-call-id fc))))
+                                      `(("role" . "tool")
+                                        ("name" . ,(llm-chat-prompt-function-call-result-function-name fc))
+                                        ("content" . ,(llm-chat-prompt-function-call-result-result fc)))))
+                                   (llm-chat-prompt-interaction-function-call-results i))
+                         (list
                           (append
-                           (when (llm-chat-prompt-function-call-result-call-id fc)
-                             `(("tool_call_id" .
-                                ,(llm-chat-prompt-function-call-result-call-id fc))))
-                           `(("name" . ,(llm-chat-prompt-function-call-result-function-name fc)))))))
+                           `(("role" . ,(llm-chat-prompt-interaction-role i)))
+                           (when-let ((content (llm-chat-prompt-interaction-content i)))
+                             (if (stringp content) `(("content" . ,content))
+                               (llm-openai-function-call-to-response content)))))))
                      (llm-chat-prompt-interactions prompt)))
           request-alist)
     (push `("model" . ,(or (llm-openai-chat-model provider) "gpt-4o")) request-alist)
@@ -185,15 +190,20 @@ STREAMING if non-nil, turn on response streaming."
                          (assoc-default 'message
                                         (aref (assoc-default 'choices response) 0)))))
 
+(defun llm-openai-function-call-to-response (fcs)
+  "Convert back from the generic representation to the Open AI.
+FCS is a list of `make-llm-provider-utils-function-call'"
+  `(("tool_calls" .
+     ,(mapcar (lambda (fc)
+                `(("id" . ,(llm-provider-utils-function-call-id fc))
+                  ("type" . "function")
+                  ("function" .
+                   (("arguments" . ,(json-encode (llm-provider-utils-function-call-args fc)))
+                    ("name" . ,(llm-provider-utils-function-call-name fc))))))
+              fcs))))
+
 (cl-defmethod llm-provider-populate-function-calls ((_ llm-openai) prompt calls)
-  (llm-provider-utils-append-to-prompt
-   prompt
-   (mapcar (lambda (call)
-             `((id . ,(llm-provider-utils-function-call-id call))
-               (function (name . ,(llm-provider-utils-function-call-name call))
-                         (arguments . ,(json-encode
-                                        (llm-provider-utils-function-call-args call))))))
-           calls)))
+  (llm-provider-utils-append-to-prompt prompt calls))
 
 (defun llm-openai--get-partial-chat-response (response)
   "Return the text in the partial chat response from RESPONSE.
@@ -247,37 +257,19 @@ RESPONSE can be nil if the response is complete."
   "Return the name of the provider."
   "Open AI")
 
-;; See https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo
-;; and https://platform.openai.com/docs/models/gpt-3-5,
-;; and also https://platform.openai.com/settings/organization/limits.
 (cl-defmethod llm-chat-token-limit ((provider llm-openai))
-  (let ((model (llm-openai-chat-model provider)))
-    (cond
-     ((string-match (rx (seq (or ?- ?_) (group-n 1 (+ digit)) ?k)) model)
-      (let ((n (string-to-number (match-string 1 model))))
-        ;; This looks weird but Open AI really has an extra token for 16k
-        ;; models, but not for 32k models.
-        (+ (* n 1024) (if (= n 16) 1 0))))
-     ((equal model "gpt-4") 8192)
-     ((string-match-p "gpt-4o" model) 30000)
-     ((string-match-p (rx (seq "gpt-4-" (+ ascii) "-preview")) model)
-      128000)
-     ((string-match-p (rx (seq "gpt-4-" (+ digit))) model)
-      8192)
-     ((string-match-p (rx (seq "gpt-3.5-turbo-1" (+ digit))) model)
-      16385)
-     ((string-match-p (rx (seq "gpt-3.5-turbo" (opt "-instruct"))) model)
-      4096)
-     (t 4096))))
-
-(cl-defmethod llm-chat-token-limit ((provider llm-openai-compatible))
   (llm-provider-utils-model-token-limit (llm-openai-chat-model provider)))
 
 (cl-defmethod llm-capabilities ((_ llm-openai))
   (list 'streaming 'embeddings 'function-calls))
 
-(cl-defmethod llm-capabilities ((_ llm-openai-compatible))
-  (list 'streaming 'embeddings))
+(cl-defmethod llm-capabilities ((provider llm-openai-compatible))
+  (append '(streaming)
+          (when (llm-openai-embedding-model provider)
+            '(embeddings))
+          (let ((model (llm-models-match (llm-openai-chat-model provider))))
+            (when (and model (member 'tool-use (llm-model-capabilities model)))
+              '(function-calls)))))
 
 (provide 'llm-openai)
 
