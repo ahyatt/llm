@@ -1,3 +1,6 @@
+* Version 0.18.0
+- Remove testing and other development files from ELPA packaging.
+- Remove vendored =plz-event-source= and =plz-media-type=, and add requirements.
 * Version 0.17.4
 - Fix problem with Open AI's =llm-chat-token-limit=.
 * Version 0.17.3
