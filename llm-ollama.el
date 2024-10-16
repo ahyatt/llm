@@ -124,8 +124,7 @@ PROVIDER is the llm-ollama provider."
 		       (when images
 			 `(("images" .
 			    ,(mapcar (lambda (img) (base64-encode-string (llm-media-data img) t))
-				     images))))
-		       )))
+				     images)))))))
                   (llm-chat-prompt-interactions prompt)))
     (when (llm-chat-prompt-context prompt)
       (push `(("role" . "system")

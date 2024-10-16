@@ -610,8 +610,7 @@ This should only be used for logging or debugging."
 								 (length (llm-media-data part)))
 						       part))
 				      (llm-multipart-parts content))
-			    content))
-                        ))
+			    content))))
               (llm-chat-prompt-interactions prompt) "\n")
    "\n"
    (when (llm-chat-prompt-temperature prompt)
