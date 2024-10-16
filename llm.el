@@ -172,12 +172,10 @@ Each argument should be either a string, image object or an
 multipart message."
   (make-llm-multipart
    :parts (mapcar (lambda (part)
-		    (if (if (fboundp 'imagep)
-			    (imagep part)
-			  (error "llm-make-multipart requires imagep"))
+		    (if (and (fboundp 'imagep) (imagep part))
 			(llm--image-to-media part)
 		      part))
-		    parts)))
+		  parts)))
 
 (cl-defun llm--log (type &key provider prompt msg)
   "Log a MSG of TYPE, given PROVIDER, PROMPT, and MSG.
