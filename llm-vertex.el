@@ -213,7 +213,7 @@ the key must be regenerated every hour."
 					 (if (llm-media-p part)
 					     `((inline_data
 					       . ((mime_type . ,(llm-media-mime-type part))
-						  (data . ,(base64url-encode-string (llm-media-data part))))))
+						  (data . ,(base64-encode-string (llm-media-data part) t)))))
 					   `((text . ,part))))
 					   (llm-multipart-parts (llm-chat-prompt-interaction-content interaction)))
 				 (llm-chat-prompt-interaction-content interaction)))))))
