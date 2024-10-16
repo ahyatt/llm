@@ -172,7 +172,9 @@ Each argument should be either a string, image object or an
 multipart message."
   (make-llm-multipart
    :parts (mapcar (lambda (part)
-		    (if (imagep part)
+		    (if (if (fboundp 'imagep)
+			    (imagep part)
+			  (error "llm-make-multipart requires imagep"))
 			(llm--image-to-media part)
 		      part))
 		    parts)))
