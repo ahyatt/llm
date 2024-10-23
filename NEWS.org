@@ -4,6 +4,7 @@
 - Update list of Ollama models for function calling.
 - Centralize model list so things like Vertex and Open AI compatible libraries can have more accurate context lengths and capabilities.
 - Update default Gemini chat model to Gemini 1.5 Pro.
+- Update default Claude chat model to latest Sonnet version.
 * Version 0.17.4
 - Fix problem with Open AI's =llm-chat-token-limit=.
 - Fix Open AI and Gemini's parallel function calling.
