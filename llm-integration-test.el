@@ -117,6 +117,58 @@
        (ert-info ((format "Using provider %s" (llm-name provider)))
          ,@body))))
 
+(llm-def-integration-test llm-embedding (provider)
+  (when (member 'embeddings (llm-capabilities provider))
+    (let ((result (llm-embedding provider "Paris")))
+      (should (vectorp result))
+      (should (> (length result) 0)))))
+
+(llm-def-integration-test llm-embedding-async (provider)
+  (when (member 'embeddings (llm-capabilities provider))
+    (let ((result nil)
+          (buf (current-buffer))
+          (llm-warn-on-nonfree nil))
+      (llm-embedding-async
+       provider
+       "Paris"
+       (lambda (response)
+         (should (eq (current-buffer) buf))
+         (setq result response))
+       (lambda (error)
+         (error "Error: %s" error)))
+      (while (null result)
+        (sleep-for 0.1))
+      (should (vectorp result))
+      (should (> (length result) 0)))))
+
+(llm-def-integration-test llm-batch-streaming (provider)
+  (when (member 'embeddings-batch (llm-capabilities provider))
+    (let ((result (llm-batch-embeddings provider '("Paris" "France"))))
+      (should (listp result))
+      (should (= (length result) 2))
+      (should (vectorp (aref result 0)))
+      (should (vectorp (aref result 1))))))
+
+(llm-def-integration-test llm-batch-streaming-async (provider)
+  (when (member 'embeddings-batch (llm-capabilities provider))
+    (let ((result nil)
+          (buf (current-buffer))
+          (llm-warn-on-nonfree nil))
+      (llm-batch-embeddings-async
+       provider
+       '("Paris" "France")
+       (lambda (response)
+         (should (eq (current-buffer) buf))
+         (setq result response))
+       (lambda (error)
+         (error "Error: %s" error)))
+      (while (null result)
+        (sleep-for 0.1))
+      (should (listp result))
+      (should (= (length result) 2))
+      (should (vectorp (aref result 0)))
+      (should (vectorp (aref result 1))))))
+
 (llm-def-integration-test llm-chat (provider)
   (should (equal
            (llm-chat

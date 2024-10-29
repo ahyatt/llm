@@ -468,6 +468,8 @@ won't have any partial responses, so basically just operates like
 
 `embeddings': the LLM can return vector embeddings of text.
 
+`embeddings-batch': the LLM can return many vector embeddings at the same time.
+
 `function-calls': the LLM can call functions."
   (ignore provider)
   nil)
@@ -513,6 +515,44 @@ be passed to `llm-cancel-request'."
   (error "LLM provider was nil.  Please set the provider in the application you are using"))
 
 (cl-defmethod llm-embedding-async :before (provider _ _ _)
+  "Issue a warning if the LLM is non-free."
+  (when-let (info (llm-nonfree-message-info provider))
+    (llm--warn-on-nonfree (llm-name provider) info)))
+
+(cl-defmethod llm-batch-embeddings (provider string-list)
+  "Return a list of embedding vectors of STRING-LIST.
+
+The list of vectors is in an order corresponding to the order of
+STRING-LIST.
+
+PROVIDER is the provider struct that will be used for an LLM call."
+  (ignore provider string-list)
+  (signal 'not-implemented nil))
+
+(cl-defmethod llm-batch-embeddings ((_ (eql nil)) _)
+  "Catch trivial configuration mistake."
+  (error "LLM provider was nil.  Please set the provider in the application you are using"))
+
+(cl-defmethod llm-batch-embeddings :before (provider _)
+  "Issue a warning if the LLM is non-free."
+  (when-let (info (llm-nonfree-message-info provider))
+    (llm--warn-on-nonfree (llm-name provider) info)))
+
+(cl-defmethod llm-batch-embeddings-async (provider string-list vector-callback error-callback)
+  "Calculate a list of vector embeddings of STRING-LIST from PROVIDER.
+
+VECTOR-CALLBACK will be called with the list of vector embeddings.
+
+ERROR-CALLBACK will be called in the event of an error, with a signal
+and a string message."
+  (ignore provider string-list vector-callback error-callback)
+  (signal 'not-implemented nil))
+
+(cl-defmethod llm-batch-embeddings-async ((_ (eql nil)) _ _ _)
+  "Catch trivial configuration mistake."
+  (error "LLM provider was nil.  Please set the provider in the application you are using"))
+
+(cl-defmethod llm-batch-embeddings-async :before (provider _ _ _)
   "Issue a warning if the LLM is non-free."
   (when-let (info (llm-nonfree-message-info provider))
     (llm--warn-on-nonfree (llm-name provider) info)))
