@@ -31,6 +31,10 @@
 
 (cl-defstruct (llm-azure (:include llm-openai-compatible)))
 
+(cl-defmethod llm-nonfree-message-info ((_ llm-azure))
+  "Return Azure's nonfree terms of service."
+  "https://azure.microsoft.com/en-us/support/legal/")
+
 (cl-defmethod llm-provider-chat-url ((provider llm-azure))
   (format "%s/openai/deployments/%s/chat/completions?api-version=2024-08-01-preview"
           (llm-azure-url provider)
