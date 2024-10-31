@@ -141,7 +141,7 @@
       (should (vectorp result))
       (should (> (length result) 0)))))
 
-(llm-def-integration-test llm-batch-streaming (provider)
+(llm-def-integration-test llm-batch-embeddings (provider)
   (when (member 'embeddings-batch (llm-capabilities provider))
     (let ((result (llm-batch-embeddings provider '("Paris" "France"))))
       (should (listp result))
@@ -149,7 +149,7 @@
       (should (vectorp (aref result 0)))
       (should (vectorp (aref result 1))))))
 
-(llm-def-integration-test llm-batch-streaming-async (provider)
+(llm-def-integration-test llm-batch-embedding-async (provider)
   (when (member 'embeddings-batch (llm-capabilities provider))
     (let ((result nil)
           (buf (current-buffer))
@@ -171,9 +171,9 @@
 
 (llm-def-integration-test llm-chat (provider)
   (should (equal
-           (llm-chat
-            provider
-            (llm-make-chat-prompt llm-integration-test-chat-prompt))
+           (string-trim (llm-chat
+                         provider
+                         (llm-make-chat-prompt llm-integration-test-chat-prompt)))
            llm-integration-test-chat-answer)))
 
 (llm-def-integration-test llm-chat-async (provider)
@@ -190,7 +190,7 @@
        (error "Error: %s" error)))
     (while (null result)
       (sleep-for 0.1))
-    (should (equal result llm-integration-test-chat-answer))))
+    (should (equal (string-trim result) llm-integration-test-chat-answer))))
 
 (llm-def-integration-test llm-chat-streaming (provider)
   (when (member 'streaming (llm-capabilities provider))
@@ -213,8 +213,8 @@
       (while (and (null returned-result)
                   (time-less-p (time-subtract (current-time) start-time) 10))
         (sleep-for 0.1))
-      (should (equal returned-result llm-integration-test-chat-answer))
-      (should (equal streamed-result llm-integration-test-chat-answer)))))
+      (should (equal (string-trim returned-result) llm-integration-test-chat-answer))
+      (should (equal (string-trim streamed-result) llm-integration-test-chat-answer)))))
 
 (llm-def-integration-test llm-function-call (provider)
   (let ((prompt (llm-integration-test-fc-prompt)))
