@@ -113,6 +113,8 @@ TIMEOUT is the number of seconds to wait for a response."
                     (status (plz-response-status response))
                     (body (plz-response-body response)))
            (funcall on-error 'error body)))
+        ((plz-error-message error)
+         (funcall on-error 'error (plz-error-message error)))
         (t (user-error "Unexpected error: %s" error))))
 
 (cl-defun llm-request-plz-async (url &key headers data on-success media-type
