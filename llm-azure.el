@@ -45,5 +45,8 @@
           (llm-azure-url provider)
           (llm-azure-embedding-model provider)))
 
+(cl-defmethod llm-provider-headers ((provider llm-azure))
+  `(("api-key" . ,(llm-azure-key provider))))
+
 (provide 'llm-azure)
 ;;; llm-azure.el ends here
