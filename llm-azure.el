@@ -48,5 +48,8 @@
 (cl-defmethod llm-provider-headers ((provider llm-azure))
   `(("api-key" . ,(llm-azure-key provider))))
 
+(cl-defmethod llm-capabilities ((provider llm-azure))
+  (list 'streaming 'embedding))
+
 (provide 'llm-azure)
 ;;; llm-azure.el ends here
