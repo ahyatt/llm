@@ -51,5 +51,8 @@
 (cl-defmethod llm-capabilities ((provider llm-azure))
   (list 'streaming 'embedding))
 
+(cl-defmethod llm-name ((provider llm-azure))
+  (format "Azure OpenAI %s" (llm-azure-chat-model provider)))
+
 (provide 'llm-azure)
 ;;; llm-azure.el ends here
