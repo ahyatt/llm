@@ -1,4 +1,5 @@
 * Version 0.18.0
+- Add Microsoft Azure's Open AI
 - Remove testing and other development files from ELPA packaging.
 - Remove vendored =plz-event-source= and =plz-media-type=, and add requirements.
 - Update list of Ollama models for function calling.

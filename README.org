@@ -33,6 +33,9 @@ You can set up with ~make-llm-openai~, with the following parameters:
 ** Open AI Compatible
 There are many Open AI compatible APIs and proxies of Open AI.  You can set up one with ~make-llm-openai-compatible~, with the following parameter:
 - ~:url~, the URL of leading up to the command ("embeddings" or "chat/completions").  So, for example, "https://api.openai.com/v1/" is the URL to use Open AI (although if you wanted to do that, just use ~make-llm-openai~ instead.
+** Azure's Open AI
+Microsoft Azure has an Open AI integration, although it doesn't support everything Open AI does, such as function calling.  You can set it up with ~make-llm-azure~, with the following parameter:
+- ~:url~, the endpoint URL, such as "https://docs-test-001.openai.azure.com/".
 ** Gemini (not via Google Cloud)
 This is Google's AI model.  You can get an API key via their [[https://makersuite.google.com/app/apikey][page on Google AI Studio]].
 Set this up with ~make-llm-gemini~, with the following parameters:
