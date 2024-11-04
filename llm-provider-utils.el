@@ -83,11 +83,15 @@ PROVIDER is the provider that will be used to make the request.")
   nil)
 
 ;; Methods for embeddings
-(cl-defgeneric llm-provider-embedding-url (provider)
-  "Return the URL for embeddings for the PROVIDER.")
+(cl-defgeneric llm-provider-embedding-url (provider &optional batch)
+  "Return the URL for embeddings for the PROVIDER.
+BATCH is true if this is a batch request.")
 
 (cl-defgeneric llm-provider-embedding-request (provider string)
   "Return the request for the PROVIDER for STRING.")
+
+(cl-defgeneric llm-provider-batch-embeddings-request (provider string-list)
+  "Return the request for the PROVIDER for STRING-LIST.")
 
 (cl-defgeneric llm-provider-embedding-extract-error (provider response)
   "Return an error message from RESPONSE for the PROVIDER.
@@ -102,6 +106,9 @@ Return nil if there is no error.")
 
 (cl-defgeneric llm-provider-embedding-extract-result (provider response)
   "Return the result from RESPONSE for the PROVIDER.")
+
+(cl-defgeneric llm-provider-batch-embeddings-extract-result (provider response)
+  "Return the result from RESPONSE for the PROVIDER for a batch request.")
 
 ;; Methods for chat
 
@@ -219,7 +226,7 @@ return a list of `llm-chat-function-call' structs.")
 (cl-defmethod llm-embedding ((provider llm-standard-full-provider) string)
   (llm-provider-request-prelude provider)
   (let ((response (llm-request-plz-sync
-                   (llm-provider-embedding-url provider)
+                   (llm-provider-embedding-url provider nil)
                    :timeout (llm-provider-chat-timeout provider)
                    :headers (llm-provider-headers provider)
                    :data (llm-provider-embedding-request provider string))))
@@ -231,9 +238,44 @@ return a list of `llm-chat-function-call' structs.")
   (llm-provider-request-prelude provider)
   (let ((buf (current-buffer)))
     (llm-request-plz-async
-     (llm-provider-embedding-url provider)
+     (llm-provider-embedding-url provider nil)
      :headers (llm-provider-headers provider)
      :data (llm-provider-embedding-request provider string)
+     :on-success (lambda (data)
+                   (if-let ((err-msg (llm-provider-embedding-extract-error provider data)))
+                       (llm-provider-utils-callback-in-buffer
+                        buf error-callback 'error
+                        err-msg)
+                     (llm-provider-utils-callback-in-buffer
+                      buf vector-callback
+                      (llm-provider-embedding-extract-result provider data))))
+     :on-error (lambda (_ data)
+                 (llm-provider-utils-callback-in-buffer
+                  buf error-callback 'error
+                  (if (stringp data)
+                      data
+                    (or (llm-provider-embedding-extract-error
+                         provider data)
+                        "Unknown error")))))))
+
+(cl-defmethod llm-batch-embeddings ((provider llm-standard-full-provider) string-list)
+  (llm-provider-request-prelude provider)
+  (let ((response (llm-request-plz-sync
+                   (llm-provider-embedding-url provider t)
+                   :timeout (llm-provider-chat-timeout provider)
+                   :headers (llm-provider-headers provider)
+                   :data (llm-provider-batch-embeddings-request provider string-list))))
+    (if-let ((err-msg (llm-provider-embedding-extract-error provider response)))
+        (error err-msg)
+      (llm-provider-batch-embeddings-extract-result provider response))))
+
+(cl-defmethod llm-batch-embeddings-async ((provider llm-standard-full-provider) string-list vector-callback error-callback)
+  (llm-provider-request-prelude provider t)
+  (let ((buf (current-buffer)))
+    (llm-request-plz-async
+     (llm-provider-embedding-url provider t)
+     :headers (llm-provider-headers provider)
+     :data (llm-provider-batch-embeddings-request provider string-list)
      :on-success (lambda (data)
                    (if-let ((err-msg (llm-provider-embedding-extract-error provider data)))
                        (llm-provider-utils-callback-in-buffer

@@ -66,16 +66,29 @@ https://api.example.com/v1/chat, then URL should be
   "Return Open AI's nonfree terms of service."
   "https://openai.com/policies/terms-of-use")
 
-(cl-defmethod llm-provider-embedding-request ((provider llm-openai) string)
-  "Return the request to the server for the embedding of STRING.
+(cl-defmethod llm-provider-embedding-request ((provider llm-openai) string-or-list)
+  "Return the request to the server for the embedding of STRING-OR-LIST.
 PROVIDER is the Open AI provider struct."
-  `(("input" . ,string)
+  `(("input" . ,string-or-list)
     ("model" . ,(or (llm-openai-embedding-model provider)
                     "text-embedding-3-small"))))
+
+(cl-defmethod llm-provider-batch-embeddings-request ((provider llm-openai) batch)
+  (llm-provider-embedding-request provider batch))
 
 (cl-defmethod llm-provider-embedding-extract-result ((_ llm-openai) response)
   "Return the embedding from the server RESPONSE."
   (assoc-default 'embedding (aref (assoc-default 'data response) 0)))
+
+(cl-defmethod llm-provider-batch-embeddings-extract-result ((_ llm-openai) response)
+  "Return the embedding from the server RESPONSE."
+  (let* ((data (assoc-default 'data response))
+         (vec (make-vector (length data) nil)))
+    (mapc (lambda (d)
+            (aset vec (assoc-default 'index d)
+                  (assoc-default 'embedding d)))
+          data)
+    (append vec nil)))
 
 (cl-defgeneric llm-openai--check-key (provider)
   "Check that the key is set for the Open AI PROVIDER.")
@@ -114,7 +127,7 @@ PROVIDER is the Open AI provider struct."
 (cl-defmethod llm-openai--url ((_ llm-openai) command)
   (concat "https://api.openai.com/v1/" command))
 
-(cl-defmethod llm-provider-embedding-url ((provider llm-openai))
+(cl-defmethod llm-provider-embedding-url ((provider llm-openai) &optional _)
   (llm-openai--url provider "embeddings"))
 
 (cl-defmethod llm-provider-chat-url ((provider llm-openai))
@@ -266,7 +279,7 @@ RESPONSE can be nil if the response is complete."
 (cl-defmethod llm-capabilities ((provider llm-openai-compatible))
   (append '(streaming)
           (when (llm-openai-embedding-model provider)
-            '(embeddings))
+            '(embeddings embeddings-batch))
           (let ((model (llm-models-match (llm-openai-chat-model provider))))
             (when (and model (member 'tool-use (llm-model-capabilities model)))
               '(function-calls)))))

@@ -40,7 +40,7 @@
           (llm-azure-url provider)
           (llm-azure-chat-model provider)))
 
-(cl-defmethod llm-provider-embedding-url ((provider llm-azure))
+(cl-defmethod llm-provider-embedding-url ((provider llm-azure) &optional _)
   (format "%s/openai/deployments/%s/embeddings?api-version=2024-08-01-preview"
           (llm-azure-url provider)
           (llm-azure-embedding-model provider)))

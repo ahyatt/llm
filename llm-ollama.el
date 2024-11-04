@@ -73,7 +73,7 @@ EMBEDDING-MODEL is the model to use for embeddings.  It is required."
   (format "%s://%s:%d/api/%s" (llm-ollama-scheme provider )(llm-ollama-host provider)
           (llm-ollama-port provider) method))
 
-(cl-defmethod llm-provider-embedding-url ((provider llm-ollama))
+(cl-defmethod llm-provider-embedding-url ((provider llm-ollama) &optional _)
   (llm-ollama--url provider "embed"))
 
 (cl-defmethod llm-provider-chat-url ((provider llm-ollama))
@@ -94,9 +94,15 @@ PROVIDER is the llm-ollama provider."
   `(("input" . ,string)
     ("model" . ,(llm-ollama-embedding-model provider))))
 
+(cl-defmethod llm-provider-batch-embeddings-request ((provider llm-ollama) strings)
+  (llm-provider-embedding-request provider strings))
+
 (cl-defmethod llm-provider-embedding-extract-result ((_ llm-ollama) response)
   "Return the embedding from the server RESPONSE."
   (aref (assoc-default 'embeddings response) 0))
+
+(cl-defmethod llm-provider-batch-embeddings-extract-result ((_ llm-ollama) response)
+  (append (assoc-default 'embeddings response) nil))
 
 (cl-defmethod llm-provider-chat-extract-result ((_ llm-ollama) response)
   "Return the chat response from the server RESPONSE."
@@ -174,7 +180,7 @@ PROVIDER is the llm-ollama provider."
                                              (llm-ollama-embedding-model provider))))
                        (and embedding-model
                             (member 'embedding (llm-model-capabilities embedding-model)))))
-            '(embeddings))
+            '(embeddings embeddings-batch))
           (when (let ((chat-model (llm-models-match
                                    (llm-ollama-chat-model provider))))
                   (and chat-model
