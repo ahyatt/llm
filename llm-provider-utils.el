@@ -226,7 +226,7 @@ return a list of `llm-chat-function-call' structs.")
 (cl-defmethod llm-embedding ((provider llm-standard-full-provider) string)
   (llm-provider-request-prelude provider)
   (let ((response (llm-request-plz-sync
-                   (llm-provider-embedding-url provider)
+                   (llm-provider-embedding-url provider nil)
                    :timeout (llm-provider-chat-timeout provider)
                    :headers (llm-provider-headers provider)
                    :data (llm-provider-embedding-request provider string))))
