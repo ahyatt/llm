@@ -136,7 +136,8 @@ REQUIRED is whether this is required or not."
 
 MIME-TYPE is a string containing the mime type of the media.
 
-DATA is a (binary) string containing the data."
+DATA is a (binary) string containing the data. The string should use
+unibyte encoding."
   mime-type data)
 
 (defun llm--image-to-media (image)
@@ -153,6 +154,7 @@ DATA is a (binary) string containing the data."
 		('xbm "image/x-xbitmap"))
    :data (if-let ((data (image-property image :data))) data
 	   (with-temp-buffer
+	     (set-buffer-multibyte nil)
 	     (insert-file-contents-literally (image-property image :file))
 	     (buffer-string)))))
 
