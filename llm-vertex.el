@@ -178,7 +178,7 @@ the key must be regenerated every hour."
 (cl-defmethod llm-provider-chat-request ((_ llm-google) prompt _)
   (llm-provider-utils-combine-to-system-prompt prompt llm-vertex-example-prelude)
   (append
-   (when-let ((first (car (llm-chat-prompt-interactions prompt))))
+   (let ((first (car (llm-chat-prompt-interactions prompt))))
      ;; System prompts for vertex only really make sense when they are
      ;; the first interaction, since they are sent separately
      (when (eq (llm-chat-prompt-interaction-role first) 'system)
