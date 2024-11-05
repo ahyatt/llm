@@ -134,7 +134,7 @@ REQUIRED is whether this is required or not."
 (cl-defstruct llm-media
   "Contains media that can be sent as part of an interaction.
 
-MIME-TYPE is a string containing the mime type of the media. Not all
+MIME-TYPE is a string containing the mime type of the media.  Not all
 MIME types are accepted by all providers.
 
 DATA is a (binary) string containing the data.  The string should use
@@ -171,7 +171,7 @@ media.
 
 Note that this includes the special case where there are multiple
 text parts and no media parts, although this case is only
-supported by some providers. For example, this can be used to
+supported by some providers.  For example, this can be used to
 send instructions and code blocks separately."
   parts)
 
