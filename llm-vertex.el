@@ -105,7 +105,7 @@ the key must be regenerated every hour."
       (setf (llm-vertex-key provider) (encode-coding-string result 'utf-8)))
     (setf (llm-vertex-key-gentime provider) (current-time))))
 
-(cl-defmethod llm-provider-embedding-url ((provider llm-vertex))
+(cl-defmethod llm-provider-embedding-url ((provider llm-vertex) &optional _)
   (format "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:predict"
           llm-vertex-gcloud-region
           (llm-vertex-project provider)

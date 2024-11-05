@@ -1,7 +1,13 @@
-* Version 0.17.5
+* Version 0.18.0
+- Add batch embeddings capability (currently for just Open AI and Ollama).
+- Add Microsoft Azure's Open AI
+- Remove testing and other development files from ELPA packaging.
+- Remove vendored =plz-event-source= and =plz-media-type=, and add requirements.
 - Update list of Ollama models for function calling.
 - Centralize model list so things like Vertex and Open AI compatible libraries can have more accurate context lengths and capabilities.
 - Update default Gemini chat model to Gemini 1.5 Pro.
+- Update default Claude chat model to latest Sonnet version.
+- Fix issue in some Open AI compatible providers with empty function call arguments
 * Version 0.17.4
 - Fix problem with Open AI's =llm-chat-token-limit=.
 - Fix Open AI and Gemini's parallel function calling.

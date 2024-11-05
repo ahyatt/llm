@@ -33,6 +33,9 @@ You can set up with ~make-llm-openai~, with the following parameters:
 ** Open AI Compatible
 There are many Open AI compatible APIs and proxies of Open AI.  You can set up one with ~make-llm-openai-compatible~, with the following parameter:
 - ~:url~, the URL of leading up to the command ("embeddings" or "chat/completions").  So, for example, "https://api.openai.com/v1/" is the URL to use Open AI (although if you wanted to do that, just use ~make-llm-openai~ instead.
+** Azure's Open AI
+Microsoft Azure has an Open AI integration, although it doesn't support everything Open AI does, such as function calling.  You can set it up with ~make-llm-azure~, with the following parameter:
+- ~:url~, the endpoint URL, such as "https://docs-test-001.openai.azure.com/".
 ** Gemini (not via Google Cloud)
 This is Google's AI model.  You can get an API key via their [[https://makersuite.google.com/app/apikey][page on Google AI Studio]].
 Set this up with ~make-llm-gemini~, with the following parameters:
@@ -119,6 +122,8 @@ For all callbacks, the callback will be executed in the buffer the function was 
 - ~llm-chat-streaming provider prompt partial-callback response-callback error-callback~:  Similar to ~llm-chat-async~, but request a streaming response.  As the response is built up, ~partial-callback~ is called with the all the text retrieved up to the current point.  Finally, ~reponse-callback~ is called with the complete text.
 - ~llm-embedding provider string~: With the user-chosen ~provider~, send a string and get an embedding, which is a large vector of floating point values.  The embedding represents the semantic meaning of the string, and the vector can be compared against other vectors, where smaller distances between the vectors represent greater semantic similarity.
 - ~llm-embedding-async provider string vector-callback error-callback~: Same as ~llm-embedding~ but this is processed asynchronously. ~vector-callback~ is called with the vector embedding, and, in case of error, ~error-callback~ is called with the same arguments as in ~llm-chat-async~.
+- ~llm-batch-embedding provider strings~: same as ~llm-embedding~, but takes in a list of strings, and returns a list of vectors whose order corresponds to the ordering of the strings.
+- ~llm-batch-embedding-async provider strings vectors-callback error-callback~: same as ~llm-embedding-async~, but takes in a list of strings, and returns a list of vectors whose order corresponds to the ordering of the strings.
 - ~llm-count-tokens provider string~: Count how many tokens are in ~string~.  This may vary by ~provider~, because some provideres implement an API for this, but typically is always about the same.  This gives an estimate if the provider has no API support.
 - ~llm-cancel-request request~ Cancels the given request, if possible.  The ~request~ object is the return value of async and streaming functions.
 - ~llm-name provider~.  Provides a short name of the model or provider, suitable for showing to users.

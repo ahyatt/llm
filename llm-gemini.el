@@ -43,7 +43,7 @@ You can get this at https://makersuite.google.com/app/apikey."
   "Return nonfree terms of service for Gemini."
   "https://policies.google.com/terms/generative-ai")
 
-(cl-defmethod llm-provider-embedding-url ((provider llm-gemini))
+(cl-defmethod llm-provider-embedding-url ((provider llm-gemini) &optional _)
   "Return the URL for the EMBEDDING request for STRING from PROVIDER."
   (format "https://generativelanguage.googleapis.com/v1beta/models/%s:embedContent?key=%s"
           (llm-gemini-embedding-model provider)

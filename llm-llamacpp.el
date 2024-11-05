@@ -60,7 +60,7 @@ PATH is the path to append to the URL, not prefixed with a slash."
         (port (llm-llamacpp-port provider)))
     (format "%s://%s:%d/%s" scheme host port path)))
 
-(cl-defmethod llm-provider-embedding-url ((provider llm-llamacpp))
+(cl-defmethod llm-provider-embedding-url ((provider llm-llamacpp) &optional _)
   (llm-llamacpp--url provider "embedding"))
 
 (cl-defmethod llm-provider-chat-url ((provider llm-llamacpp))

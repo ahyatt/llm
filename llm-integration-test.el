@@ -31,8 +31,15 @@
 ;; - GEMINI_KEY: A Gemini API key.
 ;; - VERTEX_PROJECT: A Google Cloud Vertex project.
 ;; - OLLAMA_CHAT_MODELS: A list of Ollama models to test.
+;; - AZURE_URL: The URL of the Azure API.
+;; - AZURE_KEY: The key for the Azure API.
+;; - AZURE_CHAT_MODEL: The name of the chat model to test.
+;; - AZURE_EMBEDDING_MODEL: The name of the embedding model to test.
+;; - AZURE_SLEEP: The number of seconds to sleep between tests, to avoid rate
+;;   limiting.
 ;;
-;; If any of these are set, the corresponding provider will be tested.
+;; If any of these are set (except for Azure, which needs multiple), the
+;; corresponding provider will be tested.
 
 
 ;;; Code:
@@ -87,6 +94,11 @@
     ("capital_of_country" . "Italy"))
   "The correct answer to the function call prompt.")
 
+(defun llm-integration-test-rate-limit (provider)
+  (cond ((eq (type-of provider) 'llm-azure)
+         ;; The free Azure tier has extremely restrictive rate limiting.
+         (sleep-for (string-to-number (or (getenv "AZURE_SLEEP") "60"))))))
+
 (defun llm-integration-test-providers ()
   "Return a list of providers to test."
   (let ((providers))
@@ -102,6 +114,14 @@
     (when (getenv "VERTEX_PROJECT")
       (require 'llm-vertex)
       (push (make-llm-vertex :project (getenv "VERTEX_PROJECT")) providers))
+    (when (and (getenv "AZURE_URL") (getenv "AZURE_KEY"))
+      (require 'llm-azure)
+      ;; Because Azure requires setting up each model, we can't just use any
+      ;; model it supports, but the model that the user running tests has set up.
+      (push (make-llm-azure :key (getenv "AZURE_KEY") :url (getenv "AZURE_URL")
+                            :chat-model (getenv "AZURE_CHAT_MODEL")
+                            :embedding-model (getenv "AZURE_EMBEDDING_MODEL"))
+            providers))
     (when (getenv "OLLAMA_CHAT_MODELS")
       (require 'llm-ollama)
       ;; This variable is a list of models to test.
@@ -113,32 +133,88 @@
   "Define an integration test."
   (declare (indent defun))
   `(ert-deftest ,name ()
-     (dolist (,(car arglist) (llm-integration-test-providers))
-       (ert-info ((format "Using provider %s" (llm-name provider)))
-         ,@body))))
+     (let ((llm-warn-on-nonfree nil))
+       (dolist (,(car arglist) (llm-integration-test-providers))
+         (llm-integration-test-rate-limit provider)
+         (ert-info ((format "Using provider %s" (llm-name provider)))
+           ,@body)))))
+
+(llm-def-integration-test llm-embedding (provider)
+  (when (member 'embeddings (llm-capabilities provider))
+    (let ((result (llm-embedding provider "Paris")))
+      (should (vectorp result))
+      (should (> (length result) 0)))))
+
+(llm-def-integration-test llm-embedding-async (provider)
+  (when (member 'embeddings (llm-capabilities provider))
+    (let ((result nil)
+          (buf (current-buffer))
+          (llm-warn-on-nonfree nil))
+      (llm-embedding-async
+       provider
+       "Paris"
+       (lambda (response)
+         (should (eq (current-buffer) buf))
+         (setq result response))
+       (lambda (error)
+         (error "Error: %s" error)))
+      (while (null result)
+        (sleep-for 0.1))
+      (should (vectorp result))
+      (should (> (length result) 0)))))
+
+(llm-def-integration-test llm-batch-embeddings (provider)
+  (when (member 'embeddings-batch (llm-capabilities provider))
+    (let ((result (llm-batch-embeddings provider '("Paris" "France"))))
+      (should (listp result))
+      (should (= (length result) 2))
+      (should (vectorp (aref result 0)))
+      (should (vectorp (aref result 1))))))
+
+(llm-def-integration-test llm-batch-embedding-async (provider)
+  (when (member 'embeddings-batch (llm-capabilities provider))
+    (let ((result nil)
+          (buf (current-buffer))
+          (llm-warn-on-nonfree nil))
+      (llm-batch-embeddings-async
+       provider
+       '("Paris" "France")
+       (lambda (response)
+         (should (eq (current-buffer) buf))
+         (setq result response))
+       (lambda (error)
+         (error "Error: %s" error)))
+      (while (null result)
+        (sleep-for 0.1))
+      (should (listp result))
+      (should (= (length result) 2))
+      (should (vectorp (aref result 0)))
+      (should (vectorp (aref result 1))))))
 
 (llm-def-integration-test llm-chat (provider)
   (should (equal
-           (llm-chat
-            provider
-            (llm-make-chat-prompt llm-integration-test-chat-prompt))
+           (string-trim (llm-chat
+                         provider
+                         (llm-make-chat-prompt llm-integration-test-chat-prompt)))
            llm-integration-test-chat-answer)))
 
 (llm-def-integration-test llm-chat-async (provider)
   (let ((result nil)
         (buf (current-buffer))
-        (llm-warn-on-nonfree nil))
+        (llm-warn-on-nonfree nil)
+        (err-result nil))
     (llm-chat-async
      provider
      (llm-make-chat-prompt llm-integration-test-chat-prompt)
      (lambda (response)
        (should (eq (current-buffer) buf))
        (setq result response))
-     (lambda (error)
-       (error "Error: %s" error)))
-    (while (null result)
+     (lambda (_ err)
+       (setq err-result err)))
+    (while (not (or result err-result))
       (sleep-for 0.1))
-    (should (equal result llm-integration-test-chat-answer))))
+    (if err-result (error err-result))
+    (should (equal (string-trim result) llm-integration-test-chat-answer))))
 
 (llm-def-integration-test llm-chat-streaming (provider)
   (when (member 'streaming (llm-capabilities provider))
@@ -146,7 +222,8 @@
           (returned-result nil)
           (llm-warn-on-nonfree nil)
           (buf (current-buffer))
-          (start-time (current-time)))
+          (start-time (current-time))
+          (err-result nil))
       (llm-chat-streaming
        provider
        (llm-make-chat-prompt llm-integration-test-chat-prompt)
@@ -156,29 +233,33 @@
        (lambda (response)
          (should (eq (current-buffer) buf))
          (setq returned-result response))
-       (lambda (error)
-         (error "Error: %s" error)))
+       (lambda (_ err)
+         (setq err-result err)))
       (while (and (null returned-result)
+                  (null err-result)
                   (time-less-p (time-subtract (current-time) start-time) 10))
         (sleep-for 0.1))
-      (should (equal returned-result llm-integration-test-chat-answer))
-      (should (equal streamed-result llm-integration-test-chat-answer)))))
+      (if err-result (error err-result))
+      (should (equal (string-trim returned-result) llm-integration-test-chat-answer))
+      (should (equal (string-trim streamed-result) llm-integration-test-chat-answer)))))
 
 (llm-def-integration-test llm-function-call (provider)
-  (let ((prompt (llm-integration-test-fc-prompt)))
-    (should (equal
-             (llm-chat provider prompt)
-             llm-integration-test-fc-answer))
-    ;; Test that we can send the function back to the provider without error.
-    (llm-chat provider prompt)))
+  (when (member 'function-calls (llm-capabilities provider))
+    (let ((prompt (llm-integration-test-fc-prompt)))
+      (should (equal
+               (llm-chat provider prompt)
+               llm-integration-test-fc-answer))
+      ;; Test that we can send the function back to the provider without error.
+      (llm-chat provider prompt))))
 
 (llm-def-integration-test llm-function-call-multiple (provider)
-  (let ((prompt (llm-integration-test-fc-multiple-prompt)))
-    ;; Sending back multiple answers often doesn't happen, so we can't reliably
-    ;; check for this yet.
-    (llm-chat provider prompt)
-    ;; Test that we can send the function back to the provider without error.
-    (llm-chat provider prompt)))
+  (when (member 'function-calls (llm-capabilities provider))
+    (let ((prompt (llm-integration-test-fc-multiple-prompt)))
+      ;; Sending back multiple answers often doesn't happen, so we can't reliably
+      ;; check for this yet.
+      (llm-chat provider prompt)
+      ;; Test that we can send the function back to the provider without error.
+      (llm-chat provider prompt))))
 
 (llm-def-integration-test llm-count-tokens (provider)
   (let ((result (llm-count-tokens provider "What is the capital of France?")))
