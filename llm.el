@@ -167,7 +167,12 @@ capability is available, as indicated by `llm-capabilities'."
 
 PARTS is a list of the parts of the interaction.  Each element
 should be either a string for text, or a `llm-media' object for
-media."
+media.
+
+Note that this includes the special case where there are multiple
+text parts and no media parts, although this case is only
+supported by some providers. For example, this can be used to
+send instructions and code blocks separately."
   parts)
 
 (defun llm-make-multipart (&rest parts)
