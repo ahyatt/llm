@@ -198,7 +198,9 @@ STREAMING if non-nil, turn on response streaming."
               (make-llm-provider-utils-function-call
                :id (assoc-default 'id call)
                :name (assoc-default 'name function)
-               :args (json-read-from-string (assoc-default 'arguments function)))))
+               :args (json-read-from-string
+                      (let ((args (assoc-default 'arguments function)))
+                        (if (= (length args) 0) "{}" args))))))
           (assoc-default 'tool_calls
                          (assoc-default 'message
                                         (aref (assoc-default 'choices response) 0)))))
@@ -211,7 +213,8 @@ FCS is a list of `make-llm-provider-utils-function-call'"
                 `(("id" . ,(llm-provider-utils-function-call-id fc))
                   ("type" . "function")
                   ("function" .
-                   (("arguments" . ,(json-encode (llm-provider-utils-function-call-args fc)))
+                   (("arguments" . ,(json-encode
+                                     (llm-provider-utils-function-call-args fc)))
                     ("name" . ,(llm-provider-utils-function-call-name fc))))))
               fcs))))
 
