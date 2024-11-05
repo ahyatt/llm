@@ -276,8 +276,11 @@ RESPONSE can be nil if the response is complete."
 (cl-defmethod llm-chat-token-limit ((provider llm-openai))
   (llm-provider-utils-model-token-limit (llm-openai-chat-model provider)))
 
-(cl-defmethod llm-capabilities ((_ llm-openai))
-  (list 'streaming 'embeddings 'function-calls))
+(cl-defmethod llm-capabilities ((provider llm-openai))
+  (append '(streaming embeddings function-calls)
+	  (when-let ((model (llm-models-match (llm-openai-chat-model provider))))
+	    (seq-intersection (llm-model-capabilities model)
+			      '(image-input)))))
 
 (cl-defmethod llm-capabilities ((provider llm-openai-compatible))
   (append '(streaming)

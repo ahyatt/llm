@@ -301,9 +301,11 @@ If STREAMING is non-nil, use the URL for the streaming API."
 (cl-defmethod llm-capabilities ((provider llm-vertex))
   (append
    (list 'streaming 'embeddings)
-   (let ((model (llm-models-match (llm-vertex-chat-model provider))))
-     (when (and model (member 'tool-use (llm-model-capabilities model)))
-       (list 'function-calls)))))
+   (when-let ((model (llm-models-match (llm-vertex-chat-model provider)))
+	      (capabilities (llm-model-capabilities model)))
+     (append
+      (when (member 'tool-use capabilities) '(function-calls))
+      (seq-intersection capabilities '(image-input audio-input video-input))))))
 
 (provide 'llm-vertex)
 

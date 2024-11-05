@@ -188,11 +188,12 @@ PROVIDER is the llm-ollama provider."
                        (and embedding-model
                             (member 'embedding (llm-model-capabilities embedding-model)))))
             '(embeddings))
-          (when (let ((chat-model (llm-models-match
-                                   (llm-ollama-chat-model provider))))
-                  (and chat-model
-                       (member 'tool-use (llm-model-capabilities chat-model))))
-            '(function-calls))))
+          (when-let ((chat-model (llm-models-match
+                                  (llm-ollama-chat-model provider)))
+		     (capabilities (llm-model-capabilities chat-model)))
+	    (append
+	     (when (member 'tool-use capabilities) '(function-calls))
+	     (seq-intersection capabilities '(image-input))))))
 
 (provide 'llm-ollama)
 
