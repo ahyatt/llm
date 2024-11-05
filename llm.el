@@ -134,13 +134,14 @@ REQUIRED is whether this is required or not."
 (cl-defstruct llm-media
   "Contains media that can be sent as part of an interaction.
 
-MIME-TYPE is a string containing the mime type of the media.
+MIME-TYPE is a string containing the mime type of the media. Not all
+MIME types are accepted by all providers.
 
 DATA is a (binary) string containing the data.  The string should use
 unibyte encoding.
 
 This should only be used if the `image-input' or `audio-input'
-capability is available for the current model."
+capability is available, as indicated by `llm-capabilities'."
   mime-type data)
 
 (defun llm--image-to-media (image)
