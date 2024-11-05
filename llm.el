@@ -137,7 +137,10 @@ REQUIRED is whether this is required or not."
 MIME-TYPE is a string containing the mime type of the media.
 
 DATA is a (binary) string containing the data. The string should use
-unibyte encoding."
+unibyte encoding.
+
+This should only be used if the `image-input' or `audio-input'
+capability is available for the current model. "
   mime-type data)
 
 (defun llm--image-to-media (image)
