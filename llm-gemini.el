@@ -99,9 +99,11 @@ If STREAMING-P is non-nil, use the streaming endpoint."
 (cl-defmethod llm-capabilities ((provider llm-gemini))
   (append
    (list 'streaming 'embeddings)
-   (let ((model (llm-models-match (llm-gemini-chat-model provider))))
-     (when (and model (member 'tool-use (llm-model-capabilities model)))
-       (list 'function-calls)))))
+   (when-let ((model (llm-models-match (llm-gemini-chat-model provider)))
+	      (capabilities (llm-model-capabilities model)))
+     (append
+      (when (member 'tool-use capabilities) '(function-calls))
+      (seq-intersection capabilities '(image-input audio-input video-input))))))
 
 (provide 'llm-gemini)
 
