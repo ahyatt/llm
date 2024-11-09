@@ -40,5 +40,9 @@ jobs:
         eldev -p -dtT lint
 
     - name: Test the project
+      with:
+        OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+        ANTHROPIC_KEY: ${{ secrets.ANTHROPIC_KEY }}
+        GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
       run: |
         eldev -p -dtT test
