@@ -173,8 +173,24 @@ STREAMING if non-nil, turn on response streaming."
                           (append
                            `(("role" . ,(llm-chat-prompt-interaction-role i)))
                            (when-let ((content (llm-chat-prompt-interaction-content i)))
-                             (if (stringp content) `(("content" . ,content))
-                               (llm-openai-function-call-to-response content)))))))
+			     `(("content"
+				. ,(pcase content
+				    ((pred llm-multipart-p)
+				     (mapcar (lambda (part)
+						   (if (llm-media-p part)
+						       `(("type" . "image_url")
+							 ("image_url"
+							  . (("url"
+							      . ,(concat
+								  "data:"
+								  (llm-media-mime-type part)
+								  ";base64,"
+								  (base64-encode-string (llm-media-data part)))))))
+						     `(("type" . "text")
+						       ("text" . ,part))))
+					     (llm-multipart-parts content)))
+				    ((pred listp) (llm-openai-function-call-to-response content))
+				    (_ content)))))))))
                      (llm-chat-prompt-interactions prompt)))
           request-alist)
     (push `("model" . ,(or (llm-openai-chat-model provider) "gpt-4o")) request-alist)
@@ -276,8 +292,11 @@ RESPONSE can be nil if the response is complete."
 (cl-defmethod llm-chat-token-limit ((provider llm-openai))
   (llm-provider-utils-model-token-limit (llm-openai-chat-model provider)))
 
-(cl-defmethod llm-capabilities ((_ llm-openai))
-  (list 'streaming 'embeddings 'function-calls))
+(cl-defmethod llm-capabilities ((provider llm-openai))
+  (append '(streaming embeddings function-calls)
+	  (when-let ((model (llm-models-match (llm-openai-chat-model provider))))
+	    (seq-intersection (llm-model-capabilities model)
+			      '(image-input)))))
 
 (cl-defmethod llm-capabilities ((provider llm-openai-compatible))
   (append '(streaming)

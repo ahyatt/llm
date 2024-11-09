@@ -176,8 +176,14 @@ the key must be regenerated every hour."
   (llm-provider-extract-function-calls provider (json-read-from-string response)))
 
 (cl-defmethod llm-provider-chat-request ((_ llm-google) prompt _)
-  (llm-provider-utils-combine-to-user-prompt prompt llm-vertex-example-prelude)
+  (llm-provider-utils-combine-to-system-prompt prompt llm-vertex-example-prelude)
   (append
+   (let ((first (car (llm-chat-prompt-interactions prompt))))
+     ;; System prompts for vertex only really make sense when they are
+     ;; the first interaction, since they are sent separately
+     (when (eq (llm-chat-prompt-interaction-role first) 'system)
+       `((system_instruction
+	  . ((parts . (((text . ,(llm-chat-prompt-interaction-content first))))))))))
    `((contents
       .
       ,(mapcar (lambda (interaction)
@@ -203,8 +209,18 @@ the key must be regenerated every hour."
                                                   (content . ,(llm-chat-prompt-function-call-result-result fc)))))))))
                                          (llm-chat-prompt-interaction-function-call-results interaction))
 
-                               (llm-chat-prompt-interaction-content interaction))))))
-               (llm-chat-prompt-interactions prompt))))
+                               (if (llm-multipart-p (llm-chat-prompt-interaction-content interaction))
+				   (mapcar (lambda (part)
+					 (if (llm-media-p part)
+					     `((inline_data
+					       . ((mime_type . ,(llm-media-mime-type part))
+						  (data . ,(base64-encode-string (llm-media-data part) t)))))
+					   `((text . ,part))))
+					   (llm-multipart-parts (llm-chat-prompt-interaction-content interaction)))
+				 (llm-chat-prompt-interaction-content interaction)))))))
+               (seq-filter
+		(lambda (interaction) (not (eq 'system (llm-chat-prompt-interaction-role interaction))))
+		(llm-chat-prompt-interactions prompt)))))
    (when (llm-chat-prompt-functions prompt)
      ;; Although Gemini claims to be compatible with Open AI's function declaration,
      ;; it's only somewhat compatible.
@@ -285,9 +301,11 @@ If STREAMING is non-nil, use the URL for the streaming API."
 (cl-defmethod llm-capabilities ((provider llm-vertex))
   (append
    (list 'streaming 'embeddings)
-   (let ((model (llm-models-match (llm-vertex-chat-model provider))))
-     (when (and model (member 'tool-use (llm-model-capabilities model)))
-       (list 'function-calls)))))
+   (when-let ((model (llm-models-match (llm-vertex-chat-model provider)))
+	      (capabilities (llm-model-capabilities model)))
+     (append
+      (when (member 'tool-use capabilities) '(function-calls))
+      (seq-intersection capabilities '(image-input audio-input video-input))))))
 
 (provide 'llm-vertex)
 

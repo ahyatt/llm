@@ -76,6 +76,9 @@ Use of this directly is deprecated, instead use `llm-make-chat-prompt'."
   "This defines a single interaction given as part of a chat prompt.
 ROLE can a symbol, of either `user', `assistant', or `function'.
 
+CONTENT is the content of the interaction.  It should be either a
+string, an `llm-multipart' object or a list of function calls.
+
 FUNCTION-CALL-RESULTS is a list of structs of type
 `llm-chat-prompt-function-call-results', which is only populated
 if `role' is `function'.  It stores the results of the function
@@ -128,6 +131,63 @@ REQUIRED is whether this is required or not."
   type
   required)
 
+(cl-defstruct llm-media
+  "Contains media that can be sent as part of an interaction.
+
+MIME-TYPE is a string containing the mime type of the media.  Not all
+MIME types are accepted by all providers.
+
+DATA is a (binary) string containing the data.  The string should use
+unibyte encoding.
+
+This should only be used if the `image-input' or `audio-input'
+capability is available, as indicated by `llm-capabilities'."
+  mime-type data)
+
+(defun llm--image-to-media (image)
+  "Convert an IMAGE object to an `llm-media' object."
+  (make-llm-media
+   :mime-type (pcase (image-property image :type)
+		('svg "image/svg+xml")
+		('webp "image/webp")
+		('png "image/png")
+		('gif "image/gif")
+		('tiff "image/tiff")
+		('jpeg "image/jpeg")
+		('xpm "image/x-xpixmap")
+		('xbm "image/x-xbitmap"))
+   :data (if-let ((data (image-property image :data))) data
+	   (with-temp-buffer
+	     (set-buffer-multibyte nil)
+	     (insert-file-contents-literally (image-property image :file))
+	     (buffer-string)))))
+
+(cl-defstruct llm-multipart
+  "A multipart message that can contain both text and media.
+
+PARTS is a list of the parts of the interaction.  Each element
+should be either a string for text, or a `llm-media' object for
+media.
+
+Note that this includes the special case where there are multiple
+text parts and no media parts, although this case is only
+supported by some providers.  For example, this can be used to
+send instructions and code blocks separately."
+  parts)
+
+(defun llm-make-multipart (&rest parts)
+  "Create a multipart message from the arguments PARTS.
+
+Each argument should be either a string, image object or an
+`llm-media' object.  The arguments are combined into a single
+multipart message."
+  (make-llm-multipart
+   :parts (mapcar (lambda (part)
+		    (if (and (fboundp 'imagep) (imagep part))
+			(llm--image-to-media part)
+		      part))
+		  parts)))
+
 (cl-defun llm--log (type &key provider prompt msg)
   "Log a MSG of TYPE, given PROVIDER, PROMPT, and MSG.
 These are all optional, each one should be the normal meaning of
@@ -168,10 +228,10 @@ This is deprecated, and you should use `llm-make-chat-prompt'
 instead."
   (llm-make-chat-prompt text))
 
-(cl-defun llm-make-chat-prompt (text &key context examples functions
+(cl-defun llm-make-chat-prompt (content &key context examples functions
                                      temperature max-tokens
                                      non-standard-params)
-  "Create a `llm-chat-prompt' with TEXT sent to the LLM provider.
+  "Create a `llm-chat-prompt' with CONTENT sent to the LLM provider.
 
 This is the most correct and easy way to create an
 `llm-chat-prompt', and should suffice for almost all uses.
@@ -185,12 +245,14 @@ populated, a best effort is made to do something reasonable, but
 it may not be quite the same on all providers as the prompt
 mutating in terms of an actual conversation.
 
-TEXT is the latest user input to the LLM, the thing to be
-responded to.  This is required.  This can also be a string, in
-which case it represents the chat history, starting with the
-user's initial chat, followed by the response, and so on.  If it
-is a list, it MUST be an odd number, since the presumption is
-that it ends with the user's latest input to the LLM.
+CONTENT is the latest user input to the LLM, the thing to be
+responded to, in form of a string containing text or an
+`llm-multipart' object containing both text and media.  This is
+required.  This can also be a list, in which case it represents
+the chat history, starting with the user's initial chat, followed
+by the response, and so on.  If it is a list, it MUST be an odd
+number, since the presumption is that it ends with the user's
+latest input to the LLM.
 
 CONTEXT is a string given to the LLM as context for the entire
 interaction, such as instructions to the LLM on how to reply,
@@ -225,10 +287,10 @@ to be provider specific.  Don't use this if you want the prompt
 to be used amongst different providers, because it is likely to
 cause a request error.  The cars of the alist are strings and the
 cdrs can be strings or numbers.  This is optional."
-  (unless text
-    (error "TEXT is required"))
-  (when (and (listp text) (zerop (mod (length text) 2)))
-    (error "TEXT, as a list, must have an odd number of elements"))
+  (unless content
+    (error "CONTENT is required"))
+  (when (and (listp content) (zerop (mod (length content) 2)))
+    (error "CONTENT, as a list, must have an odd number of elements"))
   (make-llm-chat-prompt
    :context context
    :examples examples
@@ -236,7 +298,7 @@ cdrs can be strings or numbers.  This is optional."
                                     (make-llm-chat-prompt-interaction
                                      :role (if (zerop (mod i 2)) 'user 'assistant)
                                      :content s))
-                                  (if (listp text) text (list text)))
+                                  (if (listp content) content (list content)))
    :functions functions
    :temperature temperature
    :max-tokens max-tokens
@@ -614,7 +676,15 @@ This should only be used for logging or debugging."
                           ('user "User")
                           ('system "System")
                           ('assistant "Assistant"))
-                        (llm-chat-prompt-interaction-content i)))
+			(let ((content (llm-chat-prompt-interaction-content i)))
+			  (if (llm-multipart-p content)
+			      (mapcar (lambda (part) (if (llm-media-p part)
+							 (format "[%s data, %d bytes]"
+								 (llm-media-mime-type part)
+								 (length (llm-media-data part)))
+						       part))
+				      (llm-multipart-parts content))
+			    content))))
               (llm-chat-prompt-interactions prompt) "\n")
    "\n"
    (when (llm-chat-prompt-temperature prompt)
