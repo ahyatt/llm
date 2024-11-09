@@ -183,7 +183,7 @@ the key must be regenerated every hour."
      ;; the first interaction, since they are sent separately
      (when (eq (llm-chat-prompt-interaction-role first) 'system)
        `((system_instruction
-	  . ((parts . (((text . ,(llm-chat-prompt-interaction-content first))))))))))
+          . ((parts . (((text . ,(llm-chat-prompt-interaction-content first))))))))))
    `((contents
       .
       ,(mapcar (lambda (interaction)
@@ -210,17 +210,17 @@ the key must be regenerated every hour."
                                          (llm-chat-prompt-interaction-function-call-results interaction))
 
                                (if (llm-multipart-p (llm-chat-prompt-interaction-content interaction))
-				   (mapcar (lambda (part)
-					 (if (llm-media-p part)
-					     `((inline_data
-					       . ((mime_type . ,(llm-media-mime-type part))
-						  (data . ,(base64-encode-string (llm-media-data part) t)))))
-					   `((text . ,part))))
-					   (llm-multipart-parts (llm-chat-prompt-interaction-content interaction)))
-				 (llm-chat-prompt-interaction-content interaction)))))))
+                                   (mapcar (lambda (part)
+                                             (if (llm-media-p part)
+                                                 `((inline_data
+                                                    . ((mime_type . ,(llm-media-mime-type part))
+                                                       (data . ,(base64-encode-string (llm-media-data part) t)))))
+                                               `((text . ,part))))
+                                           (llm-multipart-parts (llm-chat-prompt-interaction-content interaction)))
+                                 (llm-chat-prompt-interaction-content interaction)))))))
                (seq-filter
-		(lambda (interaction) (not (eq 'system (llm-chat-prompt-interaction-role interaction))))
-		(llm-chat-prompt-interactions prompt)))))
+                (lambda (interaction) (not (eq 'system (llm-chat-prompt-interaction-role interaction))))
+                (llm-chat-prompt-interactions prompt)))))
    (when (llm-chat-prompt-functions prompt)
      ;; Although Gemini claims to be compatible with Open AI's function declaration,
      ;; it's only somewhat compatible.
@@ -302,7 +302,7 @@ If STREAMING is non-nil, use the URL for the streaming API."
   (append
    (list 'streaming 'embeddings)
    (when-let ((model (llm-models-match (llm-vertex-chat-model provider)))
-	      (capabilities (llm-model-capabilities model)))
+              (capabilities (llm-model-capabilities model)))
      (append
       (when (member 'tool-use capabilities) '(function-calls))
       (seq-intersection capabilities '(image-input audio-input video-input))))))

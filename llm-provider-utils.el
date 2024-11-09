@@ -430,13 +430,19 @@ EXAMPLE-PRELUDE is the text to introduce any examples with."
 This should be used for providers that do not have a notion of a system prompt.
 
 EXAMPLE-PRELUDE is the text to introduce any examples with."
-  (when-let ((system-content (llm-provider-utils-get-system-prompt prompt example-prelude)))
-    (setf (llm-chat-prompt-interaction-content (car (llm-chat-prompt-interactions prompt)))
-          (concat system-content
-                  "\n"
-                  (llm-chat-prompt-interaction-content (car (llm-chat-prompt-interactions prompt))))
-          (llm-chat-prompt-context prompt) nil
-          (llm-chat-prompt-examples prompt) nil)))
+  (let ((system-content (llm-provider-utils-get-system-prompt prompt example-prelude)))
+    (when (> (length system-content) 0)
+      (setf (llm-chat-prompt-interaction-content (car (llm-chat-prompt-interactions prompt)))
+            (let ((initial-content (llm-chat-prompt-interaction-content (car (llm-chat-prompt-interactions prompt)))))
+              (if (llm-multipart-p initial-content)
+                  (make-llm-multipart
+                   :parts (cons system-content
+                                (llm-multipart-parts initial-content)))
+                (concat system-content
+                        "\n"
+                        initial-content)))
+            (llm-chat-prompt-context prompt) nil
+            (llm-chat-prompt-examples prompt) nil))))
 
 (defun llm-provider-utils-collapse-history (prompt &optional history-prelude)
   "Collapse history to a single PROMPT.

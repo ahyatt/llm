@@ -97,7 +97,16 @@
 (defun llm-integration-test-rate-limit (provider)
   (cond ((eq (type-of provider) 'llm-azure)
          ;; The free Azure tier has extremely restrictive rate limiting.
-         (sleep-for (string-to-number (or (getenv "AZURE_SLEEP") "60"))))))
+         (sleep-for (string-to-number (or (getenv "AZURE_SLEEP") "60"))))
+        ((member (type-of provider) '(llm-gemini llm-vertex))
+         (sleep-for 15))))
+
+(defun llm-integration-test-string-eq (target actual)
+  "Test that TARGET approximately equals ACTUAL.
+This is a very approximate test because LLMs that aren't that great
+often mess up and put punctuation, or repeat the word, or something
+else.  We really just want to see if it's in the right ballpark."
+  (string-match-p (regexp-quote (downcase target)) (downcase actual)))
 
 (defun llm-integration-test-providers ()
   "Return a list of providers to test."
@@ -214,7 +223,7 @@
     (while (not (or result err-result))
       (sleep-for 0.1))
     (if err-result (error err-result))
-    (should (equal (string-trim result) llm-integration-test-chat-answer))))
+    (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim result)))))
 
 (llm-def-integration-test llm-chat-streaming (provider)
   (when (member 'streaming (llm-capabilities provider))
@@ -240,8 +249,8 @@
                   (time-less-p (time-subtract (current-time) start-time) 10))
         (sleep-for 0.1))
       (if err-result (error err-result))
-      (should (equal (string-trim returned-result) llm-integration-test-chat-answer))
-      (should (equal (string-trim streamed-result) llm-integration-test-chat-answer)))))
+      (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim returned-result)))
+      (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim streamed-result))))))
 
 (llm-def-integration-test llm-function-call (provider)
   (when (member 'function-calls (llm-capabilities provider))
@@ -260,6 +269,18 @@
       (llm-chat provider prompt)
       ;; Test that we can send the function back to the provider without error.
       (llm-chat provider prompt))))
+
+(llm-def-integration-test llm-image-chat (provider)
+  (when (member 'image-input (llm-capabilities provider))
+    (let* ((image-load-path (append image-load-path (list default-directory)))
+           (result (llm-chat
+                    provider
+                    (llm-make-chat-prompt
+                     (llm-make-multipart
+                      "What is this animal?  Please answer in one word, without punctuation or whitespace."
+                      (create-image "animal.jpeg"))))))
+      (should (stringp result))
+      (should (llm-integration-test-string-eq "owl" (string-trim (downcase result)))))))
 
 (llm-def-integration-test llm-count-tokens (provider)
   (let ((result (llm-count-tokens provider "What is the capital of France?")))
