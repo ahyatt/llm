@@ -51,9 +51,11 @@ will use a reasonable default.
 
 EMBEDDING-MODEL is the model to use for embeddings.  If unset, it
 will use a reasonable default."
-  key chat-model embedding-model)
+  key (chat-model "gpt-4o") (embedding-model "text-embedding-3-small"))
 
-(cl-defstruct (llm-openai-compatible (:include llm-openai))
+(cl-defstruct (llm-openai-compatible (:include llm-openai
+                                               (chat-model nil)
+                                               (embedding-model nil)))
   "A structure for other APIs that use the Open AI's API.
 
 URL is the URL to use for the API, up to the command.  So, for
@@ -70,8 +72,7 @@ https://api.example.com/v1/chat, then URL should be
   "Return the request to the server for the embedding of STRING-OR-LIST.
 PROVIDER is the Open AI provider struct."
   `(("input" . ,string-or-list)
-    ("model" . ,(or (llm-openai-embedding-model provider)
-                    "text-embedding-3-small"))))
+    ("model" . ,(llm-openai-embedding-model provider))))
 
 (cl-defmethod llm-provider-batch-embeddings-request ((provider llm-openai) batch)
   (llm-provider-embedding-request provider batch))
@@ -173,27 +174,27 @@ STREAMING if non-nil, turn on response streaming."
                           (append
                            `(("role" . ,(llm-chat-prompt-interaction-role i)))
                            (when-let ((content (llm-chat-prompt-interaction-content i)))
-			     `(("content"
-				. ,(pcase content
-				    ((pred llm-multipart-p)
-				     (mapcar (lambda (part)
-						   (if (llm-media-p part)
-						       `(("type" . "image_url")
-							 ("image_url"
-							  . (("url"
-							      . ,(concat
-								  "data:"
-								  (llm-media-mime-type part)
-								  ";base64,"
-								  (base64-encode-string (llm-media-data part)))))))
-						     `(("type" . "text")
-						       ("text" . ,part))))
-					     (llm-multipart-parts content)))
-				    ((pred listp) (llm-openai-function-call-to-response content))
-				    (_ content)))))))))
+                             (cond
+                              ((listp content)
+                               (llm-openai-function-call-to-response content))
+                              ((llm-multipart-p content)
+                               `(("content"  . ,(mapcar (lambda (part)
+                                                          (if (llm-media-p part)
+                                                              `(("type" . "image_url")
+                                                                ("image_url"
+                                                                 . (("url"
+                                                                     . ,(concat
+                                                                         "data:"
+                                                                         (llm-media-mime-type part)
+                                                                         ";base64,"
+                                                                         (base64-encode-string (llm-media-data part)))))))
+                                                            `(("type" . "text")
+                                                              ("text" . ,part))))
+                                                        (llm-multipart-parts content)))))
+                              (t `(("content" . ,content)))))))))
                      (llm-chat-prompt-interactions prompt)))
           request-alist)
-    (push `("model" . ,(or (llm-openai-chat-model provider) "gpt-4o")) request-alist)
+    (push `("model" . ,(llm-openai-chat-model provider)) request-alist)
     (when (llm-chat-prompt-temperature prompt)
       (push `("temperature" . ,(* (llm-chat-prompt-temperature prompt) 2.0)) request-alist))
     (when (llm-chat-prompt-max-tokens prompt)
@@ -294,9 +295,9 @@ RESPONSE can be nil if the response is complete."
 
 (cl-defmethod llm-capabilities ((provider llm-openai))
   (append '(streaming embeddings function-calls)
-	  (when-let ((model (llm-models-match (llm-openai-chat-model provider))))
-	    (seq-intersection (llm-model-capabilities model)
-			      '(image-input)))))
+          (when-let ((model (llm-models-match (llm-openai-chat-model provider))))
+            (seq-intersection (llm-model-capabilities model)
+                              '(image-input)))))
 
 (cl-defmethod llm-capabilities ((provider llm-openai-compatible))
   (append '(streaming)
