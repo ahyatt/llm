@@ -3,9 +3,14 @@
 * Introduction
 This library provides an interface for interacting with Large Language Models (LLMs). It allows elisp code to use LLMs while also giving end-users the choice to select their preferred LLM. This is particularly beneficial when working with LLMs since various high-quality models exist, some of which have paid API access, while others are locally installed and free but offer medium quality. Applications using LLMs can utilize this library to ensure compatibility regardless of whether the user has a local LLM or is paying for API access.
 
-LLMs exhibit varying functionalities and APIs. This library aims to abstract functionality to a higher level, as some high-level concepts might be supported by an API while others require more low-level implementations. An example of such a concept is "examples," where the client offers example interactions to demonstrate a pattern for the LLM. While the GCloud Vertex API has an explicit API for examples, OpenAI's API requires specifying examples by modifying the system prompt. OpenAI also introduces the concept of a system prompt, which does not exist in the Vertex API. Our library aims to conceal these API variations by providing higher-level concepts in our API.
+This library abstracts several kinds of features:
+   - Chat functionality: the ability to query the LLM and get a response, and continue to take turns writing to the LLM and receiving responses.  The library supports both synchronous, asynchronous, and streaming responses.
+   - Chat with image and other kinda of media inputs are also supported, so that the user can input images and discuss them with the LLM.
+   - Function calling (aka "tool use") is supported, for having the LLM call elisp functions that it chooses, with arguments it provides.
+   - Embeddings: Send text and receive a vector that encodes the semantic meaning of the underlying text.  Can be used in a search system to find similar passages.
+   - Prompt construction: Create a prompt to give to an LLM from one more sources of data.
 
-Certain functionalities might not be available in some LLMs. Any such unsupported functionality will raise a ~'not-implemented~ signal.
+Certain functionalities might not be available in some LLMs. Any such unsupported functionality will raise a ~'not-implemented~ signal, or it may fail in some other way.  Clients are recommended to check =llm-capabilities= when trying to do something beyond basic text chat.
 * Setting up providers
 Users of an application that uses this package should not need to install it themselves. The llm package should be installed as a dependency when you install the package that uses it. However, you do need to require the llm module and set up the provider you will be using. Typically, applications will have a variable you can set. For example, let's say there's a package called "llm-refactoring", which has a variable ~llm-refactoring-provider~. You would set it up like so:
 
@@ -28,7 +33,7 @@ For embedding users. if you store the embeddings, you *must* set the embedding m
 ** Open AI
 You can set up with ~make-llm-openai~, with the following parameters:
 - ~:key~, the Open AI key that you get when you sign up to use Open AI's APIs.  Remember to keep this private.  This is non-optional.
-- ~:chat-model~: A model name from the [[https://platform.openai.com/docs/models/gpt-4][list of Open AI's model names.]]  Keep in mind some of these are not available to everyone.  This is optional, and will default to a reasonable 3.5 model.
+- ~:chat-model~: A model name from the [[https://platform.openai.com/docs/models/gpt-4][list of Open AI's model names.]]  Keep in mind some of these are not available to everyone.  This is optional, and will default to a reasonable model.
 - ~:embedding-model~: A model name from [[https://platform.openai.com/docs/guides/embeddings/embedding-models][list of Open AI's embedding model names.]]  This is optional, and will default to a reasonable model.
 ** Open AI Compatible
 There are many Open AI compatible APIs and proxies of Open AI.  You can set up one with ~make-llm-openai-compatible~, with the following parameter:
@@ -151,7 +156,7 @@ Conversations can take place by repeatedly calling ~llm-chat~ and its variants. 
 ** Caution about ~llm-chat-prompt-interactions~
 The interactions in a prompt may be modified by conversation or by the conversion of the context and examples to what the LLM understands.  Different providers require different things from the interactions.  Some can handle system prompts, some cannot.  Some require alternating user and assistant chat interactions, others can handle anything.  It's important that clients keep to behaviors that work on all providers.  Do not attempt to read or manipulate ~llm-chat-prompt-interactions~ after initially setting it up for the first time, because you are likely to make changes that only work for some providers.  Similarly, don't directly create a prompt with ~make-llm-chat-prompt~, because it is easy to create something that wouldn't work for all providers.
 ** Function calling
-*Note: function calling functionality is currently alpha quality.  If you want to use function calling, please watch the =llm= [[https://github.com/ahyatt/llm/discussions][discussions]] for any announcements about changes.*
+*Note: function calling functionality is currently beta quality.  If you want to use function calling, please watch the =llm= [[https://github.com/ahyatt/llm/discussions][discussions]] for any announcements about changes.*
 
 Function calling is a way to give the LLM a list of functions it can call, and have it call the functions for you.  The standard interaction has the following steps:
 1. The client sends the LLM a prompt with functions it can call.
@@ -199,6 +204,14 @@ for a function than "write-email".
 Examples can be found in =llm-tester=. There is also a function call to generate
 function calls from existing elisp functions in
 =utilities/elisp-to-function-call.el=.
+** Media input
+*Note:  media input functionality is currently alpha quality.  If you want to use it, please watch the =llm= [[https://github.com/ahyatt/llm/discussions][discussions]] for any announcements about changes.*
+
+Media can be used in =llm-chat= and related functions.  To use media, you can use
+=llm-multipart= in =llm-make-chat-prompt=, and pass it an Emacs image or an
+=llm-media= object for other kinds of media.  Besides images, some models support
+video and audio.  Not all providers or models support these, with images being
+the most frequently supported media type, and video and audio more rare.
 ** Advanced prompt creation
 The =llm-prompt= module provides helper functions to create prompts that can
 incorporate data from your application.  In particular, this should be very

@@ -83,7 +83,7 @@ FUNCTION-CALL-RESULTS is a list of structs of type
 `llm-chat-prompt-function-call-results', which is only populated
 if `role' is `function'.  It stores the results of the function
 calls."
-  role content  function-call-results)
+  role content function-call-results)
 
 (cl-defstruct llm-chat-prompt-function-call-result
   "This defines the result from a function call.
@@ -148,19 +148,19 @@ capability is available, as indicated by `llm-capabilities'."
   "Convert an IMAGE object to an `llm-media' object."
   (make-llm-media
    :mime-type (pcase (image-property image :type)
-		('svg "image/svg+xml")
-		('webp "image/webp")
-		('png "image/png")
-		('gif "image/gif")
-		('tiff "image/tiff")
-		('jpeg "image/jpeg")
-		('xpm "image/x-xpixmap")
-		('xbm "image/x-xbitmap"))
+                ('svg "image/svg+xml")
+                ('webp "image/webp")
+                ('png "image/png")
+                ('gif "image/gif")
+                ('tiff "image/tiff")
+                ('jpeg "image/jpeg")
+                ('xpm "image/x-xpixmap")
+                ('xbm "image/x-xbitmap"))
    :data (if-let ((data (image-property image :data))) data
-	   (with-temp-buffer
-	     (set-buffer-multibyte nil)
-	     (insert-file-contents-literally (image-property image :file))
-	     (buffer-string)))))
+           (with-temp-buffer
+             (set-buffer-multibyte nil)
+             (insert-file-contents-literally (image-property image :file))
+             (buffer-string)))))
 
 (cl-defstruct llm-multipart
   "A multipart message that can contain both text and media.
@@ -183,10 +183,10 @@ Each argument should be either a string, image object or an
 multipart message."
   (make-llm-multipart
    :parts (mapcar (lambda (part)
-		    (if (and (fboundp 'imagep) (imagep part))
-			(llm--image-to-media part)
-		      part))
-		  parts)))
+                    (if (and (fboundp 'imagep) (imagep part))
+                        (llm--image-to-media part)
+                      part))
+                  parts)))
 
 (cl-defun llm--log (type &key provider prompt msg)
   "Log a MSG of TYPE, given PROVIDER, PROMPT, and MSG.
@@ -229,8 +229,8 @@ instead."
   (llm-make-chat-prompt text))
 
 (cl-defun llm-make-chat-prompt (content &key context examples functions
-                                     temperature max-tokens
-                                     non-standard-params)
+                                        temperature max-tokens
+                                        non-standard-params)
   "Create a `llm-chat-prompt' with CONTENT sent to the LLM provider.
 
 This is the most correct and easy way to create an
@@ -532,7 +532,13 @@ won't have any partial responses, so basically just operates like
 
 `embeddings-batch': the LLM can return many vector embeddings at the same time.
 
-`function-calls': the LLM can call functions."
+`function-calls': the LLM can call functions.i
+
+`image-input': the LLM can accept images as input.
+
+`video-input': the LLM can accept video as input.
+
+`audio-input': the LLM can accept audio as input."
   (ignore provider)
   nil)
 
@@ -676,15 +682,15 @@ This should only be used for logging or debugging."
                           ('user "User")
                           ('system "System")
                           ('assistant "Assistant"))
-			(let ((content (llm-chat-prompt-interaction-content i)))
-			  (if (llm-multipart-p content)
-			      (mapcar (lambda (part) (if (llm-media-p part)
-							 (format "[%s data, %d bytes]"
-								 (llm-media-mime-type part)
-								 (length (llm-media-data part)))
-						       part))
-				      (llm-multipart-parts content))
-			    content))))
+                        (let ((content (llm-chat-prompt-interaction-content i)))
+                          (if (llm-multipart-p content)
+                              (mapcar (lambda (part) (if (llm-media-p part)
+                                                         (format "[%s data, %d bytes]"
+                                                                 (llm-media-mime-type part)
+                                                                 (length (llm-media-data part)))
+                                                       part))
+                                      (llm-multipart-parts content))
+                            content))))
               (llm-chat-prompt-interactions prompt) "\n")
    "\n"
    (when (llm-chat-prompt-temperature prompt)
