@@ -47,6 +47,7 @@
 (require 'llm)
 (require 'ert)
 (require 'seq)
+(require 'image)
 
 (defconst llm-integration-test-chat-prompt
   "What is the capital of France?  Give me only one word, in English, with no punctuation."
@@ -55,6 +56,12 @@
 (defconst llm-integration-test-chat-answer
   "Paris"
   "The correct answer to the chat prompt.")
+
+(defconst llm-integration-current-directory
+  (file-truename
+   (file-name-directory (locate-dominating-file (or load-file-name default-directory)
+                                                "llm.el")))
+  "The directory of this file.")
 
 (defun llm-integration-test-fc-prompt ()
   "Return a function call prompt for testing."
@@ -271,14 +278,20 @@ else.  We really just want to see if it's in the right ballpark."
       (llm-chat provider prompt))))
 
 (llm-def-integration-test llm-image-chat (provider)
+  ;; On github, the emacs we use doesn't have image support, so we can't use
+  ;; image objects.
   (when (member 'image-input (llm-capabilities provider))
-    (let* ((image-load-path (append image-load-path (list default-directory)))
+    (let* ((image-bytes
+            (with-temp-buffer (set-buffer-multibyte nil)
+                              (insert-file-contents-literally
+                               (expand-file-name "animal.jpeg" llm-integration-current-directory))
+                              (buffer-string)))
            (result (llm-chat
                     provider
                     (llm-make-chat-prompt
                      (llm-make-multipart
-                      "What is this animal?  Please answer in one word, without punctuation or whitespace."
-                      (create-image "animal.jpeg"))))))
+                      "What is this animal?  You should have an image, if not please let me know.  If you do have the image, please answer in one word, without punctuation or whitespace."
+                      (make-llm-media :mime-type "image/jpeg" :data image-bytes))))))
       (should (stringp result))
       (should (llm-integration-test-string-eq "owl" (string-trim (downcase result)))))))
 
