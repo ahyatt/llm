@@ -64,6 +64,7 @@ jobs:
       env:
         OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
         ANTHROPIC_KEY: ${{ secrets.ANTHROPIC_KEY }}
-        GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
+        # I can't seem to get Gemini to stop rate limiting me, temporarily disabling.
+        # GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
       run: |
         eldev -p -dtT test
