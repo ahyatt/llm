@@ -57,6 +57,9 @@
   "Paris"
   "The correct answer to the chat prompt.")
 
+(defconst llm-integration-current-directory (file-name-directory load-file-name)
+  "The directory of this file.")
+
 (defun llm-integration-test-fc-prompt ()
   "Return a function call prompt for testing."
   (llm-make-chat-prompt
@@ -273,12 +276,13 @@ else.  We really just want to see if it's in the right ballpark."
 
 (llm-def-integration-test llm-image-chat (provider)
   (when (member 'image-input (llm-capabilities provider))
-    (let* ((image-load-path (append image-load-path (list default-directory)))
+    (message "adding %s to image-load-path" llm-integration-current-directory)
+    (let* ((image-load-path (append image-load-path (list llm-integration-current-directory)))
            (result (llm-chat
                     provider
                     (llm-make-chat-prompt
                      (llm-make-multipart
-                      "What is this animal?  Please answer in one word, without punctuation or whitespace."
+                      "What is this animal?  You should have an image, if not please let me know.  If you do have the image, please answer in one word, without punctuation or whitespace."
                       (create-image "animal.jpeg"))))))
       (should (stringp result))
       (should (llm-integration-test-string-eq "owl" (string-trim (downcase result)))))))
