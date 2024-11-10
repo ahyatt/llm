@@ -99,7 +99,7 @@
          ;; The free Azure tier has extremely restrictive rate limiting.
          (sleep-for (string-to-number (or (getenv "AZURE_SLEEP") "60"))))
         ((member (type-of provider) '(llm-gemini llm-vertex))
-         (sleep-for 15))))
+         (sleep-for 30))))
 
 (defun llm-integration-test-string-eq (target actual)
   "Test that TARGET approximately equals ACTUAL.
