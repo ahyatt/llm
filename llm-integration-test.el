@@ -47,6 +47,7 @@
 (require 'llm)
 (require 'ert)
 (require 'seq)
+(require 'image)
 
 (defconst llm-integration-test-chat-prompt
   "What is the capital of France?  Give me only one word, in English, with no punctuation."
