@@ -278,17 +278,20 @@ else.  We really just want to see if it's in the right ballpark."
       (llm-chat provider prompt))))
 
 (llm-def-integration-test llm-image-chat (provider)
-  (message "Looking in %s for image files, image-load-path: %s" llm-integration-current-directory image-load-path)
-  (message "Files in directory: %s" (directory-files llm-integration-current-directory))
+  ;; On github, the emacs we use doesn't have image support, so we can't use
+  ;; image objects.
   (when (member 'image-input (llm-capabilities provider))
-    (let* ((image-load-path (cons llm-integration-current-directory image-load-path))
-           (image (find-image '((:file "animal.jpeg" :type jpeg))))
+    (let* ((image-bytes
+            (with-temp-buffer (set-buffer-multibyte nil)
+                              (insert-file-contents-literally
+                               (expand-file-name "animal.jpeg" llm-integration-current-directory))
+                              (buffer-string)))
            (result (llm-chat
                     provider
                     (llm-make-chat-prompt
                      (llm-make-multipart
                       "What is this animal?  You should have an image, if not please let me know.  If you do have the image, please answer in one word, without punctuation or whitespace."
-                      (or image (error "Couldn't find image")))))))
+                      (make-llm-media :mime-type "image/jpeg" :data image-bytes))))))
       (should (stringp result))
       (should (llm-integration-test-string-eq "owl" (string-trim (downcase result)))))))
 
