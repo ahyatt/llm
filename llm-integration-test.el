@@ -58,8 +58,9 @@
   "The correct answer to the chat prompt.")
 
 (defconst llm-integration-current-directory
-  (file-name-directory (locate-dominating-file (or load-file-name default-directory)
-                                               "llm.el"))
+  (file-truename
+   (file-name-directory (locate-dominating-file (or load-file-name default-directory)
+                                                "llm.el")))
   "The directory of this file.")
 
 (defun llm-integration-test-fc-prompt ()
