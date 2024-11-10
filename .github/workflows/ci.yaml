@@ -8,7 +8,7 @@ on:
     branches: [ "*" ]
 
 jobs:
-  test:
+  fast-tests:
     runs-on: ubuntu-latest
     environment: Continuous Integration
     strategy:
@@ -19,6 +19,8 @@ jobs:
           - 28.2
           - 29.1
           - 29.2
+          - 29.3
+          - 29.4
     steps:
     - name: Set up Emacs
       uses: jcs090218/setup-emacs@master
@@ -40,5 +42,29 @@ jobs:
         eldev -p -dtT lint
 
     - name: Test the project
+      # We don't set up the env variables so no integration tests will be run
+      run: |
+        eldev -p -dtT test
+  integration-tests:
+    runs-on: ubuntu-latest
+    environment: Continuous Integration
+    steps:
+    - name: Set up Emacs
+      uses: jcs090218/setup-emacs@master
+      with:
+        version: 29.4
+
+    - name: Install Eldev
+      uses: emacs-eldev/setup-eldev@v1
+
+    - name: Check out the source code
+      uses: actions/checkout@v4
+
+    - name: Test the project
+      env:
+        OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+        ANTHROPIC_KEY: ${{ secrets.ANTHROPIC_KEY }}
+        # I can't seem to get Gemini to stop rate limiting me, temporarily disabling.
+        # GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
       run: |
         eldev -p -dtT test
