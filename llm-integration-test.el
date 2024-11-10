@@ -278,7 +278,8 @@ else.  We really just want to see if it's in the right ballpark."
       (llm-chat provider prompt))))
 
 (llm-def-integration-test llm-image-chat (provider)
-  (message "Looking in %s for image files" llm-integration-current-directory)
+  (message "Looking in %s for image files, image-load-path: %s" llm-integration-current-directory image-load-path)
+  (message "Files in directory: %s" (directory-files llm-integration-current-directory))
   (when (member 'image-input (llm-capabilities provider))
     (let* ((image-load-path (cons llm-integration-current-directory image-load-path))
            (image (find-image '((:file "animal.jpeg" :type jpeg))))

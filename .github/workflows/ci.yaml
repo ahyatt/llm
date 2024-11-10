@@ -60,10 +60,6 @@ jobs:
     - name: Check out the source code
       uses: actions/checkout@v4
 
-    - name: Debug Directory Structure
-      run: |
-        pwd
-        ls -R
     - name: Test the project
       env:
         OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
