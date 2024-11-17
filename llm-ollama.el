@@ -180,7 +180,8 @@ PROVIDER is the llm-ollama provider."
                       (funcall msg-receiver response))))))
 
 (cl-defmethod llm-name ((provider llm-ollama))
-  (llm-ollama-chat-model provider))
+  (or (llm-ollama-chat-model provider)
+      (llm-ollama-embedding-model provider)))
 
 (cl-defmethod llm-chat-token-limit ((provider llm-ollama))
   (llm-provider-utils-model-token-limit (llm-ollama-chat-model provider)
@@ -194,9 +195,9 @@ PROVIDER is the llm-ollama provider."
                        (and embedding-model
                             (member 'embedding (llm-model-capabilities embedding-model)))))
             '(embeddings embeddings-batch))
-          (when-let ((chat-model (llm-models-match
-                                  (llm-ollama-chat-model provider)))
-                     (capabilities (llm-model-capabilities chat-model)))
+          (when-let* ((model (llm-ollama-chat-model provider))
+                      (chat-model (llm-models-match model))
+                      (capabilities (llm-model-capabilities chat-model)))
             (append
              (when (member 'tool-use capabilities) '(function-calls))
              (seq-intersection capabilities '(image-input))))))
