@@ -270,7 +270,7 @@ return a list of `llm-chat-function-call' structs.")
       (llm-provider-batch-embeddings-extract-result provider response))))
 
 (cl-defmethod llm-batch-embeddings-async ((provider llm-standard-full-provider) string-list vector-callback error-callback)
-  (llm-provider-request-prelude provider t)
+  (llm-provider-request-prelude provider)
   (let ((buf (current-buffer)))
     (llm-request-plz-async
      (llm-provider-embedding-url provider t)

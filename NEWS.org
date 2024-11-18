@@ -1,3 +1,5 @@
+* Veresion 0.18.1
+- Fix extra argument in ~llm-batch-embeddings-async~.
 * Version 0.18.0
 - Add media handling, for images, videos, and audio.
 - Add batch embeddings capability (currently for just Open AI and Ollama).
