@@ -206,7 +206,12 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :name "Nemotron Mini" :symbol 'nemotron-mini
     :capabilities '(generation tool-use)
     :context-length 4096
-    :regex "nemotron-mini")))
+    :regex "nemotron-mini")
+   (make-llm-model
+    :name "BGE-M3" :symbol 'bge-m3
+    :capabilities '(embedding free-software)  ;; MIT license
+    :context-length 8192
+    :regex "bge-m3")))
 
 (defun llm-models-by-symbol (symbol)
   "Return the model with SYMBOL."
