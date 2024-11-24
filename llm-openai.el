@@ -195,6 +195,8 @@ STREAMING if non-nil, turn on response streaming."
                      (llm-chat-prompt-interactions prompt)))
           request-alist)
     (push `("model" . ,(llm-openai-chat-model provider)) request-alist)
+    (when (eq 'json (llm-chat-prompt-response-format prompt))
+      (push '("response_format" . (("type" . "json_object"))) request-alist))
     (when (llm-chat-prompt-temperature prompt)
       (push `("temperature" . ,(* (llm-chat-prompt-temperature prompt) 2.0)) request-alist))
     (when (llm-chat-prompt-max-tokens prompt)
@@ -294,7 +296,7 @@ RESPONSE can be nil if the response is complete."
   (llm-provider-utils-model-token-limit (llm-openai-chat-model provider)))
 
 (cl-defmethod llm-capabilities ((provider llm-openai))
-  (append '(streaming embeddings function-calls)
+  (append '(streaming embeddings function-calls json-response)
           (when-let ((model (llm-models-match (llm-openai-chat-model provider))))
             (seq-intersection (llm-model-capabilities model)
                               '(image-input)))))
