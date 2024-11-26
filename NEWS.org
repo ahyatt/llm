@@ -1,4 +1,5 @@
 * Version 0.21.0
+- Add GitHub's GitHub Models
 - Add ~llm-models-add~ as a convenience method to add a model to the known list.
 * Version 0.20.0
 - Add ability to output according to a JSON spec.
