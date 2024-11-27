@@ -245,6 +245,8 @@ nothing to add, in which case it is nil."
             params-alist))
     (when (llm-chat-prompt-max-tokens prompt)
       (push `(maxOutputTokens . ,(llm-chat-prompt-max-tokens prompt)) params-alist))
+    (pcase (llm-chat-prompt-response-format prompt)
+      ('json (push '("response_mime_type" . "application/json") params-alist)))
     (when params-alist
       `((generation_config . ,params-alist)))))
 
@@ -300,7 +302,7 @@ If STREAMING is non-nil, use the URL for the streaming API."
 
 (cl-defmethod llm-capabilities ((provider llm-vertex))
   (append
-   (list 'streaming 'embeddings)
+   (list 'streaming 'embeddings 'json-response)
    (when-let ((model (llm-models-match (llm-vertex-chat-model provider)))
               (capabilities (llm-model-capabilities model)))
      (append

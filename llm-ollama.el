@@ -144,6 +144,8 @@ PROVIDER is the llm-ollama provider."
     (when (llm-chat-prompt-functions prompt)
       (push `("tools" . ,(mapcar #'llm-provider-utils-openai-function-spec
                                  (llm-chat-prompt-functions prompt))) request-alist))
+    (when (eq 'json (llm-chat-prompt-response-format prompt))
+      (push `("format" . ,(llm-chat-prompt-response-format prompt)) request-alist))
     (push `("stream" . ,(if streaming t :json-false)) request-alist)
     (when (llm-chat-prompt-temperature prompt)
       (push `("temperature" . ,(llm-chat-prompt-temperature prompt)) options))
@@ -188,7 +190,7 @@ PROVIDER is the llm-ollama provider."
                                         2048))
 
 (cl-defmethod llm-capabilities ((provider llm-ollama))
-  (append '(streaming)
+  (append '(streaming json-response)
           (when (and (llm-ollama-embedding-model provider)
                      (let ((embedding-model (llm-models-match
                                              (llm-ollama-embedding-model provider))))

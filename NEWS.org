@@ -1,4 +1,6 @@
-* Veresion 0.18.1
+* Version 0.19.0
+- Add JSON mode, for most providers with the exception of Claude.
+* Version 0.18.1
 - Fix extra argument in ~llm-batch-embeddings-async~.
 * Version 0.18.0
 - Add media handling, for images, videos, and audio.
