@@ -302,7 +302,7 @@ If STREAMING is non-nil, use the URL for the streaming API."
 
 (cl-defmethod llm-capabilities ((provider llm-vertex))
   (append
-   (list 'streaming 'embeddings json-response)
+   (list 'streaming 'embeddings 'json-response)
    (when-let ((model (llm-models-match (llm-vertex-chat-model provider)))
               (capabilities (llm-model-capabilities model)))
      (append
