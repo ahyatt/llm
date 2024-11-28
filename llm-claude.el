@@ -130,7 +130,9 @@
                            (funcall msg-receiver (assoc-default 'text delta))))))))))
 
 (cl-defmethod llm-provider-headers ((provider llm-claude))
-  `(("x-api-key" . ,(llm-claude-key provider))
+  `(("x-api-key" . ,(if (functionp (llm-claude-key provider))
+                        (funcall (llm-claude-key provider))
+                      (llm-claude-key provider)))
     ("anthropic-version" . "2023-06-01")
     ("anthropic-beta" . "tools-2024-04-04")))
 
