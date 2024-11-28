@@ -55,6 +55,7 @@ for debugging, because the log buffer will grow without bound."
   :type 'boolean)
 
 (defun llm--warn-on-nonfree (name tos)
+
   "Issue a warning if `llm-warn-on-nonfree' is non-nil.
 NAME is the human readable name of the LLM (e.g \"Open AI\").
 
@@ -70,7 +71,7 @@ See %s for the details on the restrictions on use." name tos)))
   "This stores all the information needed for a structured chat prompt.
 
 Use of this directly is deprecated, instead use `llm-make-chat-prompt'."
-  context examples interactions functions temperature max-tokens non-standard-params)
+  context examples interactions functions temperature max-tokens response-format non-standard-params)
 
 (cl-defstruct llm-chat-prompt-interaction
   "This defines a single interaction given as part of a chat prompt.
@@ -229,7 +230,7 @@ instead."
   (llm-make-chat-prompt text))
 
 (cl-defun llm-make-chat-prompt (content &key context examples functions
-                                        temperature max-tokens
+                                        temperature max-tokens response-format
                                         non-standard-params)
   "Create a `llm-chat-prompt' with CONTENT sent to the LLM provider.
 
@@ -276,6 +277,12 @@ This is not required.
 
 MAX-TOKENS is the maximum number of tokens to generate.  This is optional.
 
+If RESPONSE-FORMAT is `json' (the currently only accepted value), we
+will attempt to force ouput to fit the format.  This should not be used
+with function calling.  If this is set the instructions to the LLM
+should tell the model about the format, for example with JSON format by
+including examples or describing the schema.
+
 CONTEXT, EXAMPLES, FUNCTIONS, TEMPERATURE, and MAX-TOKENS are
 usually turned into part of the interaction, and if so, they will
 be put in the first interaction of the prompt (before anything in
@@ -302,6 +309,7 @@ cdrs can be strings or numbers.  This is optional."
    :functions functions
    :temperature temperature
    :max-tokens max-tokens
+   :response-format response-format
    :non-standard-params non-standard-params))
 
 (defun llm-chat-prompt-append-response (prompt response &optional role)
@@ -535,6 +543,9 @@ won't have any partial responses, so basically just operates like
 `function-calls': the LLM can call functions.i
 
 `image-input': the LLM can accept images as input.
+
+`json-response': the LLM can be requested to return responses only in
+JSON format.
 
 `video-input': the LLM can accept video as input.
 
