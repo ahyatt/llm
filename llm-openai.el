@@ -111,6 +111,10 @@ PROVIDER is the Open AI provider struct."
 
 (cl-defmethod llm-openai--headers ((provider llm-openai))
   (when-let ((key (llm-openai-key provider)))
+    ;; If the key is a function, call it.  The `auth-source' API uses functions
+    ;; to wrap secrets and to obfuscate them in the Emacs heap.
+    (when (functionp key)
+      (setq key (funcall key)))
     ;; Encode the API key to ensure it is unibyte.  The request library gets
     ;; confused by multibyte headers, which turn the entire body multibyte if
     ;; there’s a non-ascii character, regardless of encoding.  And API keys are
