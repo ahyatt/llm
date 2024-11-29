@@ -46,7 +46,9 @@
           (llm-azure-embedding-model provider)))
 
 (cl-defmethod llm-provider-headers ((provider llm-azure))
-  `(("api-key" . ,(llm-azure-key provider))))
+  `(("api-key" . ,(if (functionp (llm-azure-key provider))
+                      (funcall (llm-azure-key provider))
+                    (llm-azure-key provider)))))
 
 (cl-defmethod llm-capabilities ((_ llm-azure))
   (list 'streaming 'embedding))

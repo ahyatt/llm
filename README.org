@@ -23,6 +23,17 @@ Users of an application that uses this package should not need to install it the
 
 Here ~my-openai-key~ would be a variable you set up before with your OpenAI key. Or, just substitute the key itself as a string. It's important to remember never to check your key into a public repository such as GitHub, because your key must be kept private. Anyone with your key can use the API, and you will be charged.
 
+You can also use a function as a key, so you can store your key in a secure place and retrieve it via a function.  For example, you could add a line to =~/.authinfo.gpg=:
+
+#+begin_example
+machine llm.openai password <key>
+#+end_example
+
+And then set up your provider like:
+#+begin_src emacs-lisp
+(setq llm-refactoring-provider (make-llm-openai :key (plist-get (car (auth-source-search :host "llm.openai")) :secret)))
+#+end_src
+
 All of the providers (except for =llm-fake=), can also take default parameters that will be used if they are not specified in the prompt.  These are the same parameters as appear in the prompt, but prefixed with =default-chat-=.  So, for example, if you find that you like Ollama to be less creative than the default, you can create your provider like:
 
 #+begin_src emacs-lisp
