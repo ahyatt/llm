@@ -55,6 +55,11 @@ Microsoft Azure has an Open AI integration, although it doesn't support everythi
 - ~:key~, the Azure key for Azure OpenAI service.
 - ~:chat-model~, the  chat model, which must be deployed in Azure.
 - ~embedding-model~, the embedding model which must be deployed in Azure. 
+** GitHub Models
+GitHub now has its own platform for interacting with AI models.  For a list of models check the [[https://github.com/marketplace/models][marketplace]].  You can set it up with ~make-llm-github~, with the following parameters:
+- ~:key~, a GitHub token or an Azure AI production key.
+- ~:chat-model~, the chat model, which can be any of the ones you have access for (currently o1 is restricted).
+- ~:embedding-model~, the embedding model, which can be better found [[https://github.com/marketplace?type=models&task=Embeddings][through a filter]]a.
 ** Gemini (not via Google Cloud)
 This is Google's AI model.  You can get an API key via their [[https://makersuite.google.com/app/apikey][page on Google AI Studio]].
 Set this up with ~make-llm-gemini~, with the following parameters:
