@@ -90,8 +90,10 @@
     ;; From https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo
     (should-have-token-limit "gpt-4" 8192)
     (should-have-token-limit "gpt-4-0613" 8192)
-    (should-have-token-limit "gpt-4o" 128000)
-    (should-have-token-limit "gpt-4o-mini" 128000)
+    ;; I couldn't find documentation on this, but the token limit is actually
+    ;; 30k instead of 128k for most customers.
+    (should-have-token-limit "gpt-4o" 30000)
+    (should-have-token-limit "gpt-4o-mini" 30000)
     (should-have-token-limit "unknown" 4096)))
 
 (ert-deftest llm-test-capabilities-openai-compatible ()

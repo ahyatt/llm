@@ -1,3 +1,5 @@
+* Version 0.19.1
+- Fix Open AI context length sizes, which are mostly smaller than advertised.
 * Version 0.19.0
 - Add JSON mode, for most providers with the exception of Claude.
 - Add ability for keys to be functions, thanks to Daniel Mendler.
