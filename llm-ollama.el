@@ -57,10 +57,13 @@ default to localhost.
 
 PORT is the localhost port that Ollama is running on.  It is optional.
 
+KEY is an api key used to authenticate with to access restricted
+Ollama service. It is optional.
+
 CHAT-MODEL is the model to use for chat queries.  It is required.
 
 EMBEDDING-MODEL is the model to use for embeddings.  It is required."
-  (scheme "http") (host "localhost") (port 11434) chat-model embedding-model)
+  (scheme "http") (host "localhost") (port 11434) key chat-model embedding-model)
 
 ;; Ollama's models may or may not be free, we have no way of knowing.  There's no
 ;; way to tell, and no ToS to point out here.
@@ -72,6 +75,9 @@ EMBEDDING-MODEL is the model to use for embeddings.  It is required."
   "With ollama PROVIDER, return url for METHOD."
   (format "%s://%s:%d/api/%s" (llm-ollama-scheme provider )(llm-ollama-host provider)
           (llm-ollama-port provider) method))
+
+(cl-defmethod llm-provider-headers ((provider llm-ollama))
+  `(("Authorization" . ,(format "Bearer %s" (llm-ollama-key provider)))))
 
 (cl-defmethod llm-provider-embedding-url ((provider llm-ollama) &optional _)
   (llm-ollama--url provider "embed"))
