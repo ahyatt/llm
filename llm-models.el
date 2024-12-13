@@ -170,6 +170,16 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 128000
     :regex "llama-?3\\.2")
    (make-llm-model
+    :name "Llama 3.3" :symbol 'llama-3.3
+    :capabilities '(generation tool-use)
+    :context-length 128000
+    :regex "llama-?3\\.3")
+   (make-llm-model
+    :name "qwq" :symbol 'qwq
+    :capabilities '(generation tool-use)
+    :context-length 32768
+    :regex "qwq")
+   (make-llm-model
     :name "Gemma 2" :symbol 'gemma-2
     :capabilities '(generation free-software)  ;; Apache license
     :context-length 8192
