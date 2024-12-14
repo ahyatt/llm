@@ -94,5 +94,27 @@
     (should (equal "Previous interactions:\n\nUser: Hello\nAssistant: Hi! How can I assist you?\n\nThe current conversation follows:\n\nEarl Grey, hot."
                    (llm-chat-prompt-interaction-content (nth 0 (llm-chat-prompt-interactions prompt-for-second-request)))))))
 
+(ert-deftest llm-provider-utils-json-schema ()
+  (should (equal '((type . object)
+                   (properties
+                    (cities
+                     (type . array)
+                     (items
+                      (type . string))))
+                   (required . (cities)))
+                 (llm-provider-utils-json-schema
+                  '(:type object
+                          :properties
+                          (:cities (:type array :items (:type string)))
+                          :required (cities)))))
+  (should (equal '((type . boolean))
+                 (llm-provider-utils-json-schema '(:type boolean))))
+  (should (equal '((type . object)
+                   (properties . ((data . ((enum . ("pizza" "calzone" "pasta")))))))
+                 (llm-provider-utils-json-schema
+                  '(:type object
+                          :properties
+                          (:data (:enum ("pizza" "calzone" "pasta"))))))))
+
 (provide 'llm-provider-utils-test)
 ;;; llm-provider-utils-test.el ends here

@@ -235,6 +235,10 @@ the key must be regenerated every hour."
                  (llm-chat-prompt-functions prompt)))))
    (llm-vertex--chat-parameters prompt)))
 
+(defun llm-vertex--response-schema (schema)
+  "Return vertex SCHEMA from our standard schema spec."
+  (llm-provider-utils-json-schema schema))
+
 (defun llm-vertex--chat-parameters (prompt)
   "From PROMPT, create the parameters section.
 Return value is a cons for adding to an alist, unless there is
@@ -245,8 +249,12 @@ nothing to add, in which case it is nil."
             params-alist))
     (when (llm-chat-prompt-max-tokens prompt)
       (push `(maxOutputTokens . ,(llm-chat-prompt-max-tokens prompt)) params-alist))
-    (pcase (llm-chat-prompt-response-format prompt)
-      ('json (push '("response_mime_type" . "application/json") params-alist)))
+    (when-let ((format (llm-chat-prompt-response-format prompt)))
+      (push '("response_mime_type" . "application/json") params-alist)
+      (unless (eq 'json format)
+        (push `("response_schema" . ,(llm-vertex--response-schema
+                                      (llm-chat-prompt-response-format prompt)))
+              params-alist)))
     (when params-alist
       `((generation_config . ,params-alist)))))
 
