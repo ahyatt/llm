@@ -154,6 +154,17 @@ PROVIDER is the Open AI provider struct."
 (cl-defmethod llm-provider-chat-extract-error ((provider llm-openai) err-response)
   (llm-provider-embedding-extract-error provider err-response))
 
+(defun llm-openai--response-format (format)
+  "Return the Open AI response format for FORMAT."
+  (if (eq format 'json) '(("type" . "json_object"))
+    ;; If not JSON, this must be a json response spec.
+    `(("type" . "json_schema")
+      ("json_schema" . (("name" . "response")
+                        ("strict" . t)
+                        ("schema" . ,(append
+                                      (llm-provider-utils-json-schema format)
+                                      '(("additionalProperties" . :json-false)))))))))
+
 (cl-defmethod llm-provider-chat-request ((provider llm-openai) prompt streaming)
   "From PROMPT, create the chat request data to send.
 PROVIDER is the Open AI provider.
@@ -199,8 +210,10 @@ STREAMING if non-nil, turn on response streaming."
                      (llm-chat-prompt-interactions prompt)))
           request-alist)
     (push `("model" . ,(llm-openai-chat-model provider)) request-alist)
-    (when (eq 'json (llm-chat-prompt-response-format prompt))
-      (push '("response_format" . (("type" . "json_object"))) request-alist))
+    (when (llm-chat-prompt-response-format prompt)
+      (push `("response_format" . ,(llm-openai--response-format
+                                    (llm-chat-prompt-response-format prompt)))
+            request-alist))
     (when (llm-chat-prompt-temperature prompt)
       (push `("temperature" . ,(* (llm-chat-prompt-temperature prompt) 2.0)) request-alist))
     (when (llm-chat-prompt-max-tokens prompt)

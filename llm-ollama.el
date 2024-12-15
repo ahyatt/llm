@@ -108,6 +108,12 @@ PROVIDER is the llm-ollama provider."
   "Return the chat response from the server RESPONSE."
   (assoc-default 'content (assoc-default 'message response)))
 
+(defun llm-ollama--response-format (format)
+  "Return the response format for FORMAT."
+  (if (eq format 'json)
+      :json
+    (llm-provider-utils-json-schema format)))
+
 (cl-defmethod llm-provider-chat-request ((provider llm-ollama) prompt streaming)
   (let (request-alist messages options)
     (setq messages
@@ -144,8 +150,10 @@ PROVIDER is the llm-ollama provider."
     (when (llm-chat-prompt-functions prompt)
       (push `("tools" . ,(mapcar #'llm-provider-utils-openai-function-spec
                                  (llm-chat-prompt-functions prompt))) request-alist))
-    (when (eq 'json (llm-chat-prompt-response-format prompt))
-      (push `("format" . ,(llm-chat-prompt-response-format prompt)) request-alist))
+    (when (llm-chat-prompt-response-format prompt)
+      (push `("format" . ,(llm-ollama--response-format
+                           (llm-chat-prompt-response-format prompt)))
+            request-alist))
     (push `("stream" . ,(if streaming t :json-false)) request-alist)
     (when (llm-chat-prompt-temperature prompt)
       (push `("temperature" . ,(llm-chat-prompt-temperature prompt)) options))

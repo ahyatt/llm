@@ -149,10 +149,36 @@ For all callbacks, the callback will be executed in the buffer the function was 
 - ~llm-chat-token-limit~.  Gets the token limit for the chat model.  This isn't possible for some backends like =llama.cpp=, in which the model isn't selected or known by this library.
 
   And the following helper functions:
-  - ~llm-make-chat-prompt text &keys context examples functions temperature max-tokens response-format non-standard-params~: This is how you make prompts.  ~text~ can be a string (the user input to the llm chatbot), or a list representing a series of back-and-forth exchanges, of odd number, with the last element of the list representing the user's latest input.  This supports inputting context (also commonly called a system prompt, although it isn't guaranteed to replace the actual system prompt), examples, and other important elements, all detailed in the docstring for this function.  ~response-format~ can be ~'json~, to force JSON output, but the prompt also needs to mention and ideally go into detail about what kind of JSON response is desired.  Providers with the ~json-response~ capability support JSON output, and it will be ignored if unsupported.  The ~non-standard-params~ let you specify other options that might vary per-provider, and for this, the correctness is up to the client.
+  - ~llm-make-chat-prompt text &keys context examples functions temperature max-tokens response-format non-standard-params~: This is how you make prompts.  ~text~ can be a string (the user input to the llm chatbot), or a list representing a series of back-and-forth exchanges, of odd number, with the last element of the list representing the user's latest input.  This supports inputting context (also commonly called a system prompt, although it isn't guaranteed to replace the actual system prompt), examples, and other important elements, all detailed in the docstring for this function.  ~response-format~ can be ~'json~, to force JSON output, or a JSON schema (see below) but the prompt also needs to mention and ideally go into detail about what kind of JSON response is desired.  Providers with the ~json-response~ capability support JSON output, and it will be ignored if unsupported.  The ~non-standard-params~ let you specify other options that might vary per-provider, and for this, the correctness is up to the client.
   - ~llm-chat-prompt-to-text prompt~: From a prompt, return a string representation.  This is not usually suitable for passing to LLMs, but for debugging purposes.
   - ~llm-chat-streaming-to-point provider prompt buffer point finish-callback~: Same basic arguments as ~llm-chat-streaming~, but will stream to ~point~ in ~buffer~.
   - ~llm-chat-prompt-append-response prompt response role~: Append a new response (from the user, usually) to the prompt.  The ~role~ is optional, and defaults to ~'user~.
+*** JSON schema
+By using the ~response-format~ argument to ~llm-make-chat-prompt~, you can ask the LLM to return items according to a specified JSON schema, based on the [[https://json-schema.org][JSON Schema Spec]].  Not everything is supported, but the most commonly used parts are.  To specify the JSON schema, we use a plist-based approach.  JSON objects are defined with ~(:type object :properties (:<var1> <schema1> :<var2> <schema2> ... :<varn> <scheman>) :required (<req var1> ... <req varn>))~.  Arrays are defined with ~(:type array :items <schema>)~.  Enums are defined with ~(:enum (<val1> <val2> <val3>))~.  You can also request integers, strings, and other types defined by the JSON Schema Spec, by just having ~(:type <type>)~.  Typically, LLMs often require the top-level schema object to be an object, and often that all properties on the top-level object must be required.
+
+Some examples:
+#+begin_src emacs-lisp
+(llm-chat my-provider (llm-make-chat-prompt
+                                "How many countries are there?  Return the result as JSON."
+                                :response-format
+                                '(:type object :properties (:num (:type integer)) :required (num))))
+#+end_src
+
+#+RESULTS:
+: {"num":195}
+
+#+begin_src emacs-lisp
+(llm-chat ash/llm-openai-small (llm-make-chat-prompt
+                                "Which editor is hard to quit?  Return the result as JSON."
+                                :response-format
+                                '(:type object :properties (:editor (:enum ("emacs" "vi" "vscode"))
+                                                                    :authors (:type array :items (:type string)))
+                                        :required (editor authors))))
+#+end_src
+
+#+RESULTS:
+: {"editor":"vi","authors":["Bram Moolenaar","Bill Joy"]}
+
 ** Logging
 Interactions with the =llm= package can be logged by setting ~llm-log~ to a non-nil value.  This should be done only when developing.  The log can be found in the =*llm log*= buffer.
 ** How to handle conversations

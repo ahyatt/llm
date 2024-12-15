@@ -295,6 +295,22 @@ else.  We really just want to see if it's in the right ballpark."
       (should (stringp result))
       (should (llm-integration-test-string-eq "owl" (string-trim (downcase result)))))))
 
+(llm-def-integration-test llm-json-test (provider)
+  (when (member 'json-response (llm-capabilities provider))
+    (let ((result (llm-chat
+                   provider
+                   (llm-make-chat-prompt
+                    "List the 3 largest cities in France in order of population, giving the results in JSON."
+                    :response-format
+                    '(:type object
+                            :properties
+                            (:cities (:type array :items (:type string)))
+                            :required (cities))))))
+      (should (equal
+               '(:cities ["Paris" "Marseille" "Lyon"])
+               (let ((json-object-type 'plist))
+                 (json-read-from-string result)))))))
+
 (llm-def-integration-test llm-count-tokens (provider)
   (let ((result (llm-count-tokens provider "What is the capital of France?")))
     (should (integerp result))

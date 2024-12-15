@@ -277,11 +277,18 @@ This is not required.
 
 MAX-TOKENS is the maximum number of tokens to generate.  This is optional.
 
-If RESPONSE-FORMAT is `json' (the currently only accepted value), we
+If RESPONSE-FORMAT is `json' (the currently only accepted symbol), we
 will attempt to force ouput to fit the format.  This should not be used
 with function calling.  If this is set the instructions to the LLM
 should tell the model about the format, for example with JSON format by
-including examples or describing the schema.
+including examples or describing the schema.  This can also be a
+structure defining the JSON schema.  The structure is plist that can be
+either `(:type <type> <additional-properties...>)', or in the case of
+enums `(:enum (<val1> .. <valn>))'.  LLMs will often require the
+top-level schema passed in will be an object: `(:type object
+:properties (:val schema :other-val other-schema) :required (val
+other-val))'.  Often, all properties must be required.  Arrays can be
+specified with `(:type array :items <schema>)'.
 
 CONTEXT, EXAMPLES, FUNCTIONS, TEMPERATURE, and MAX-TOKENS are
 usually turned into part of the interaction, and if so, they will

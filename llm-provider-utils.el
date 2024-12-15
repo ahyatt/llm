@@ -478,6 +478,43 @@ If MODEL cannot be found, warn and return DEFAULT, which by default is 4096."
       (warn "No model predefined for model %s, using restrictive defaults" model)
       (or default 4096))))
 
+(defun llm-provider--decolon (sym)
+  "Remove a colon from the beginnging of SYM."
+  (let ((s (symbol-name sym)))
+    (if (string-prefix-p ":" s)
+        (intern (substring s 1))
+      sym)))
+
+(defun llm-provider-utils-json-schema (spec)
+  "Return a JSON schema object from SPEC.
+This is a plist that represents a JSON type specification.
+An example is `(:type object
+                      :properties
+                      (:cities (:type array :items (:type string)))
+                      :required (cities))'"
+  (let ((schema `((type . ,(plist-get spec :type)))))
+    (pcase (plist-get spec :type)
+      ('object
+       (let ((properties (plist-get spec :properties)))
+         (setq schema
+               (push (cons 'properties
+                           (mapcar (lambda (pair)
+                                     (cons (llm-provider--decolon (car pair))
+                                           (llm-provider-utils-json-schema (cadr pair))))
+                                   (seq-partition properties 2)))
+                     schema))
+         (when (plist-get spec :required)
+           (push (cons 'required (plist-get spec :required)) schema))
+         (nreverse schema)))
+      ('array
+       (let ((items (plist-get spec :items)))
+         (push (cons 'items (llm-provider-utils-json-schema items)) schema))
+       (nreverse schema))
+      ('nil (if (plist-get spec :enum)
+                `((enum . ,(plist-get spec :enum)))
+              (error "Unknown JSON schema type: %s" (plist-get spec :type))))
+      (_ schema))))
+
 (defun llm-provider-utils-openai-arguments (args)
   "Convert ARGS to the Open AI function calling spec.
 ARGS is a list of `llm-function-arg' structs."
