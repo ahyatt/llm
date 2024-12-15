@@ -490,8 +490,8 @@ If MODEL cannot be found, warn and return DEFAULT, which by default is 4096."
 This is a plist that represents a JSON type specification.
 An example is `(:type object
                       :properties
-                      '(:cities (:type array :items '(:type string)))
-                      :required '(cities))'"
+                      (:cities (:type array :items (:type string)))
+                      :required (cities))'"
   (let ((schema `((type . ,(plist-get spec :type)))))
     (pcase (plist-get spec :type)
       ('object
