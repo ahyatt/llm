@@ -306,7 +306,7 @@ else.  We really just want to see if it's in the right ballpark."
                             :properties
                             (:cities (:type array :items (:type string)))
                             :required (cities))))))
-      (should (llm-integration-test-string-eq
+      (should (equal
                '(:cities ["Paris" "Marseille" "Lyon"])
                (let ((json-object-type 'plist))
                  (json-read-from-string result)))))))
