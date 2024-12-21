@@ -153,7 +153,7 @@ the key must be regenerated every hour."
                              (assoc-default 'content
                                             (aref (assoc-default 'candidates response) 0)))))
                  (when parts
-                   (assoc-default 'text (aref parts 0))))))))
+                   (assoc-default 'text (aref parts (- (length parts) 1)))))))))
 
 (cl-defmethod llm-provider-extract-function-calls ((provider llm-google) response)
   (if (vectorp response)

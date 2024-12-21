@@ -1,6 +1,6 @@
 * Version 0.20.0
 - Add ability to output according to a JSON spec.
-- Add Gemini 2.0 Flash and Llama 3.3 and QwQ models.
+- Add Gemini 2.0 Flash, Gemini 2.0 Flash Thinking, and Llama 3.3 and QwQ models.
 * Version 0.19.1
 - Fix Open AI context length sizes, which are mostly smaller than advertised.
 * Version 0.19.0
