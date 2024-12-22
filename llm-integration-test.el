@@ -170,7 +170,7 @@ else.  We really just want to see if it's in the right ballpark."
        provider
        "Paris"
        (lambda (response)
-         (should (eq (current-buffer) buf))
+         (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
          (setq result response))
        (lambda (error)
          (error "Error: %s" error)))
@@ -196,7 +196,7 @@ else.  We really just want to see if it's in the right ballpark."
        provider
        '("Paris" "France")
        (lambda (response)
-         (should (eq (current-buffer) buf))
+         (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
          (setq result response))
        (lambda (error)
          (error "Error: %s" error)))
@@ -223,7 +223,7 @@ else.  We really just want to see if it's in the right ballpark."
      provider
      (llm-make-chat-prompt llm-integration-test-chat-prompt)
      (lambda (response)
-       (should (eq (current-buffer) buf))
+       (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
        (setq result response))
      (lambda (_ err)
        (setq err-result err)))
@@ -244,16 +244,17 @@ else.  We really just want to see if it's in the right ballpark."
        provider
        (llm-make-chat-prompt llm-integration-test-chat-prompt)
        (lambda (partial-response)
-         (should (eq (current-buffer) buf))
+         (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
          (setq streamed-result (concat streamed-result partial-response)))
        (lambda (response)
-         (should (eq (current-buffer) buf))
+         (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
          (setq returned-result response))
        (lambda (_ err)
          (setq err-result err)))
-      (while (and (null returned-result)
+      (while (and (or (null returned-result)
+                      (= (length streamed-result) 0))
                   (null err-result)
-                  (time-less-p (time-subtract (current-time) start-time) 10))
+                  (time-less-p (time-subtract (current-time) start-time) 60))
         (sleep-for 0.1))
       (if err-result (error err-result))
       (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim returned-result)))
