@@ -168,12 +168,13 @@ Some examples:
 : {"num":195}
 
 #+begin_src emacs-lisp
-(llm-chat ash/llm-openai-small (llm-make-chat-prompt
-                                "Which editor is hard to quit?  Return the result as JSON."
-                                :response-format
-                                '(:type object :properties (:editor (:enum ("emacs" "vi" "vscode"))
-                                                                    :authors (:type array :items (:type string)))
-                                        :required (editor authors))))
+(llm-chat my-provider
+          (llm-make-chat-prompt
+           "Which editor is hard to quit?  Return the result as JSON."
+           :response-format
+           '(:type object :properties (:editor (:enum ("emacs" "vi" "vscode"))
+                                               :authors (:type array :items (:type string)))
+                   :required (editor authors))))
 #+end_src
 
 #+RESULTS:
