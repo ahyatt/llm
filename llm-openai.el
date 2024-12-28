@@ -165,97 +165,157 @@ PROVIDER is the Open AI provider struct."
                                       (llm-provider-utils-json-schema format)
                                       '(("additionalProperties" . :json-false)))))))))
 
+(defun llm-openai--build-model (provider)
+  "Get the model field for the request."
+  (list :model (llm-openai-chat-model provider)))
+
+(defun llm-openai--build-streaming (streaming)
+  "Add streaming field if STREAMING is non-nil."
+  (when streaming
+    (list :stream t)))
+
+(defun llm-openai--build-temperature (prompt)
+  "Build the temperature field if present in PROMPT."
+  (when (llm-chat-prompt-temperature prompt)
+    (list :temperature (* (llm-chat-prompt-temperature prompt) 2.0))))
+
+(defun llm-openai--build-max-tokens (prompt)
+  "Build the max_tokens field if present in PROMPT."
+  (when (llm-chat-prompt-max-tokens prompt)
+    (list :max_tokens (llm-chat-prompt-max-tokens prompt))))
+
+(defun llm-openai--build-response-format (prompt)
+  "Build the response_format field if present in PROMPT."
+  (when (llm-chat-prompt-response-format prompt)
+    (list :response_format
+          (llm-openai--response-format (llm-chat-prompt-response-format prompt)))))
+
+(defun llm-openai--build-tools (prompt)
+  "Build the tools field if tools are present in PROMPT."
+  (when (llm-chat-prompt-tools prompt)
+    (list :tools (vconcat (mapcar #'llm-provider-utils-openai-tool-spec
+                                  (llm-chat-prompt-tools prompt))))))
+
+(defun llm-openai--build-messages (prompt)
+  "Build the :messages field based on interactions in PROMPT."
+  (let ((interactions (llm-chat-prompt-interactions prompt)))
+    (list
+     :messages
+     (vconcat
+      (mapcan
+       (lambda (interaction)
+         (if (llm-chat-prompt-interaction-tool-uses interaction)
+             ;; Handle tool interactions
+             (mapcar
+              (lambda (tool-call)
+                (let ((msg-plist
+                       (list
+                        :role "tool"
+                        :name (llm-chat-prompt-tool-use-tool-name tool-call)
+                        :content (llm-chat-prompt-tool-use-result tool-call))))
+                  (when (llm-chat-prompt-tool-use-call-id tool-call)
+                    (setq msg-plist
+                          (plist-put msg-plist :tool_call_id
+                                     (llm-chat-prompt-tool-use-call-id tool-call))))
+                  msg-plist))
+              (llm-chat-prompt-interaction-tool-use interaction))
+           ;; Handle regular interactions
+           (list
+            (let ((msg-plist
+                   (list :role (llm-chat-prompt-interaction-role interaction))))
+              (when-let ((content (llm-chat-prompt-interaction-content interaction)))
+                (setq msg-plist
+                      (plist-put msg-plist :content
+                                 (cond
+                                   ((listp content)
+                                    (llm-openai-tool-calls-to-response content))
+                                   ((llm-multipart-p content)
+                                    (vconcat
+                                     (mapcar
+                                      (lambda (part)
+                                        (if (llm-media-p part)
+                                            (list :type "image_url"
+                                                  :image_url
+                                                  (list :url
+                                                        (concat
+                                                         "data:"
+                                                         (llm-media-mime-type part)
+                                                         ";base64,"
+                                                         (base64-encode-string
+                                                          (llm-media-data part)))))
+                                          (list :type "text" :text part)))
+                                      (llm-multipart-parts content))))
+                                   (t content)))))
+              msg-plist))))
+       interactions)))))
+
+(defun llm-provider-merge-non-standard-params (non-standard-params request-plist)
+  "Merge NON-STANDARD-PARAMS (alist) into REQUEST-PLIST."
+  (dolist (param non-standard-params request-plist)
+    (let ((key (car param))
+          (val (cdr param)))
+      (setq request-plist
+            (plist-put request-plist
+                       (if (keywordp key) key (intern (concat ":" (symbol-name key))))
+                       val)))))
+
 (cl-defmethod llm-provider-chat-request ((provider llm-openai) prompt streaming)
   "From PROMPT, create the chat request data to send.
 PROVIDER is the Open AI provider.
-FUNCTIONS is a list of functions to call, or nil if none.
 STREAMING if non-nil, turn on response streaming."
-  (let (request-alist)
-    (llm-provider-utils-combine-to-system-prompt prompt llm-openai-example-prelude)
-    (when streaming (push `("stream" . ,t) request-alist))
-    (push `("messages" .
-            ,(mapcan (lambda (i)
-                       (if (llm-chat-prompt-interaction-function-call-results i)
-                           (mapcar (lambda (fc)
-                                     (append
-                                      (when (llm-chat-prompt-function-call-result-call-id fc)
-                                        `(("tool_call_id" .
-                                           ,(llm-chat-prompt-function-call-result-call-id fc))))
-                                      `(("role" . "tool")
-                                        ("name" . ,(llm-chat-prompt-function-call-result-function-name fc))
-                                        ("content" . ,(llm-chat-prompt-function-call-result-result fc)))))
-                                   (llm-chat-prompt-interaction-function-call-results i))
-                         (list
-                          (append
-                           `(("role" . ,(llm-chat-prompt-interaction-role i)))
-                           (when-let ((content (llm-chat-prompt-interaction-content i)))
-                             (cond
-                              ((listp content)
-                               (llm-openai-function-call-to-response content))
-                              ((llm-multipart-p content)
-                               `(("content"  . ,(mapcar (lambda (part)
-                                                          (if (llm-media-p part)
-                                                              `(("type" . "image_url")
-                                                                ("image_url"
-                                                                 . (("url"
-                                                                     . ,(concat
-                                                                         "data:"
-                                                                         (llm-media-mime-type part)
-                                                                         ";base64,"
-                                                                         (base64-encode-string (llm-media-data part)))))))
-                                                            `(("type" . "text")
-                                                              ("text" . ,part))))
-                                                        (llm-multipart-parts content)))))
-                              (t `(("content" . ,content)))))))))
-                     (llm-chat-prompt-interactions prompt)))
-          request-alist)
-    (push `("model" . ,(llm-openai-chat-model provider)) request-alist)
-    (when (llm-chat-prompt-response-format prompt)
-      (push `("response_format" . ,(llm-openai--response-format
-                                    (llm-chat-prompt-response-format prompt)))
-            request-alist))
-    (when (llm-chat-prompt-temperature prompt)
-      (push `("temperature" . ,(* (llm-chat-prompt-temperature prompt) 2.0)) request-alist))
-    (when (llm-chat-prompt-max-tokens prompt)
-      (push `("max_tokens" . ,(llm-chat-prompt-max-tokens prompt)) request-alist))
-    (when (llm-chat-prompt-functions prompt)
-      (push `("tools" . ,(mapcar #'llm-provider-utils-openai-function-spec
-                                 (llm-chat-prompt-functions prompt)))
-            request-alist))
-    (append request-alist (llm-chat-prompt-non-standard-params prompt))))
+  (llm-provider-utils-combine-to-system-prompt prompt llm-openai-example-prelude)
+  (let ((non-standard-params (llm-chat-prompt-non-standard-params prompt))
+        request-plist)
+
+    ;; Combine all the parts
+    (setq request-plist
+          (append
+           (llm-openai--build-model provider)
+           (llm-openai--build-streaming streaming)
+           (llm-openai--build-temperature prompt)
+           (llm-openai--build-max-tokens prompt)
+           (llm-openai--build-response-format prompt)
+           (llm-openai--build-tools prompt)
+           (llm-openai--build-messages prompt)))
+
+    ;; Merge non-standard params
+    (setq request-plist (llm-provider-merge-non-standard-params non-standard-params request-plist))
+
+    ;; Return the final request plist
+    request-plist))
 
 (cl-defmethod llm-provider-chat-extract-result ((_ llm-openai) response)
   (assoc-default 'content
                  (assoc-default 'message (aref (cdr (assoc 'choices response)) 0))))
 
-(cl-defmethod llm-provider-extract-function-calls ((_ llm-openai) response)
+(cl-defmethod llm-provider-extract-tool-uses ((_ llm-openai) response)
   (mapcar (lambda (call)
-            (let ((function (cdr (nth 2 call))))
-              (make-llm-provider-utils-function-call
+            (let ((tool (cdr (nth 2 call))))
+              (make-llm-provider-utils-tool-use
                :id (assoc-default 'id call)
-               :name (assoc-default 'name function)
+               :name (assoc-default 'name tool)
                :args (json-read-from-string
-                      (let ((args (assoc-default 'arguments function)))
+                      (let ((args (assoc-default 'arguments tool)))
                         (if (= (length args) 0) "{}" args))))))
           (assoc-default 'tool_calls
                          (assoc-default 'message
                                         (aref (assoc-default 'choices response) 0)))))
 
-(defun llm-openai-function-call-to-response (fcs)
+(defun llm-openai-tool-calls-to-response (fcs)
   "Convert back from the generic representation to the Open AI.
-FCS is a list of `make-llm-provider-utils-function-call'"
+FCS is a list of `llm-provider-utils-tool-use' structs."
   `(("tool_calls" .
-     ,(mapcar (lambda (fc)
-                `(("id" . ,(llm-provider-utils-function-call-id fc))
-                  ("type" . "function")
-                  ("function" .
-                   (("arguments" . ,(json-encode
-                                     (llm-provider-utils-function-call-args fc)))
-                    ("name" . ,(llm-provider-utils-function-call-name fc))))))
-              fcs))))
+                  ,(mapcar (lambda (fc)
+                             `(("id" . ,(llm-provider-utils-tool-use-id fc))
+                               ("type" . "function")
+                               ("function" .
+                                           (("arguments" . ,(json-encode
+                                                             (llm-provider-utils-tool-use-args fc)))
+                                            ("name" . ,(llm-provider-utils-tool-use-name fc))))))
+                           fcs))))
 
-(cl-defmethod llm-provider-populate-function-calls ((_ llm-openai) prompt calls)
-  (llm-provider-utils-append-to-prompt prompt calls))
+(cl-defmethod llm-provider-populate-tool-uses ((_ llm-openai) prompt tool-uses)
+  (llm-provider-utils-append-to-prompt prompt tool-uses))
 
 (defun llm-openai--get-partial-chat-response (response)
   "Return the text in the partial chat response from RESPONSE.
@@ -284,26 +344,26 @@ RESPONSE can be nil if the response is complete."
   (let* ((num-index (+ 1 (assoc-default 'index (aref (car (last data)) 0))))
          (cvec (make-vector num-index nil)))
     (dotimes (i num-index)
-      (setf (aref cvec i) (make-llm-provider-utils-function-call)))
+      (setf (aref cvec i) (make-llm-provider-utils-tool-use)))
     (cl-loop for part in data do
-             (cl-loop for call in (append part nil) do
-                      (let* ((index (assoc-default 'index call))
-                             (id (assoc-default 'id call))
-                             (function (assoc-default 'function call))
-                             (name (assoc-default 'name function))
-                             (arguments (assoc-default 'arguments function)))
-                        (when id
-                          (setf (llm-provider-utils-function-call-id (aref cvec index)) id))
-                        (when name
-                          (setf (llm-provider-utils-function-call-name (aref cvec index)) name))
-                        (setf (llm-provider-utils-function-call-args (aref cvec index))
-                              (concat (llm-provider-utils-function-call-args (aref cvec index))
-                                      arguments)))))
+          (cl-loop for call in (append part nil) do
+                (let* ((index (assoc-default 'index call))
+                       (id (assoc-default 'id call))
+                       (function (assoc-default 'function call))
+                       (name (assoc-default 'name function))
+                       (arguments (assoc-default 'arguments function)))
+                  (when id
+                    (setf (llm-provider-utils-tool-use-id (aref cvec index)) id))
+                  (when name
+                    (setf (llm-provider-utils-tool-use-name (aref cvec index)) name))
+                  (setf (llm-provider-utils-tool-use-args (aref cvec index))
+                        (concat (llm-provider-utils-tool-use-args (aref cvec index))
+                                arguments)))))
     (cl-loop for call in (append cvec nil)
-             do (setf (llm-provider-utils-function-call-args call)
-                      (json-read-from-string (llm-provider-utils-function-call-args call)))
-             finally return (when (> (length cvec) 0)
-                              (append cvec nil)))))
+          do (setf (llm-provider-utils-tool-use-args call)
+                   (json-read-from-string (llm-provider-utils-tool-use-args call)))
+          finally return (when (> (length cvec) 0)
+                           (append cvec nil)))))
 
 (cl-defmethod llm-name ((_ llm-openai))
   "Return the name of the provider."

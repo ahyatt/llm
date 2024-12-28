@@ -192,21 +192,20 @@ ERR-RECEIVER with the error message.")
 
 ;; Methods for chat function calling
 
-(cl-defgeneric llm-provider-extract-function-calls (provider response)
-  "Return the function call results from RESPONSE for the PROVIDER.
+(cl-defgeneric llm-provider-extract-tool-uses (provider response)
+  "Return the tool uses from RESPONSE for the PROVIDER.
 
-If there are no function call results, return nil.  If there are
-function call results, return a list of
-`llm-provider-utils-function-call'.")
+If there are no tool uses, return nil.  If there are tool uses, return a
+list of `llm-provider-utils-tool-use'.")
 
-(cl-defmethod llm-provider-extract-function-calls ((_ llm-standard-chat-provider) _)
+(cl-defmethod llm-provider-extract-tool-usetool-calls ((_ llm-standard-chat-provider) _)
   "By default, the standard provider has no function call extractor."
   nil)
 
-(cl-defgeneric llm-provider-populate-function-calls (provider prompt calls)
-  "For PROVIDER, in PROMPT, record function call execution.
-This is the recording before the calls were executed, in the prompt.
-CALLS are a list of `llm-provider-utils-function-call'.")
+(cl-defgeneric llm-provider-populate-tool-uses (provider prompt tool-uses)
+  "For PROVIDER, in PROMPT, record tool uses.
+This is the recording before the function calls were executed, in the prompt.
+CALLS are a list of `llm-provider-utils-tool-use'.")
 
 (cl-defgeneric llm-provider-collect-streaming-function-data (provider data)
   "Transform a list of streaming function call DATA responses.
@@ -215,7 +214,7 @@ PROVIDER is the struct specifying the LLM provider and its configuration.
 
 The DATA responses are a list of whatever is sent to the function
 call handler in `llm-provider-streaming-media-handler'.  This should
-return a list of `llm-chat-function-call' structs.")
+return a list of `llm-chat-prompt-tool-use' structs.")
 
 (cl-defmethod llm-provider-collect-streaming-function-data ((_ llm-standard-chat-provider) _)
   ;; by default, there is no function calling
@@ -297,14 +296,23 @@ return a list of `llm-chat-function-call' structs.")
   (llm-provider-request-prelude provider)
   (let ((response (llm-request-plz-sync (llm-provider-chat-url provider)
                                         :headers (llm-provider-headers provider)
-                                        :data (llm-provider-chat-request provider prompt nil))))
+                                        :data (llm-provider-chat-request provider prompt nil)))
+        (final-result nil))
     (if-let ((err-msg (llm-provider-chat-extract-error provider response)))
         (error err-msg)
       (llm-provider-utils-process-result provider prompt
                                          (llm-provider-chat-extract-result
                                           provider response)
-                                         (llm-provider-extract-function-calls
-                                          provider response)))))
+                                         (llm-provider-extract-tool-uses
+                                          provider response)
+                                         (lambda (result)
+                                           (setq final-result result))))
+    ;; In most cases, final-result will be available immediately.  However, when
+    ;; executing tools, we need to wait for their callbacks, and only after
+    ;; those are called with this be ready.
+    (while (not final-result)
+      (sleep-for 0.1))
+    final-result))
 
 (cl-defmethod llm-chat-async ((provider llm-standard-chat-provider) prompt success-callback
                               error-callback)
@@ -324,7 +332,8 @@ return a list of `llm-chat-function-call' structs.")
                       (llm-provider-utils-process-result
                        provider prompt
                        (llm-provider-chat-extract-result provider data)
-                       (llm-provider-extract-function-calls provider data)))))
+                       (llm-provider-extract-tool-uses provider data)
+                       success-callback))))
      :on-error (lambda (_ data)
                  (llm-provider-utils-callback-in-buffer
                   buf error-callback 'error
@@ -368,7 +377,8 @@ return a list of `llm-chat-function-call' structs.")
          current-text
          (when fc
            (llm-provider-collect-streaming-function-data
-            provider (nreverse fc))))))
+            provider (nreverse fc)))
+         response-callback)))
      :on-error (lambda (_ data)
                  (llm-provider-utils-callback-in-buffer
                   buf error-callback 'error
@@ -516,102 +526,112 @@ An example is `(:type object
       (_ schema))))
 
 (defun llm-provider-utils-openai-arguments (args)
-  "Convert ARGS to the Open AI function calling spec.
-ARGS is a list of `llm-function-arg' structs."
-  (let ((required (mapcar
-                   #'llm-function-arg-name
-                   (seq-filter #'llm-function-arg-required args))))
-    (append
-     `((type . object)
-       (properties
-        .
-        ,(mapcar (lambda (arg)
-                   `(,(llm-function-arg-name arg) .
-                     ,(if (and (listp (llm-function-arg-type arg))
-                               (llm-function-arg-p (car (llm-function-arg-type arg))))
-                          (llm-provider-utils-openai-arguments (llm-function-arg-type arg))
-                        (append
-                         `((type .
-                                 ,(pcase (llm-function-arg-type arg)
-                                    ('string 'string)
-                                    ('integer 'integer)
-                                    ('float 'number)
-                                    ('boolean 'boolean)
-                                    ((cl-type cons)
-                                     (pcase (car (llm-function-arg-type arg))
-                                       ('or (cdr (llm-function-arg-type arg)))
-                                       ('list 'array)
-                                       ('enum 'string)))
-                                    (_ (error "Unknown argument type: %s" (llm-function-arg-type arg))))))
-                         (when (llm-function-arg-description arg)
-                           `((description
-                              .
-                              ,(llm-function-arg-description arg))))
-                         (when (and (eq 'cons
-                                        (type-of (llm-function-arg-type arg))))
-                           (pcase (car (llm-function-arg-type arg))
-                             ('enum `((enum
-                                       .
-                                       ,(cdr (llm-function-arg-type arg)))))
-                             ('list
-                              `((items .
-                                       ,(if (llm-function-arg-p
-                                             (cadr (llm-function-arg-type arg)))
-                                            (llm-provider-utils-openai-arguments
-                                             (cdr (llm-function-arg-type arg)))
-                                          `((type . ,(cadr (llm-function-arg-type arg))))))))))))))
-                 args)))
-     (when required
-       `((required . ,required))))))
+  "Convert ARGS to the OpenAI function calling spec.
+ARGS is a list of llm argument plists.
+Each plist has the structure:
+  (:name STRING
+   :type STRING-OR-PLIST
+   :description STRING
+   :required BOOLEAN
+   :enum LIST-OF-STRINGS)
 
-;; The Open AI function calling spec follows the JSON schema spec.
-;; See https://json-schema.org/understanding-json-schema.
-(defun llm-provider-utils-openai-function-spec (call)
-  "Convert `llm-function-call' CALL to an Open AI function spec.
+:type can be either a simple string (e.g. \"string\")
+or a JSON Schema object plist (see `llm-provider-utils-json-schema')."
+  (let ((properties '())
+        (required-names '()))
+    (dolist (arg args)
+      (let* ((arg-name (plist-get arg :name))
+             (type-or-schema (let ((raw-type (plist-get arg :type)))
+                               (if (stringp raw-type)
+                                   (intern raw-type)
+                                 raw-type)))
+             (description (plist-get arg :description))
+             (required (plist-get arg :required))
+             (enum (plist-get arg :enum))
+
+             ;; Build the schema for this argument.
+             ;; If :type is itself a plist with :type inside it, we treat it
+             ;; as a JSON Schema object (via `llm-provider-utils-json-schema`).
+             ;; Otherwise we just create a simple schema with :type = string etc.
+             (schema
+              (cond
+                ((and (consp type-or-schema)
+                      (plist-get type-or-schema :type))
+                 ;; It's a JSON Schema plist
+                 (llm-provider-utils-json-schema type-or-schema))
+                (t
+                 ;; It's just a string type, or something simple
+                 (list :type type-or-schema)))))
+
+        ;; Add :description if present
+        (when description
+          (setq schema (plist-put schema :description description)))
+
+        ;; Add :enum if present
+        (when enum
+          ;; Vectors generally serialize nicely to JSON arrays, but a list is fine too.
+          (setq schema (plist-put schema :enum (apply #'vector enum))))
+
+        ;; Track required argument names if :required is t
+        (when required
+          (push (if (stringp arg-name)
+                    (intern arg-name)
+                  arg-name) required-names))
+
+        ;; Finally, put this schema into the :properties
+        (setq properties
+              (plist-put properties (intern (concat ":" arg-name)) schema))))
+    ;; Build the final spec
+    (let ((spec `(:type object :properties ,properties)))
+      (when required-names
+        (setq spec (plist-put spec :required (apply #'vector
+                                                    (nreverse required-names)))))
+      spec)))
+
+;; The Open AI tool spec follows the JSON schema spec.  See
+;; https://json-schema.org/understanding-json-schema.
+(cl-defmethod llm-provider-utils-openai-tool-spec ((tool llm-tool-function))
+  "Convert TOOL to an Open AI function spec.
 Open AI's function spec is a standard way to do this, and will be
 applicable to many endpoints.
 
 This returns a JSON object (a list that can be converted to JSON)."
-  `((type . function)
-    (function
-     .
-     ,(append
-       `((name . ,(llm-function-call-name call))
-         (description . ,(llm-function-call-description call)))
-       (when (llm-function-call-args call)
-         `((parameters
-            .
-            ,(llm-provider-utils-openai-arguments (llm-function-call-args call)))))))))
+  `(:type function
+          :function
+          (:name ,(llm-tool-function-name tool)
+                 :description ,(llm-tool-function-description tool)
+                 :parameters ,(llm-provider-utils-openai-arguments
+                               (llm-tool-function-args tool)))))
 
-(defun llm-provider-utils-append-to-prompt (prompt output &optional func-results role)
+(defun llm-provider-utils-append-to-prompt (prompt output &optional tool-uses role)
   "Append OUTPUT to PROMPT as an assistant interaction.
 
 OUTPUT can be a string or a structure in the case of function calls.
 
-FUNC-RESULTS is a list of function results resulting from the LLM
-output, if any.
+TOOL-USES is a list of results from the LLM output, if any.
 
 ROLE will be `assistant' by default, but can be passed in for other roles."
   (setf (llm-chat-prompt-interactions prompt)
         (append (llm-chat-prompt-interactions prompt)
                 (list (make-llm-chat-prompt-interaction
                        :role (or role
-                                 (if func-results 'function 'assistant))
+                                 (if tool-uses 'tool-uses 'assistant))
                        ;; If it is a structure, it will get converted to JSON,
                        ;; otherwise make sure it is a string.
-                       :content (if (listp output)
+                       :content (if (and (listp output)
+                                         (not tool-uses))
                                     output
                                   (format "%s" output))
-                       :function-call-results func-results)))))
+                       :tool-uses tool-uses)))))
 
-(cl-defstruct llm-provider-utils-function-call
-  "A struct to hold information about a function call.
+(cl-defstruct llm-provider-utils-tool-use
+  "A struct to hold information about a tool use.
 ID is a call ID, which is optional.
-NAME is the function name.
-ARG is an alist of arguments to values."
+NAME is the tool name.
+ARG is an alist of arguments to their values."
   id name args)
 
-(defun llm-provider-utils-process-result (provider prompt text funcalls)
+(defun llm-provider-utils-process-result (provider prompt text tool-uses success-callback)
   "Process the RESPONSE from the provider for PROMPT.
 This execute function calls if there are any, does any result
 appending to the prompt, and returns an appropriate response for
@@ -619,44 +639,44 @@ the client.
 
 PROVIDER is the struct that configures the use of the LLM.
 
-FUNCALLS is a list of function calls, if any.
+TOOL-USES is a list of tool uses in the result.
 
 TEXT is the text output from the provider, if any.  There should
-be either FUNCALLS or TEXT."
-  (if-let ((funcalls funcalls))
-      ;; If we have function calls, execute them and return the results, and
-      ;; it talso takes care of updating the prompt.
-      (let ((results-alist
-             (llm-provider-utils-execute-function-calls provider prompt funcalls)))
-        (llm-provider-utils-populate-function-results
-         provider prompt results-alist)
-        (mapcar #'cdr results-alist))
+be either FUNCALLS or TEXT.
+
+SUCCESS-CALLBACK is the callback that will be run when all functions
+complete."
+  (if tool-uses
+      ;; If we have tool uses, execute them, and on the callback, we will
+      ;; populate the results.
+      (llm-provider-utils-execute-tool-uses
+       provider prompt tool-uses success-callback)
     ;; We probably shouldn't be called if text is nil, but if we do,
     ;; we shouldn't add something invalid to the prompt.
     (when text
       (llm-provider-append-to-prompt provider prompt text))
     text))
 
-(defun llm-provider-utils-populate-function-results (provider prompt results-alist)
+(defun llm-provider-utils-populate-tool-uses (provider prompt results-alist)
   "Append the results in RESULTS-ALIST to the prompt.
 
 PROMPT is the prompt to populate into.
 
 RESULTS-ALIST is a list of cons of function
-calls (`llm-provider-utils-function-call' structs) and their
+calls (`llm-provider-utils-tool-use' structs) and their
 results.
 
 PROVIDER is the struct that configures the user of the LLM."
   (llm-provider-append-to-prompt
    provider prompt nil
-   (mapcar (lambda (c) (make-llm-chat-prompt-function-call-result
-                        :call-id (llm-provider-utils-function-call-id (car c))
-                        :function-name (llm-provider-utils-function-call-name (car c))
-                        :result (cddr c)))
+   (mapcar (lambda (c) (make-llm-chat-prompt-tool-use
+                        :call-id (llm-provider-utils-tool-use-id (car c))
+                        :tool-name (llm-provider-utils-tool-use-name (car c))
+                        :result (cdr c)))
            results-alist)))
 
-(defun llm-provider-utils-execute-function-calls (provider prompt funcalls)
-  "Execute FUNCALLS, a list of `llm-provider-utils-function-calls'.
+(defun llm-provider-utils-execute-tool-uses (provider prompt tool-uses success-callback)
+  "Execute TOOL-USES, a list of `llm-provider-utils-tool-use'.
 
 A response suitable for returning to the client will be returned.
 
@@ -666,35 +686,39 @@ PROMPT was the prompt given to the provider, which will get
 updated with the response from the LLM, and if there is a
 function call, the result.
 
-This returns the response suitable for output to the client; a
-cons of functions called and their output."
-  (llm-provider-populate-function-calls provider prompt funcalls)
+SUCCESS-CALLBACK is the callback that will be run when all functions
+have returned results."
+  (llm-provider-populate-tool-uses provider prompt tool-uses)
   (cl-loop
-   for func in funcalls collect
-   (cons
-    func
-    (let* ((name (llm-provider-utils-function-call-name func))
-           (arguments (llm-provider-utils-function-call-args func))
-           (function (seq-find
-                      (lambda (f) (equal name (llm-function-call-name f)))
-                      (llm-chat-prompt-functions prompt))))
-      (cons name
-            (let* ((args (cl-loop for arg in (llm-function-call-args function)
-                                  collect (cdr (seq-find (lambda (a)
-                                                           (eq (intern
-                                                                (llm-function-arg-name arg))
-                                                               (car a)))
-                                                         arguments))))
-                   (result (apply (llm-function-call-function function) args)))
-              (llm--log
-               'api-funcall
-               :provider provider
-               :msg (format "%s --> %s"
-                            (format "%S"
-                                    (cons (llm-function-call-name function)
-                                          args))
-                            (format "%s" result)))
-              result))))))
+        for tool-use in tool-uses do
+        (let* ((name (llm-provider-utils-tool-use-name tool-use))
+               (arguments (llm-provider-utils-tool-use-args tool-use))
+               (tool (seq-find
+                      (lambda (f) (equal name (llm-tool-function-name f)))
+                      (llm-chat-prompt-tools prompt)))
+               (tool-use-and-results nil)
+               (results nil)
+               (call-args (cl-loop for arg in (llm-tool-function-args tool)
+                                collect (cdr (seq-find (lambda (a)
+                                                         (eq (intern (plist-get arg :name))
+                                                             (car a)))
+                                                       arguments)))))
+          (apply (llm-tool-function-function tool)
+                 (append
+                  (list (lambda (result)
+                          (llm--log
+                           'api-funcall
+                           :provider provider
+                           :msg (format "%s --> %s"
+                                        (format "%S" (cons name call-args))
+                                        (format "%s" result)))
+                          (push (cons name result) results)
+                          (push (cons tool-use result) tool-use-and-results)
+                          (when (= (length results) (length tool-uses))
+                            (llm-provider-utils-populate-tool-uses
+                             provider prompt tool-use-and-results)
+                            (funcall success-callback results))))
+                  call-args)))))
 
 
 ;; This is a useful method for getting out of the request buffer when it's time

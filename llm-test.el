@@ -77,12 +77,97 @@
                   :interactions (list (make-llm-chat-prompt-interaction
                                        :role 'user :content "a"))))))
 
+(defun llm-test-normalize (json-obj)
+  "Normalize JSON-OBJ for comparison."
+  (cond ((plistp json-obj)
+         (mapcan (lambda (x) (list (car x) (llm-test-normalize (cadr x))))
+                 (sort (seq-partition json-obj 2)
+                       (lambda (a b)
+                         (string< (symbol-name (car a))
+                                  (symbol-name (car b)))))))
+        ((vectorp json-obj)
+         (vconcat (mapcar #'llm-test-normalize json-obj)))
+        (t json-obj)))
+
+(defconst llm-test-chat-requests-to-responses
+  `((:name "Simple request"
+           :prompt ,(llm-make-chat-prompt "Hello world")
+           :openai-stream (:model "model"
+                                  :messages [(:role user :content "Hello world")]
+                                  :stream t))
+    (:name "Request with temperature"
+           :prompt ,(llm-make-chat-prompt "Hello world" :temperature 0.5)
+           :openai-stream (:model "model"
+                                  :messages [(:role user :content "Hello world")]
+                                  :stream t
+                                  :temperature 1.0))
+    (:name "Request with context and examples"
+           :prompt ,(llm-make-chat-prompt "Hello world"
+                                          :context "context"
+                                          :examples (list (cons "input1" "output1")
+                                                          (cons "input2" "output2")))
+           :openai-stream (:model "model"
+                                  :messages [(:role system :content "context\nExamples of how you should respond follow.\nUser: input1\nAssistant: output1\nUser: input2\nAssistant: output2")
+                                             (:role user :content "Hello world")]
+                                  :stream t))
+    (:name "Request with conversation"
+           :prompt ,(llm-make-chat-prompt '("Hello world" "Hello human" "I am user!"))
+           :openai-stream (:model "model"
+                                  :messages [(:role user :content "Hello world")
+                                             (:role assistant :content "Hello human")
+                                             (:role user :content "I am user!")]
+                                  :stream t))
+    (:name "Request with image"
+           :prompt ,(llm-make-chat-prompt
+                     (make-llm-multipart
+                      :parts (list "What is this?"
+                                   (make-llm-media :mime-type "image/png"
+                                                   :data (base64-encode-string "image data")))))
+           :openai-stream (:model "model"
+                                  :messages [(:role user :content [(:type "text" :text "What is this?")
+                                                                   (:type "image_url" :image_url (:url "data:image/png;base64,YVcxaFoyVWdaR0YwWVE9PQ=="))])]
+                                  :stream t))
+    (:name "Request with tools"
+           :prompt ,(llm-make-chat-prompt
+                     "Hello world"
+                     :tools (list (make-llm-tool-function
+                                   :name "func"
+                                   :description "desc"
+                                   :args '((:name "arg1" :description "desc1" :type "string" :required t)
+                                           (:name "arg2" :description "desc2" :type "integer")))))
+           :openai-stream
+           (:model "model"
+                   :messages [(:role user :content "Hello world")]
+                   :tools [(:type function
+                                  :function
+                                  (:name "func"
+                                         :description "desc"
+                                         :parameters
+                                         (:type object
+                                                :properties
+                                                (:arg1 (:description "desc1" :type string)
+                                                       :arg2 (:description "desc2" :type integer))
+                                                :required [arg1])))]
+                   :stream t)))
+  "A list of tests for `llm-provider-chat-request'.")
+
+(ert-deftest llm-test-requests ()
+  (let ((openai-model (make-llm-openai :chat-model "model")))
+    (dolist (test llm-test-chat-requests-to-responses)
+      (ert-info ((format "Testing %s" (plist-get test :name)))
+        (when-let* ((expected-stream (plist-get test :openai-stream)))
+          (should (equal (llm-test-normalize expected-stream)
+                         (llm-test-normalize (llm-provider-chat-request
+                                              openai-model
+                                              (plist-get test :prompt)
+                                              t)))))))))
+
 (ert-deftest llm-test-chat-token-limit-openai ()
   (cl-flet* ((token-limit-for (model)
-               (llm-chat-token-limit (make-llm-openai :chat-model model)))
+                              (llm-chat-token-limit (make-llm-openai :chat-model model)))
              (should-have-token-limit (model limit)
-               (ert-info ((format "Testing %s" model))
-                 (should (equal limit (token-limit-for model))))))
+                                      (ert-info ((format "Testing %s" model))
+                                        (should (equal limit (token-limit-for model))))))
     ;; From https://platform.openai.com/docs/models/gpt-3-5
     (should-have-token-limit "gpt-3.5-turbo" 16385)
     (should-have-token-limit "gpt-3.5-turbo-instruct" 4096)

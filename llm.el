@@ -1,4 +1,4 @@
-;;; llm.el --- Interface to pluggable llm backends -*- lexical-binding: t; byte-compile-docstring-max-column: 200 -*-
+;; llm.el --- Interface to pluggable llm backends -*- lexical-binding: t; byte-compile-docstring-max-column: 200 -*-
 
 ;; Copyright (c) 2023, 2024  Free Software Foundation, Inc.
 
@@ -71,66 +71,54 @@ See %s for the details on the restrictions on use." name tos)))
   "This stores all the information needed for a structured chat prompt.
 
 Use of this directly is deprecated, instead use `llm-make-chat-prompt'."
-  context examples interactions functions temperature max-tokens response-format non-standard-params)
+  context examples interactions tools temperature max-tokens response-format non-standard-params)
 
 (cl-defstruct llm-chat-prompt-interaction
   "This defines a single interaction given as part of a chat prompt.
-ROLE can a symbol, of either `user', `assistant', or `function'.
+ROLE can a symbol, of either `user', `assistant', or `tool-use'.
 
-CONTENT is the content of the interaction.  It should be either a
+CONTENT is the content of the interaction.  It should be either
 string, an `llm-multipart' object or a list of function calls.
 
-FUNCTION-CALL-RESULTS is a list of structs of type
-`llm-chat-prompt-function-call-results', which is only populated
-if `role' is `function'.  It stores the results of the function
+TOOL-USES is a list of structs of type
+`llm-chat-prompt-tool-use', which is only populated
+if `role' is `tool-use'.  It stores the results of the function
 calls."
-  role content function-call-results)
+  role content tool-uses)
 
-(cl-defstruct llm-chat-prompt-function-call-result
-  "This defines the result from a function call.
+(cl-defstruct llm-chat-prompt-tool-use
+  "This defines the result from a tool use.
 
 CALL-ID is an ID for this function call, if available.
 
-FUNCTION-NAME is the name of the function.  This is required.
+TOOL-NAME is the name of the tool.  This is required.
 
-RESULT is the result of the function call.  This is required."
-  call-id function-name result)
+RESULT is the result of the tool use.  This is required."
+  call-id tool-name result)
 
-(cl-defstruct llm-function-call
-  "This is a struct to represent a function call the LLM can make.
+(cl-defstruct llm-tool-function
+  "This is a struct to represent a single function tool available to the
+LLM.
 
 All fields are required.
 
-FUNCTION is a function to call.
+FUNCTION is a function to call.  The first argument for FUNCTION should
+take a callback that should be called back with the result.  The other
+arguments correspond to the arguments defined in the tool.
 
 NAME is a human readable name of the function.
 
 DESCRIPTION is a human readable description of the function.
 
-ARGS is a list of `llm-function-arg' structs."
+ARGS is a list of plists, each plist having the keys `:name', `:type',
+`:description', and `:required'.  `:type' is a string, and the same set
+of types as in `RESPONSE-FORMAT' arg in `llm-make-chat-prompt':
+`string', `integer', `boolean', `float', or `array'.  There can be an
+`:enum' field as well, with a vector of possible values."
   function
   name
   description
   args)
-
-(cl-defstruct llm-function-arg
-  "An argument to an `llm-function-call'.
-
-NAME is the name of the argument.
-
-DESCRIPTION is a human readable description of the argument.  It
-can be nil for enums.
-
-TYPE is the type of the argument.  It can be one of `string',
-`integer', `float', `boolean' or the special lists, `(or <type1>
-<type2> ... <typen>)', `(enum <string1> <string2> ...
-<stringn>)', or `(list <type>)'.
-
-REQUIRED is whether this is required or not."
-  name
-  description
-  type
-  required)
 
 (cl-defstruct llm-media
   "Contains media that can be sent as part of an interaction.
@@ -229,9 +217,9 @@ This is deprecated, and you should use `llm-make-chat-prompt'
 instead."
   (llm-make-chat-prompt text))
 
-(cl-defun llm-make-chat-prompt (content &key context examples functions
-                                        temperature max-tokens response-format
-                                        non-standard-params)
+(cl-defun llm-make-chat-prompt (content &key context examples tools
+                                          temperature max-tokens response-format
+                                          non-standard-params)
   "Create a `llm-chat-prompt' with CONTENT sent to the LLM provider.
 
 This is the most correct and easy way to create an
@@ -263,7 +251,7 @@ to the chat as a whole.  This is optional.
 EXAMPLES is a list of conses, where the car is an example
 inputs, and cdr is the corresponding example outputs.  This is optional.
 
-FUNCTIONS is a list of `llm-function-call' structs.  These may be
+TOOLS is a list of `llm-tool-use' structs.  These may be
 called IF the LLM supports them.  If the LLM does not support
 them, a `not-implemented' signal will be thrown.  This is
 optional.  When this is given, the LLM will either call the
@@ -313,7 +301,7 @@ cdrs can be strings or numbers.  This is optional."
                                      :role (if (zerop (mod i 2)) 'user 'assistant)
                                      :content s))
                                   (if (listp content) content (list content)))
-   :functions functions
+   :tools tools
    :temperature temperature
    :max-tokens max-tokens
    :response-format response-format
@@ -547,7 +535,7 @@ won't have any partial responses, so basically just operates like
 
 `embeddings-batch': the LLM can return many vector embeddings at the same time.
 
-`function-calls': the LLM can call functions.i
+`tool-uses': the LLM can call functions.i
 
 `image-input': the LLM can accept images as input.
 
