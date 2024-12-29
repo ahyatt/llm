@@ -75,18 +75,18 @@ Use of this directly is deprecated, instead use `llm-make-chat-prompt'."
 
 (cl-defstruct llm-chat-prompt-interaction
   "This defines a single interaction given as part of a chat prompt.
-ROLE can a symbol, of either `user', `assistant', or `tool-use'.
+ROLE can a symbol, of either `user', `assistant', or `tool-results'.
 
 CONTENT is the content of the interaction.  It should be either
 string, an `llm-multipart' object or a list of function calls.
 
-TOOL-USES is a list of structs of type
-`llm-chat-prompt-tool-use', which is only populated
-if `role' is `tool-use'.  It stores the results of the function
+TOOL-RESULTS is a list of structs of type
+`llm-chat-prompt-tool-result', which is only populated
+if `role' is `tool-results'.  It stores the results of the function
 calls."
-  role content tool-uses)
+  role content tool-results)
 
-(cl-defstruct llm-chat-prompt-tool-use
+(cl-defstruct llm-chat-prompt-tool-result
   "This defines the result from a tool use.
 
 CALL-ID is an ID for this function call, if available.

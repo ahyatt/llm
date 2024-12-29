@@ -170,9 +170,9 @@ PROMPT is the prompt that was already sent to the provider.
 FUNC-RESULTS is a list of function results, if any.")
 
 (cl-defmethod llm-provider-append-to-prompt ((_ llm-standard-chat-provider) prompt result
-                                             &optional func-results)
+                                             &optional tool-results)
   ;; By default, we just append to the prompt.
-  (llm-provider-utils-append-to-prompt prompt result func-results))
+  (llm-provider-utils-append-to-prompt prompt result tool-results))
 
 (cl-defgeneric llm-provider-streaming-media-handler (provider msg-receiver fc-receiver err-receiver)
   "Define how to handle streaming media for the PROVIDER.
@@ -198,7 +198,7 @@ ERR-RECEIVER with the error message.")
 If there are no tool uses, return nil.  If there are tool uses, return a
 list of `llm-provider-utils-tool-use'.")
 
-(cl-defmethod llm-provider-extract-tool-usetool-calls ((_ llm-standard-chat-provider) _)
+(cl-defmethod llm-provider-extract-tool-uses ((_ llm-standard-chat-provider) _)
   "By default, the standard provider has no function call extractor."
   nil)
 
@@ -327,13 +327,13 @@ return a list of `llm-chat-prompt-tool-use' structs.")
                        (llm-provider-utils-callback-in-buffer
                         buf error-callback 'error
                         err-msg)
-                     (llm-provider-utils-callback-in-buffer
-                      buf success-callback
-                      (llm-provider-utils-process-result
-                       provider prompt
-                       (llm-provider-chat-extract-result provider data)
-                       (llm-provider-extract-tool-uses provider data)
-                       success-callback))))
+                     (llm-provider-utils-process-result
+                      provider prompt
+                      (llm-provider-chat-extract-result provider data)
+                      (llm-provider-extract-tool-uses provider data)
+                      (lambda (result)
+                        (llm-provider-utils-callback-in-buffer
+                         buf success-callback result)))))
      :on-error (lambda (_ data)
                  (llm-provider-utils-callback-in-buffer
                   buf error-callback 'error
@@ -370,15 +370,15 @@ return a list of `llm-chat-prompt-tool-use' structs.")
      :on-success
      (lambda (_)
        ;; We don't need the data at the end of streaming, so we can ignore it.
-       (llm-provider-utils-callback-in-buffer
-        buf response-callback
-        (llm-provider-utils-process-result
-         provider prompt
-         current-text
-         (when fc
-           (llm-provider-collect-streaming-function-data
-            provider (nreverse fc)))
-         response-callback)))
+       (llm-provider-utils-process-result
+        provider prompt
+        current-text
+        (when fc
+          (llm-provider-collect-streaming-function-data
+           provider (nreverse fc)))
+        (lambda (result)
+          (llm-provider-utils-callback-in-buffer
+           buf response-callback result))))
      :on-error (lambda (_ data)
                  (llm-provider-utils-callback-in-buffer
                   buf error-callback 'error
@@ -603,7 +603,7 @@ This returns a JSON object (a list that can be converted to JSON)."
                  :parameters ,(llm-provider-utils-openai-arguments
                                (llm-tool-function-args tool)))))
 
-(defun llm-provider-utils-append-to-prompt (prompt output &optional tool-uses role)
+(defun llm-provider-utils-append-to-prompt (prompt output &optional tool-results role)
   "Append OUTPUT to PROMPT as an assistant interaction.
 
 OUTPUT can be a string or a structure in the case of function calls.
@@ -615,14 +615,16 @@ ROLE will be `assistant' by default, but can be passed in for other roles."
         (append (llm-chat-prompt-interactions prompt)
                 (list (make-llm-chat-prompt-interaction
                        :role (or role
-                                 (if tool-uses 'tool-uses 'assistant))
+                                 (if tool-results 'tool-results 'assistant))
                        ;; If it is a structure, it will get converted to JSON,
-                       ;; otherwise make sure it is a string.
-                       :content (if (and (listp output)
-                                         (not tool-uses))
+                       ;; otherwise make sure it is a string.  For tool uses, we
+                       ;; want it to be nil.
+                       :content (if (or (not output)
+                                        (and (listp output)
+                                             (not tool-results)))
                                     output
                                   (format "%s" output))
-                       :tool-uses tool-uses)))))
+                       :tool-results tool-results)))))
 
 (cl-defstruct llm-provider-utils-tool-use
   "A struct to hold information about a tool use.
@@ -648,14 +650,15 @@ SUCCESS-CALLBACK is the callback that will be run when all functions
 complete."
   (if tool-uses
       ;; If we have tool uses, execute them, and on the callback, we will
-      ;; populate the results.
+      ;; populate the results.  We don't execute the callback here because it
+      ;; will be done inside `llm-provider-utils-execute-tool-uses'.
       (llm-provider-utils-execute-tool-uses
        provider prompt tool-uses success-callback)
     ;; We probably shouldn't be called if text is nil, but if we do,
     ;; we shouldn't add something invalid to the prompt.
     (when text
       (llm-provider-append-to-prompt provider prompt text))
-    text))
+    (funcall success-callback text)))
 
 (defun llm-provider-utils-populate-tool-uses (provider prompt results-alist)
   "Append the results in RESULTS-ALIST to the prompt.
@@ -669,7 +672,7 @@ results.
 PROVIDER is the struct that configures the user of the LLM."
   (llm-provider-append-to-prompt
    provider prompt nil
-   (mapcar (lambda (c) (make-llm-chat-prompt-tool-use
+   (mapcar (lambda (c) (make-llm-chat-prompt-tool-result
                         :call-id (llm-provider-utils-tool-use-id (car c))
                         :tool-name (llm-provider-utils-tool-use-name (car c))
                         :result (cdr c)))

@@ -196,6 +196,35 @@ PROVIDER is the Open AI provider struct."
     (list :tools (vconcat (mapcar #'llm-provider-utils-openai-tool-spec
                                   (llm-chat-prompt-tools prompt))))))
 
+(defun llm-openai--build-tool-interaction (interaction)
+  "Build the tool interaction for INTERACTION."
+  (mapcar
+   (lambda (tool-result)
+     (let ((msg-plist
+            (list
+             :role 'tool
+             :name (llm-chat-prompt-tool-result-tool-name tool-result)
+             :content (format "Result of tool call is %s" (llm-chat-prompt-tool-result-result tool-result)))))
+       (when (llm-chat-prompt-tool-result-call-id tool-result)
+         (setq msg-plist
+               (plist-put msg-plist :tool_call_id
+                          (llm-chat-prompt-tool-result-call-id tool-result))))
+       msg-plist))
+   (llm-chat-prompt-interaction-tool-results interaction)))
+
+(defun llm-openai--build-tool-uses (fcs)
+  "Convert back from the generic representation to the Open AI.
+FCS is a list of `llm-provider-utils-tool-use' structs."
+  (vconcat
+   (mapcar (lambda (fc)
+             `(:id ,(llm-provider-utils-tool-use-id fc)
+                   :type "function"
+                   :function
+                   (:name ,(llm-provider-utils-tool-use-name fc)
+                          :arguments ,(json-encode
+                                       (llm-provider-utils-tool-use-args fc)))))
+           fcs)))
+
 (defun llm-openai--build-messages (prompt)
   "Build the :messages field based on interactions in PROMPT."
   (let ((interactions (llm-chat-prompt-interactions prompt)))
@@ -204,48 +233,38 @@ PROVIDER is the Open AI provider struct."
      (vconcat
       (mapcan
        (lambda (interaction)
-         (if (llm-chat-prompt-interaction-tool-uses interaction)
-             ;; Handle tool interactions
-             (mapcar
-              (lambda (tool-call)
-                (let ((msg-plist
-                       (list
-                        :role "tool"
-                        :name (llm-chat-prompt-tool-use-tool-name tool-call)
-                        :content (llm-chat-prompt-tool-use-result tool-call))))
-                  (when (llm-chat-prompt-tool-use-call-id tool-call)
-                    (setq msg-plist
-                          (plist-put msg-plist :tool_call_id
-                                     (llm-chat-prompt-tool-use-call-id tool-call))))
-                  msg-plist))
-              (llm-chat-prompt-interaction-tool-use interaction))
+         (if (llm-chat-prompt-interaction-tool-results interaction)
+             (llm-openai--build-tool-interaction interaction)
            ;; Handle regular interactions
            (list
             (let ((msg-plist
                    (list :role (llm-chat-prompt-interaction-role interaction))))
               (when-let ((content (llm-chat-prompt-interaction-content interaction)))
-                (setq msg-plist
-                      (plist-put msg-plist :content
-                                 (cond
-                                   ((listp content)
-                                    (llm-openai-tool-calls-to-response content))
-                                   ((llm-multipart-p content)
-                                    (vconcat
-                                     (mapcar
-                                      (lambda (part)
-                                        (if (llm-media-p part)
-                                            (list :type "image_url"
-                                                  :image_url
-                                                  (list :url
-                                                        (concat
-                                                         "data:"
-                                                         (llm-media-mime-type part)
-                                                         ";base64,"
-                                                         (base64-encode-string
-                                                          (llm-media-data part)))))
-                                          (list :type "text" :text part)))
-                                      (llm-multipart-parts content))))
-                                   (t content)))))
+                (if (and (consp content)
+                         (llm-provider-utils-tool-use-p (car content)))
+                    (setq msg-plist
+                          (plist-put msg-plist :tool_calls
+                                     (llm-openai--build-tool-uses content)))
+                  (setq msg-plist
+                        (plist-put msg-plist :content
+                                   (cond
+                                     ((llm-multipart-p content)
+                                      (vconcat
+                                       (mapcar
+                                        (lambda (part)
+                                          (if (llm-media-p part)
+                                              (list :type "image_url"
+                                                    :image_url
+                                                    (list :url
+                                                          (concat
+                                                           "data:"
+                                                           (llm-media-mime-type part)
+                                                           ";base64,"
+                                                           (base64-encode-string
+                                                            (llm-media-data part)))))
+                                            (list :type "text" :text part)))
+                                        (llm-multipart-parts content))))
+                                     (t content))))))
               msg-plist))))
        interactions)))))
 
@@ -301,21 +320,8 @@ STREAMING if non-nil, turn on response streaming."
                          (assoc-default 'message
                                         (aref (assoc-default 'choices response) 0)))))
 
-(defun llm-openai-tool-calls-to-response (fcs)
-  "Convert back from the generic representation to the Open AI.
-FCS is a list of `llm-provider-utils-tool-use' structs."
-  `(("tool_calls" .
-                  ,(mapcar (lambda (fc)
-                             `(("id" . ,(llm-provider-utils-tool-use-id fc))
-                               ("type" . "function")
-                               ("function" .
-                                           (("arguments" . ,(json-encode
-                                                             (llm-provider-utils-tool-use-args fc)))
-                                            ("name" . ,(llm-provider-utils-tool-use-name fc))))))
-                           fcs))))
-
 (cl-defmethod llm-provider-populate-tool-uses ((_ llm-openai) prompt tool-uses)
-  (llm-provider-utils-append-to-prompt prompt tool-uses))
+  (llm-provider-utils-append-to-prompt prompt tool-uses nil 'assistant))
 
 (defun llm-openai--get-partial-chat-response (response)
   "Return the text in the partial chat response from RESPONSE.
