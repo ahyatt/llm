@@ -142,35 +142,27 @@ PROVIDER is the llm-ollama provider."
       (push `(:role system
                     :content ,(llm-provider-utils-get-system-prompt prompt llm-ollama-example-prelude))
             messages))
-    (push messages request-plist)
-    (push :messages request-plist)
-    (push (llm-ollama-chat-model provider) request-plist)
-    (push :model request-plist)
+    (plist-put request-plist :messages messages)
+    (plist-put request-plist :model (llm-ollama-chat-model provider))
     (when (and streaming (llm-chat-prompt-functions prompt))
       (signal 'not-implemented
               "Ollama does not support streaming with function calls"))
     (when (llm-chat-prompt-tools prompt)
-      (push (vconcat (mapcar #'llm-provider-utils-openai-tool-spec
-                             (llm-chat-prompt-tools prompt)))
-            request-plist)
-      (push :tools request-plist))
+      (plist-put request-plist :tools
+                 (mapcar #'llm-provider-utils-openai-tool-spec
+                         (llm-chat-prompt-tools prompt))))
     (when (llm-chat-prompt-response-format prompt)
-      (push (llm-ollama--response-format
-             (llm-chat-prompt-response-format prompt))
-            request-plist)
-      (push :format request-plist))
-    (push (if streaming t :json-false) request-plist)
-    (push :stream request-plist)
+      (plist-put request-plist :format
+                 (llm-ollama--response-format
+                  (llm-chat-prompt-response-format prompt))))
+    (plist-put request-plist :stream (if streaming t :json-false))
     (when (llm-chat-prompt-temperature prompt)
-      (push (llm-chat-prompt-temperature prompt) options)
-      (push :temperature options))
+      (plist-put request-plist :temperature (llm-chat-prompt-temperature prompt)))
     (when (llm-chat-prompt-max-tokens prompt)
-      (push (llm-chat-prompt-max-tokens prompt) options)
-      (push :num_predict options))
+      (plist-put request-plist :num_predict (llm-chat-prompt-max-tokens prompt)))
     (setq options (append options (llm-provider-utils-non-standard-params-plist prompt)))
     (when options
-      (push options request-plist)
-      (push :options request-plist))
+      (plist-put request-plist :options options))
     request-plist))
 
 (cl-defmethod llm-provider-extract-tool-uses ((_ llm-ollama) response)
