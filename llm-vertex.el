@@ -241,9 +241,7 @@ the key must be regenerated every hour."
   "From PROMPT, create the parameters section.
 Return value is a cons for adding to an alist, unless there is
 nothing to add, in which case it is nil."
-  (let ((params-plist (mapcan (lambda (pcons) (list (llm-provider-encolon (car pcons))
-                                                    (cdr pcons)))
-                              (llm-chat-prompt-non-standard-params prompt))))
+  (let ((params-plist (llm-provider-utils-non-standard-params-plist prompt)))
     (when (llm-chat-prompt-temperature prompt)
       (push (* (llm-chat-prompt-temperature prompt) 2.0) params-plist)
       (push :temperature params-plist))

@@ -115,70 +115,80 @@ PROVIDER is the llm-ollama provider."
     (llm-provider-utils-json-schema format)))
 
 (cl-defmethod llm-provider-chat-request ((provider llm-ollama) prompt streaming)
-  (let (request-alist messages options)
+  (let (request-plist messages options)
     (setq messages
-          (mapcar (lambda (interaction)
-                    (let* ((role (llm-chat-prompt-interaction-role interaction))
-                           (content (llm-chat-prompt-interaction-content interaction))
-                           (content-text "")
-                           (images nil))
-                      (if (stringp content)
-                          (setq content-text content)
-                        (if (eq 'user role)
-                            (dolist (part (llm-multipart-parts content))
-                              (if (llm-media-p part)
-                                  (setq images (append images (list part)))
-                                (setq content-text (concat content-text part))))
-                          (setq content-text (json-encode content))))
-                      (append
-                       `(("role" . ,(symbol-name role)))
-                       `(("content" . ,content-text))
-                       (when images
-                         `(("images" .
-                            ,(mapcar (lambda (img) (base64-encode-string (llm-media-data img) t))
-                                     images)))))))
-                  (llm-chat-prompt-interactions prompt)))
-    (when (llm-chat-prompt-context prompt)
-      (push `(("role" . "system")
-              ("content" . ,(llm-provider-utils-get-system-prompt prompt llm-ollama-example-prelude)))
+          (vconcat (mapcar (lambda (interaction)
+                             (let* ((role (llm-chat-prompt-interaction-role interaction))
+                                    (content (llm-chat-prompt-interaction-content interaction))
+                                    (content-text "")
+                                    (images nil))
+                               (if (stringp content)
+                                   (setq content-text content)
+                                 (if (eq 'user role)
+                                     (dolist (part (llm-multipart-parts content))
+                                       (if (llm-media-p part)
+                                           (setq images (append images (list part)))
+                                         (setq content-text (concat content-text part))))
+                                   (setq content-text (json-encode content))))
+                               (append
+                                `(:role ,(llm-provider-utils--safe-intern role)
+                                        :content ,content-text)
+                                (when images
+                                  `(:images
+                                    ,(vconcat (mapcar (lambda (img) (base64-encode-string (llm-media-data img) t))
+                                                      images)))))))
+                           (llm-chat-prompt-interactions prompt))))
+    (when (or (llm-chat-prompt-context prompt) (llm-chat-prompt-examples prompt))
+      (push `(:role system
+                    :content ,(llm-provider-utils-get-system-prompt prompt llm-ollama-example-prelude))
             messages))
-    (push `("messages" . ,messages) request-alist)
-    (push `("model" . ,(llm-ollama-chat-model provider)) request-alist)
+    (push messages request-plist)
+    (push :messages request-plist)
+    (push (llm-ollama-chat-model provider) request-plist)
+    (push :model request-plist)
     (when (and streaming (llm-chat-prompt-functions prompt))
       (signal 'not-implemented
               "Ollama does not support streaming with function calls"))
-    (when (llm-chat-prompt-functions prompt)
-      (push `("tools" . ,(mapcar #'llm-provider-utils-openai-function-spec
-                                 (llm-chat-prompt-functions prompt))) request-alist))
+    (when (llm-chat-prompt-tools prompt)
+      (push (vconcat (mapcar #'llm-provider-utils-openai-tool-spec
+                             (llm-chat-prompt-tools prompt)))
+            request-plist)
+      (push :tools request-plist))
     (when (llm-chat-prompt-response-format prompt)
-      (push `("format" . ,(llm-ollama--response-format
-                           (llm-chat-prompt-response-format prompt)))
-            request-alist))
-    (push `("stream" . ,(if streaming t :json-false)) request-alist)
+      (push (llm-ollama--response-format
+             (llm-chat-prompt-response-format prompt))
+            request-plist)
+      (push :format request-plist))
+    (push (if streaming t :json-false) request-plist)
+    (push :stream request-plist)
     (when (llm-chat-prompt-temperature prompt)
-      (push `("temperature" . ,(llm-chat-prompt-temperature prompt)) options))
+      (push (llm-chat-prompt-temperature prompt) options)
+      (push :temperature options))
     (when (llm-chat-prompt-max-tokens prompt)
-      (push `("num_predict" . ,(llm-chat-prompt-max-tokens prompt)) options))
-    (setq options (append options (llm-chat-prompt-non-standard-params prompt)))
-    (when options (push `("options" . ,options) request-alist))
-    request-alist))
+      (push (llm-chat-prompt-max-tokens prompt) options)
+      (push :num_predict options))
+    (setq options (append options (llm-provider-utils-non-standard-params-plist prompt)))
+    (when options
+      (push options request-plist)
+      (push :options request-plist))
+    request-plist))
 
-(cl-defmethod llm-provider-extract-function-calls ((_ llm-ollama) response)
+(cl-defmethod llm-provider-extract-tool-uses ((_ llm-ollama) response)
   (mapcar (lambda (call)
             (let ((function (cdar call)))
-              (make-llm-provider-utils-function-call
+              (make-llm-provider-utils-tool-use
                :name (assoc-default 'name function)
                :args (assoc-default 'arguments function))))
           (assoc-default 'tool_calls (assoc-default 'message response))))
 
-(cl-defmethod llm-provider-populate-function-calls ((_ llm-ollama) prompt calls)
+(cl-defmethod llm-provider-populate-tool-uses ((_ llm-ollama) prompt tool-uses)
   (llm-provider-utils-append-to-prompt
    prompt
-   (mapcar (lambda (call)
-             `((function (name . ,(llm-provider-utils-function-call-name call))
-                         (arguments . ,(json-encode
-                                        (llm-provider-utils-function-call-args call))))))
-           calls)))
+   (mapcar (lambda (tool-use)
+             `(:function (:name ,(llm-provider-utils-tool-use-name tool-use)
+                                :arguments (json-encode
+                                            (llm-provider-utils-tool-use-args call)))))
+           tool-uses)))
 
 (cl-defmethod llm-provider-streaming-media-handler ((_ llm-ollama) msg-receiver _ _)
   (cons 'application/x-ndjson

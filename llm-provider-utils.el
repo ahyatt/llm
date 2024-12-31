@@ -162,15 +162,15 @@ STREAMING is true if this is a streaming request.")
 (cl-defgeneric llm-provider-chat-extract-result (provider response)
   "Return the result from RESPONSE for the PROVIDER.")
 
-(cl-defgeneric llm-provider-append-to-prompt (provider prompt result func-results)
+(cl-defgeneric llm-provider-append-to-prompt (provider prompt result &optional tool-results)
   "Append RESULT to PROMPT for the PROVIDER.
 
 PROMPT is the prompt that was already sent to the provider.
 
-FUNC-RESULTS is a list of function results, if any.")
+TOOL-RESULTS is a list of function results, if any.")
 
-(cl-defmethod llm-provider-append-to-prompt ((_ llm-standard-chat-provider) prompt result
-                                             &optional tool-results)
+(cl-defmethod llm-provider-append-to-prompt ((_ llm-standard-chat-provider) prompt
+                                             result &optional tool-results)
   ;; By default, we just append to the prompt.
   (llm-provider-utils-append-to-prompt prompt result tool-results))
 
@@ -207,16 +207,16 @@ list of `llm-provider-utils-tool-use'.")
 This is the recording before the function calls were executed, in the prompt.
 CALLS are a list of `llm-provider-utils-tool-use'.")
 
-(cl-defgeneric llm-provider-collect-streaming-function-data (provider data)
-  "Transform a list of streaming function call DATA responses.
+(cl-defgeneric llm-provider-collect-streaming-tool-uses (provider data)
+  "Transform a list of streaming tool uses DATA responses.
 
 PROVIDER is the struct specifying the LLM provider and its configuration.
 
-The DATA responses are a list of whatever is sent to the function
-call handler in `llm-provider-streaming-media-handler'.  This should
+The DATA responses are a list of whatever is sent to the tool
+use handler in `llm-provider-streaming-media-handler'.  This should
 return a list of `llm-chat-prompt-tool-use' structs.")
 
-(cl-defmethod llm-provider-collect-streaming-function-data ((_ llm-standard-chat-provider) _)
+(cl-defmethod llm-provider-collect-streaming-tool-uses ((_ llm-standard-chat-provider) _)
   ;; by default, there is no function calling
   nil)
 
@@ -374,7 +374,7 @@ return a list of `llm-chat-prompt-tool-use' structs.")
         provider prompt
         current-text
         (when fc
-          (llm-provider-collect-streaming-function-data
+          (llm-provider-collect-streaming-tool-uses
            provider (nreverse fc)))
         (lambda (result)
           (llm-provider-utils-callback-in-buffer
@@ -488,16 +488,26 @@ If MODEL cannot be found, warn and return DEFAULT, which by default is 4096."
       (warn "No model predefined for model %s, using restrictive defaults" model)
       (or default 4096))))
 
-(defun llm-provider-encolon (s)
+(defun llm-provider-utils--encolon (s)
   "Turn S into a symbol preceded by a colon."
   (intern (format ":%s" s)))
 
-(defun llm-provider--decolon (sym)
+(defun llm-provider-utils-non-standard-params-plist (prompt)
+  "Return non-standard-paramters from PROMPT as a plist."
+  (mapcan (lambda (pcons) (list (llm-provider-utils--encolon (car pcons))
+                                (cdr pcons)))
+          (llm-chat-prompt-non-standard-params prompt)))
+
+(defun llm-provider-utils--decolon (sym)
   "Remove a colon from the beginnging of SYM."
   (let ((s (symbol-name sym)))
     (if (string-prefix-p ":" s)
         (intern (substring s 1))
       sym)))
+
+(defun llm-provider-utils--safe-intern (s)
+  "Intern S, but if it already a symbol, return it."
+  (if (symbolp s) s (intern s)))
 
 (defun llm-provider-utils-json-schema (spec)
   "Return a JSON schema object from SPEC.
@@ -513,7 +523,7 @@ An example is `(:type object
          (setq schema
                (push (cons 'properties
                            (mapcar (lambda (pair)
-                                     (cons (llm-provider--decolon (car pair))
+                                     (cons (llm-provider-utils--decolon (car pair))
                                            (llm-provider-utils-json-schema (cadr pair))))
                                    (seq-partition properties 2)))
                      schema))
@@ -615,7 +625,7 @@ This returns a JSON object (a list that can be converted to JSON)."
 
 OUTPUT can be a string or a structure in the case of function calls.
 
-TOOL-USES is a list of results from the LLM output, if any.
+TOOL-RESULTS is a list of results from the LLM output, if any.
 
 ROLE will be `assistant' by default, but can be passed in for other roles."
   (setf (llm-chat-prompt-interactions prompt)
@@ -706,8 +716,8 @@ have returned results."
                (tool (seq-find
                       (lambda (f) (equal name (llm-tool-function-name f)))
                       (llm-chat-prompt-tools prompt)))
-               (tool-use-and-results nil)
                (results nil)
+               (tool-use-and-results nil)
                (call-args (cl-loop for arg in (llm-tool-function-args tool)
                                 collect (cdr (seq-find (lambda (a)
                                                          (eq (intern (plist-get arg :name))
@@ -723,12 +733,13 @@ have returned results."
                                         (format "%S" (cons name call-args))
                                         (format "%s" result)))
                           ;; Push in reverse order to build the plist
-                          (push results tool-use-and-results)
-                          (push (llm-provider-utils-encolon name) tool-use-and-results)
+                          (push result tool-use-and-results)
+                          (push (llm-provider-utils--encolon name) tool-use-and-results)
+                          (push (cons tool-use result) results)
                           (when (= (length results) (length tool-uses))
                             (llm-provider-utils-populate-tool-uses
-                             provider prompt tool-use-and-results)
-                            (funcall success-callback results))))
+                             provider prompt results)
+                            (funcall success-callback tool-use-and-results))))
                   call-args)))))
 
 

@@ -49,8 +49,8 @@ not very long so that we can end stuck requests."
   "Return non-nil if STATUS is a successful HTTP status code."
   (<= 200 status 299))
 
-(cl-defun llm-request-plz-sync-raw-output (url &key headers data timeout)
-  "Make a request to URL.  The raw text response will be returned.
+(cl-defun llm-request-plz-sync (url &key headers data timeout)
+  "Make a request to URL.  The response is a JSON object.
 
 HEADERS will be added in the Authorization header, in addition to
 standard json header.  This is optional.
@@ -60,45 +60,29 @@ This is required.
 
 TIMEOUT is the number of seconds to wait for a response."
   (condition-case error
-      (let ((resp (plz-media-type-request
-        'post url
-        :as `(media-types ,plz-media-types)
-        :body (when data
-                (encode-coding-string (json-encode data) 'utf-8))
-        :connect-timeout llm-request-plz-connect-timeout
-        :headers (append headers '(("Content-Type" . "application/json")))
-        :timeout (or timeout llm-request-plz-timeout))))
+      (let ((resp (plz-media-type-request 'post url
+                    :as `(media-types ,plz-media-types)
+                    :body (when data
+                            (encode-coding-string (json-encode data) 'utf-8))
+                    :connect-timeout llm-request-plz-connect-timeout
+                    :headers (append headers '(("Content-Type" . "application/json")))
+                    :timeout (or timeout llm-request-plz-timeout))))
         (if (llm-request-success (plz-response-status resp))
             (plz-response-body resp)
           (signal 'plz-http-error resp)))
     (plz-error
      (seq-let [error-sym message data] error
        (cond
-        ((eq 'plz-http-error error-sym)
-         (let ((response (plz-error-response data)))
-           (error "LLM request failed with code %d: %s (additional information: %s)"
-                  (plz-response-status response)
-                  (nth 2 (assq (plz-response-status response) url-http-codes))
-                  (plz-response-body response))))
-        ((and (eq 'plz-curl-error error-sym)
-              (eq 28 (car (plz-error-curl-error data))))
-         (error "LLM request timed out"))
-        (t (signal error-sym (list message data))))))))
-
-(cl-defun llm-request-plz-sync (url &key headers data timeout)
-  "Make a request to URL.  The parsed response will be returned.
-
-HEADERS will be added in the Authorization header, in addition to
-the standard json header.  This is optional.
-
-DATA will be jsonified and sent as the request body.
-This is required.
-
-TIMEOUT is the number of seconds to wait for a response."
-  (llm-request-plz-sync-raw-output url
-                                   :headers headers
-                                   :data data
-                                   :timeout timeout))
+         ((eq 'plz-http-error error-sym)
+          (let ((response (plz-error-response data)))
+            (error "LLM request failed with code %d: %s (additional information: %s)"
+                   (plz-response-status response)
+                   (nth 2 (assq (plz-response-status response) url-http-codes))
+                   (plz-response-body response))))
+         ((and (eq 'plz-curl-error error-sym)
+               (eq 28 (car (plz-error-curl-error data))))
+          (error "LLM request timed out"))
+         (t (signal error-sym (list message data))))))))
 
 (defun llm-request-plz--handle-error (error on-error)
   "Handle the ERROR with the ON-ERROR callback."
@@ -118,7 +102,7 @@ TIMEOUT is the number of seconds to wait for a response."
         (t (user-error "Unexpected error: %s" error))))
 
 (cl-defun llm-request-plz-async (url &key headers data on-success media-type
-                                     on-error timeout)
+                                       on-error timeout)
   "Make a request to URL.
 Nothing will be returned.
 
@@ -139,7 +123,7 @@ MEDIA-TYPE is an optional argument that adds or overrides a media
 type, useful for streaming formats.  It is expected that this is
 only used by other methods in this file."
   (plz-media-type-request
-    'post url
+      'post url
     :as `(media-types ,(if media-type
                            (cons media-type plz-media-types)
                          plz-media-types))
