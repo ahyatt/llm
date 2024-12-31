@@ -101,7 +101,15 @@
            :gemini (:contents [(:role user :parts [(:text "Hello world")])])
            :ollama (:model "model"
                            :messages [(:role user :content "Hello world")]
-                           :stream :json-false))
+                           :stream :json-false)
+           :claude (:model "model"
+                           :max_tokens 4096
+                           :messages [(:role user :content "Hello world")]
+                           :stream :json-false)
+           :claude-stream (:model "model"
+                                  :max_tokens 4096
+                                  :messages [(:role user :content "Hello world")]
+                                  :stream t))
     (:name "Request with temperature"
            :prompt ,(llm-make-chat-prompt "Hello world" :temperature 0.5)
            :openai-stream (:model "model"
@@ -113,6 +121,11 @@
            :ollama (:model "model"
                            :messages [(:role user :content "Hello world")]
                            :options (:temperature 0.5)
+                           :stream :json-false)
+           :claude (:model "model"
+                           :max_tokens 4096
+                           :messages [(:role user :content "Hello world")]
+                           :temperature 0.5
                            :stream :json-false))
     (:name "Request with context and examples"
            :prompt ,(llm-make-chat-prompt "Hello world"
@@ -129,6 +142,11 @@
            :ollama (:model "model"
                            :messages [(:role system :content "context\nExamples of how you should respond follow.\nUser: input1\nAssistant: output1\nUser: input2\nAssistant: output2")
                                       (:role user :content "Hello world")]
+                           :stream :json-false)
+           :claude (:model "model"
+                           :max_tokens 4096
+                           :messages [(:role user :content "Hello world")]
+                           :system "context\nHere are 2 examples of how to respond:\n\nUser: input1\nAssistant: output1\nUser: input2\nAssistant: output2"
                            :stream :json-false))
     (:name "Request with conversation"
            :prompt ,(llm-make-chat-prompt '("Hello world" "Hello human" "I am user!"))
@@ -140,6 +158,12 @@
                                (:role model :parts [(:text "Hello human")])
                                (:role user :parts [(:text "I am user!")])])
            :ollama (:model "model"
+                           :messages [(:role user :content "Hello world")
+                                      (:role assistant :content "Hello human")
+                                      (:role user :content "I am user!")]
+                           :stream :json-false)
+           :claude (:model "model"
+                           :max_tokens 4096
                            :messages [(:role user :content "Hello world")
                                       (:role assistant :content "Hello human")
                                       (:role user :content "I am user!")]
@@ -164,6 +188,13 @@
                                              :content
                                              "What is this?"
                                              :images ["YVcxaFoyVWdaR0YwWVE9PQ=="])]
+                           :stream :json-false)
+           :claude (:model "model"
+                           :max_tokens 4096
+                           :messages [(:role user
+                                             :content
+                                             [(:type text :text "What is this?")
+                                              (:type image :source (:type base64 :media_type "image/png" :data "YVcxaFoyVWdaR0YwWVE9PQ=="))])]
                            :stream :json-false))
     (:name "Request with tools"
            :prompt ,(llm-make-chat-prompt
@@ -210,8 +241,21 @@
                                                  (:arg1 (:description "desc1" :type string)
                                                         :arg2 (:description "desc2" :type integer))
                                                  :required [arg1])))]
-                           :stream :json-false))))))
-"A list of tests for `llm-provider-chat-request'.")
+                           :stream :json-false)
+           :claude (:model "model"
+                           :max_tokens 4096
+                           :messages [(:role user :content "Hello world")]
+                           :tools
+                           [(:name "func"
+                                   :description "desc"
+                                   :input_schema
+                                   (:type object
+                                          :properties
+                                          (:arg1 (:description "desc1" :type string)
+                                                 :arg2 (:description "desc2" :type integer))
+                                          :required [arg1]))]
+                           :stream :json-false)))
+  "A list of tests for `llm-provider-chat-request'.")
 
 (ert-deftest llm-test-requests ()
   (dolist (test llm-test-chat-requests-to-responses)
@@ -223,7 +267,7 @@
              (response (llm-provider-chat-request
                         (funcall (intern (format "make-llm-%s" provider))
                                  :chat-model "model")
-                        (plist-get test :prompt)
+                        (copy-tree (plist-get test :prompt) t)
                         (eq variation 'stream))))
           (ert-info ((format "Testing %s for model %s (%s)"
                              (plist-get test :name)

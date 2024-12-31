@@ -637,7 +637,7 @@ ROLE will be `assistant' by default, but can be passed in for other roles."
                        ;; otherwise make sure it is a string.  For tool uses, we
                        ;; want it to be nil.
                        :content (if (or (not output)
-                                        (and (listp output)
+                                        (and (not (stringp output))
                                              (not tool-results)))
                                     output
                                   (format "%s" output))

@@ -68,7 +68,7 @@
   (llm-make-chat-prompt
    "What is the capital of France?"
    :tools
-   (list (make-llm-tool-function
+   (list (llm-make-tool-function
           :function (lambda (callback result) (funcall callback result))
           :name "capital_of_country"
           :description "Get the capital of a country."
