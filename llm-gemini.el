@@ -75,22 +75,13 @@ If STREAMING-P is non-nil, use the streaming endpoint."
 (cl-defmethod llm-provider-chat-streaming-url ((provider llm-gemini))
   (llm-gemini--chat-url provider t))
 
-(cl-defmethod llm-provider-populate-function-calls ((_ llm-gemini) prompt calls)
-  (llm-provider-utils-append-to-prompt
-   prompt
-   ;; For Vertex there is just going to be one call
-   (mapcar (lambda (fc)
-             `((functionCall
-                .
-                ((name . ,(llm-provider-utils-function-call-name fc))
-                 (args . ,(llm-provider-utils-function-call-args fc))))))
-           calls)))
+(cl-defmethod llm-provider-populate-tool-uses ((_ llm-gemini) prompt calls)
+  (cl-call-next-method))
 
 (cl-defmethod llm-provider-chat-request ((_ llm-gemini) _ _)
-  (mapcar (lambda (c) (if (eq (car c) 'generation_config)
-                          (cons 'generationConfig (cdr c))
-                        c))
-          (cl-call-next-method)))
+  ;; Temporary, can be removed in the next version.  Without this the old
+  ;; definition will cause problems when users upgrade.
+  (cl-call-next-method))
 
 (cl-defmethod llm-name ((_ llm-gemini))
   "Return the name of PROVIDER."

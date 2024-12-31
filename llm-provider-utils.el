@@ -488,6 +488,10 @@ If MODEL cannot be found, warn and return DEFAULT, which by default is 4096."
       (warn "No model predefined for model %s, using restrictive defaults" model)
       (or default 4096))))
 
+(defun llm-provider-encolon (s)
+  "Turn S into a symbol preceded by a colon."
+  (intern (format ":%s" s)))
+
 (defun llm-provider--decolon (sym)
   "Remove a colon from the beginnging of SYM."
   (let ((s (symbol-name sym)))
@@ -587,6 +591,9 @@ or a JSON Schema object plist (see `llm-provider-utils-json-schema')."
         (setq spec (plist-put spec :required (apply #'vector
                                                     (nreverse required-names)))))
       spec)))
+
+(cl-defgeneric llm-provider-utils-openai-tool-spec (tool)
+  "Convert TOOL to an Open AI function spec.")
 
 ;; The Open AI tool spec follows the JSON schema spec.  See
 ;; https://json-schema.org/understanding-json-schema.
@@ -715,8 +722,9 @@ have returned results."
                            :msg (format "%s --> %s"
                                         (format "%S" (cons name call-args))
                                         (format "%s" result)))
-                          (push (cons name result) results)
-                          (push (cons tool-use result) tool-use-and-results)
+                          ;; Push in reverse order to build the plist
+                          (push results tool-use-and-results)
+                          (push (llm-provider-utils-encolon name) tool-use-and-results)
                           (when (= (length results) (length tool-uses))
                             (llm-provider-utils-populate-tool-uses
                              provider prompt tool-use-and-results)

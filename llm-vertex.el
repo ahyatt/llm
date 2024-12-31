@@ -155,13 +155,13 @@ the key must be regenerated every hour."
                  (when parts
                    (assoc-default 'text (aref parts (- (length parts) 1)))))))))
 
-(cl-defmethod llm-provider-extract-function-calls ((provider llm-google) response)
+(cl-defmethod llm-provider-extract-tool-uses ((provider llm-google) response)
   (if (vectorp response)
-      (llm-provider-extract-function-calls provider (aref response 0))
+      (llm-provider-extract-tool-uses provider (aref response 0))
     ;; In some error cases, the response does not have any candidates.
     (when (assoc-default 'candidates response)
       (mapcar (lambda (call)
-                (make-llm-provider-utils-function-call
+                (make-llm-provider-utils-tool-use
                  :name (assoc-default 'name call)
                  :args (assoc-default 'args call)))
               (mapcan (lambda (maybe-call)
@@ -172,67 +172,65 @@ the key must be regenerated every hour."
                                'content
                                (aref (assoc-default 'candidates response) 0))))))))
 
-(cl-defmethod llm-provider-extract-streamed-function-calls ((provider llm-google) response)
-  (llm-provider-extract-function-calls provider (json-read-from-string response)))
+(defun llm-vertex--interaction (interaction)
+  "Return the interaction from INTERACTION to be used in the request."
+  `(:role ,(pcase (llm-chat-prompt-interaction-role interaction)
+             ('user 'user)
+             ('assistant 'model)
+             ('tool 'function))
+          :parts
+          ,(cond
+             ((eq 'tool-results (llm-chat-prompt-interaction-role interaction))
+              (vconcat
+               (mapcar (lambda (fc)
+                         `((:functionResponse
+                            (:name ,(llm-chat-prompt-tool-result-tool-name fc))
+                            (:response
+                             (:name ,(llm-chat-prompt-tool-result-tool-name fc)
+                                    :content ,(llm-chat-prompt-tool-result-tool-result-result fc))))))
+                       (llm-chat-prompt-interaction-function-call-results interaction))))
+             ((and (consp (llm-chat-prompt-interaction-content interaction))
+                   (llm-provider-utils-tool-use-p (car (llm-chat-prompt-interaction-content interaction))))
+              (vconcat
+               (mapcar (lambda (tool-use)
+                         `(:functionCall
+                           (:name ,(llm-provider-utils-tool-use-name tool-use)
+                                  :args ,(llm-provider-utils-tool-use-args tool-use))))
+                       (llm-chat-prompt-interaction-content interaction))))
+             ((llm-multipart-p (llm-chat-prompt-interaction-content interaction))
+              (vconcat (mapcar (lambda (part)
+                                 (if (llm-media-p part)
+                                     `(:inline_data
+                                       (:mime_type ,(llm-media-mime-type part)
+                                                   :data ,(base64-encode-string (llm-media-data part) t)))
+                                   `(:text ,part)))
+                               (llm-multipart-parts (llm-chat-prompt-interaction-content interaction)))))
+             (t `[(:text ,(llm-chat-prompt-interaction-content interaction))]))))
 
 (cl-defmethod llm-provider-chat-request ((_ llm-google) prompt _)
   (llm-provider-utils-combine-to-system-prompt prompt llm-vertex-example-prelude)
   (append
-   (let ((first (car (llm-chat-prompt-interactions prompt))))
-     ;; System prompts for vertex only really make sense when they are
-     ;; the first interaction, since they are sent separately
-     (when (eq (llm-chat-prompt-interaction-role first) 'system)
-       `((system_instruction
-          . ((parts . (((text . ,(llm-chat-prompt-interaction-content first))))))))))
-   `((contents
-      .
-      ,(mapcar (lambda (interaction)
-                 `((role . ,(pcase (llm-chat-prompt-interaction-role interaction)
-                              ('user "user")
-                              ('assistant "model")
-                              ('function "function")))
-                   (parts .
-                          ,(if (and (not (equal (llm-chat-prompt-interaction-role interaction)
-                                                'function))
-                                    (stringp (llm-chat-prompt-interaction-content interaction)))
-                               `(((text . ,(llm-chat-prompt-interaction-content
-                                            interaction))))
-                             (if (eq 'function
-                                     (llm-chat-prompt-interaction-role interaction))
-                                 (mapcar (lambda (fc)
-                                           `(((functionResponse
-                                               .
-                                               ((name . ,(llm-chat-prompt-function-call-result-function-name fc))
-                                                (response
-                                                 .
-                                                 ((name . ,(llm-chat-prompt-function-call-result-function-name fc))
-                                                  (content . ,(llm-chat-prompt-function-call-result-result fc)))))))))
-                                         (llm-chat-prompt-interaction-function-call-results interaction))
-
-                               (if (llm-multipart-p (llm-chat-prompt-interaction-content interaction))
-                                   (mapcar (lambda (part)
-                                             (if (llm-media-p part)
-                                                 `((inline_data
-                                                    . ((mime_type . ,(llm-media-mime-type part))
-                                                       (data . ,(base64-encode-string (llm-media-data part) t)))))
-                                               `((text . ,part))))
-                                           (llm-multipart-parts (llm-chat-prompt-interaction-content interaction)))
-                                 (llm-chat-prompt-interaction-content interaction)))))))
-               (seq-filter
-                (lambda (interaction) (not (eq 'system (llm-chat-prompt-interaction-role interaction))))
-                (llm-chat-prompt-interactions prompt)))))
+   (when (eq 'system (llm-chat-prompt-interaction-role (car (llm-chat-prompt-interactions prompt))))
+     `(:system_instruction
+       (:parts (:text ,(llm-chat-prompt-interaction-content
+                        (car (llm-chat-prompt-interactions prompt)))))))
+   `(:contents
+     ,(vconcat (mapcan (lambda (interaction)
+                         (unless (eq 'system (llm-chat-prompt-interaction-role interaction))
+                           (list (llm-vertex--interaction interaction))))
+                       (llm-chat-prompt-interactions prompt))))
    (when (llm-chat-prompt-functions prompt)
      ;; Although Gemini claims to be compatible with Open AI's function declaration,
      ;; it's only somewhat compatible.
-     `(("tools" .
-        ,(mapcar (lambda (tool)
-                   `((function_declarations . (((name . ,(llm-function-call-name tool))
-                                                (description . ,(llm-function-call-description tool))
-                                                (parameters
-                                                 .
-                                                 ,(llm-provider-utils-openai-arguments
-                                                   (llm-function-call-args tool))))))))
-                 (llm-chat-prompt-functions prompt)))))
+     `(:tools
+       [(:function_declarations
+         ,(vconcat (mapcar
+                    (lambda (tool)
+                      `(:name ,(llm-tool-function-name tool)
+                              :description ,(llm-tool-function-description tool)
+                              :parameters ,(llm-provider-utils-openai-arguments
+                                            (llm-tool-function-args tool))))
+                    (llm-chat-prompt-functions prompt))))]))
    (llm-vertex--chat-parameters prompt)))
 
 (defun llm-vertex--response-schema (schema)
@@ -243,30 +241,27 @@ the key must be regenerated every hour."
   "From PROMPT, create the parameters section.
 Return value is a cons for adding to an alist, unless there is
 nothing to add, in which case it is nil."
-  (let ((params-alist (llm-chat-prompt-non-standard-params prompt)))
+  (let ((params-plist (mapcan (lambda (pcons) (list (llm-provider-encolon (car pcons))
+                                                    (cdr pcons)))
+                              (llm-chat-prompt-non-standard-params prompt))))
     (when (llm-chat-prompt-temperature prompt)
-      (push `(temperature . ,(llm-chat-prompt-temperature prompt))
-            params-alist))
+      (push (* (llm-chat-prompt-temperature prompt) 2.0) params-plist)
+      (push :temperature params-plist))
     (when (llm-chat-prompt-max-tokens prompt)
-      (push `(maxOutputTokens . ,(llm-chat-prompt-max-tokens prompt)) params-alist))
+      (push ,(llm-chat-prompt-max-tokens prompt) params-plist)
+      (push :maxOutputTokens params-plist))
     (when-let ((format (llm-chat-prompt-response-format prompt)))
-      (push '("response_mime_type" . "application/json") params-alist)
+      (push 'application/json params-plist)
+      (push :response_mime_type params-plist)
       (unless (eq 'json format)
-        (push `("response_schema" . ,(llm-vertex--response-schema
-                                      (llm-chat-prompt-response-format prompt)))
-              params-alist)))
-    (when params-alist
-      `((generation_config . ,params-alist)))))
+        (push (llm-vertex--response-schema (llm-chat-prompt-response-format prompt))
+              params-plist)
+        (push :response_schema params-plist)))
+    (when params-plist
+      `(:generationConfig ,params-plist))))
 
-(cl-defmethod llm-provider-populate-function-calls ((_ llm-vertex) prompt calls)
-  (llm-provider-utils-append-to-prompt
-   prompt
-   (mapcar (lambda (fc)
-             `((functionCall
-                .
-                ((name . ,(llm-provider-utils-function-call-name fc))
-                 (args . ,(llm-provider-utils-function-call-args fc))))))
-           calls)))
+(cl-defmethod llm-provider-populate-tool-uses ((_ llm-google) prompt tool-uses)
+  (llm-provider-utils-append-to-prompt prompt tool-uses nil 'assistant))
 
 (cl-defmethod llm-provider-streaming-media-handler ((provider llm-google)
                                                     msg-receiver fc-receiver
@@ -282,7 +277,7 @@ nothing to add, in which case it is nil."
              (when-let ((fc (llm-provider-extract-function-calls provider element)))
                (funcall fc-receiver fc)))))))
 
-(cl-defmethod llm-provider-collect-streaming-function-data ((_ llm-google) data)
+(cl-defmethod llm-provider-collect-streaming-tool-uses ((_ llm-google) data)
   (car data))
 
 (defun llm-vertex--chat-url (provider &optional streaming)

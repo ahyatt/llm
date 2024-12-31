@@ -346,7 +346,7 @@ RESPONSE can be nil if the response is complete."
                                                  (json-read-from-string data))))
                              (funcall (if (stringp response) msg-receiver fc-receiver) response))))))))))
 
-(cl-defmethod llm-provider-collect-streaming-function-data ((_ llm-openai) data)
+(cl-defmethod llm-provider-collect-streaming-tool-uses ((_ llm-openai) data)
   (let* ((num-index (+ 1 (assoc-default 'index (aref (car (last data)) 0))))
          (cvec (make-vector num-index nil)))
     (dotimes (i num-index)

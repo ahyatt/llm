@@ -96,7 +96,7 @@ TOOL-NAME is the name of the tool.  This is required.
 RESULT is the result of the tool use.  This is required."
   call-id tool-name result)
 
-(cl-defstruct llm-tool-function
+(cl-defstruct (llm-tool-function (:constructor llm-make-tool-function))
   "This is a struct to represent a single function tool available to the
 LLM.
 
