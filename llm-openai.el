@@ -261,7 +261,7 @@ FCS is a list of `llm-provider-utils-tool-use' structs."
                                                            (llm-media-mime-type part)
                                                            ";base64,"
                                                            (base64-encode-string
-                                                            (llm-media-data part)))))
+                                                            (llm-media-data part) t))))
                                             (list :type "text" :text part)))
                                         (llm-multipart-parts content))))
                                      (t content))))))

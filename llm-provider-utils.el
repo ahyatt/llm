@@ -714,39 +714,36 @@ function call, the result.
 SUCCESS-CALLBACK is the callback that will be run when all functions
 have returned results."
   (llm-provider-populate-tool-uses provider prompt tool-uses)
-  (cl-loop
-        for tool-use in tool-uses do
-        (let* ((name (llm-provider-utils-tool-use-name tool-use))
-               (arguments (llm-provider-utils-tool-use-args tool-use))
-               (tool (seq-find
-                      (lambda (f) (equal name (llm-tool-function-name f)))
-                      (llm-chat-prompt-tools prompt)))
-               (results nil)
-               (tool-use-and-results nil)
-               (call-args (cl-loop for arg in (llm-tool-function-args tool)
-                                collect (cdr (seq-find (lambda (a)
-                                                         (eq (intern (plist-get arg :name))
-                                                             (car a)))
-                                                       arguments))))
-               (end-func (lambda (result)
-                           (llm--log
-                            'api-funcall
-                            :provider provider
-                            :msg (format "%s --> %s"
-                                         (format "%S" (cons name call-args))
-                                         (format "%s" result)))
-                           ;; Push in reverse order to build the plist
-                           (push result tool-use-and-results)
-                           (push (llm-provider-utils--encolon name) tool-use-and-results)
-                           (push (cons tool-use result) results)
-                           (when (= (length results) (length tool-uses))
-                             (llm-provider-utils-populate-tool-uses
-                              provider prompt results)
-                             (funcall success-callback tool-use-and-results)))))
-          (if (llm-tool-function-async tool)
-              (apply (llm-tool-function-function tool)
-                     (append (list end-fund) call-args))
-            (funcall end-func (apply (llm-tool-function-function tool) call-args))))))
+  (let (results tool-use-and-results)
+    (cl-loop
+          for tool-use in tool-uses do
+          (let* ((name (llm-provider-utils-tool-use-name tool-use))
+                 (arguments (llm-provider-utils-tool-use-args tool-use))
+                 (tool (seq-find
+                        (lambda (f) (equal name (llm-tool-function-name f)))
+                        (llm-chat-prompt-tools prompt)))
+                 (call-args (cl-loop for arg in (llm-tool-function-args tool)
+                                  collect (cdr (seq-find (lambda (a)
+                                                           (eq (intern (plist-get arg :name))
+                                                               (car a)))
+                                                         arguments))))
+                 (end-func (lambda (result)
+                             (llm--log
+                              'api-funcall
+                              :provider provider
+                              :msg (format "%s --> %s"
+                                           (format "%S" (cons name call-args))
+                                           (format "%s" result)))
+                             (push (cons name result) tool-use-and-results)
+                             (push (cons tool-use result) results)
+                             (when (= (length results) (length tool-uses))
+                               (llm-provider-utils-populate-tool-uses
+                                provider prompt results)
+                               (funcall success-callback tool-use-and-results)))))
+            (if (llm-tool-function-async tool)
+                (apply (llm-tool-function-function tool)
+                       (append (list end-func) call-args))
+              (funcall end-func (apply (llm-tool-function-function tool) call-args)))))))
 
 
 ;; This is a useful method for getting out of the request buffer when it's time

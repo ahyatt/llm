@@ -80,7 +80,7 @@
                                                   (llm-chat-prompt-interaction-content interaction)))))
                                (llm-chat-prompt-interactions prompt)))))
         (system (llm-provider-utils-get-system-prompt prompt)))
-    (when (llm-chat-prompt-functions prompt)
+    (when (llm-chat-prompt-tools prompt)
       (plist-put request :tools
                  (vconcat (mapcar (lambda (f) (llm-claude--tool-call f))
                                   (llm-chat-prompt-tools prompt)))))
@@ -100,7 +100,7 @@
                             `(:type image
                                     :source (:type base64
                                                    :media_type ,(llm-media-mime-type part)
-                                                   :data ,(base64-encode-string (llm-media-data part)))))
+                                                   :data ,(base64-encode-string (llm-media-data part) t))))
                            (t
                             (error "Unsupported multipart content: %s" part))))
                    (llm-multipart-parts content))))

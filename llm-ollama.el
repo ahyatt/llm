@@ -115,6 +115,7 @@ PROVIDER is the llm-ollama provider."
     (llm-provider-utils-json-schema format)))
 
 (cl-defmethod llm-provider-chat-request ((provider llm-ollama) prompt streaming)
+  (llm-provider-utils-combine-to-system-prompt prompt llm-ollama-example-prelude)
   (let (request-plist messages options)
     (setq messages
           (vconcat (mapcar (lambda (interaction)
@@ -138,28 +139,25 @@ PROVIDER is the llm-ollama provider."
                                     ,(vconcat (mapcar (lambda (img) (base64-encode-string (llm-media-data img) t))
                                                       images)))))))
                            (llm-chat-prompt-interactions prompt))))
-    (when (or (llm-chat-prompt-context prompt) (llm-chat-prompt-examples prompt))
-      (push `(:role system
-                    :content ,(llm-provider-utils-get-system-prompt prompt llm-ollama-example-prelude))
-            messages))
     (setq request-plist (plist-put request-plist :messages messages))
     (setq request-plist (plist-put request-plist :model (llm-ollama-chat-model provider)))
-    (when (and streaming (llm-chat-prompt-functions prompt))
+    (when (and streaming (llm-chat-prompt-tools prompt))
       (signal 'not-implemented
               "Ollama does not support streaming with function calls"))
     (when (llm-chat-prompt-tools prompt)
-      (setq request-plist (plist-put request-plist :tools
-                                     (mapcar #'llm-provider-utils-openai-tool-spec
-                                             (llm-chat-prompt-tools prompt)))))
+      (setq request-plist (plist-put
+                           request-plist :tools
+                           (vconcat (mapcar #'llm-provider-utils-openai-tool-spec
+                                            (llm-chat-prompt-tools prompt))))))
     (when (llm-chat-prompt-response-format prompt)
       (setq request-plist (plist-put request-plist :format
                                      (llm-ollama--response-format
                                       (llm-chat-prompt-response-format prompt)))))
     (setq request-plist (plist-put request-plist :stream (if streaming t :json-false)))
     (when (llm-chat-prompt-temperature prompt)
-      (setq request-plist (plist-put request-plist :temperature (llm-chat-prompt-temperature prompt))))
+      (setq options (plist-put options :temperature (llm-chat-prompt-temperature prompt))))
     (when (llm-chat-prompt-max-tokens prompt)
-      (setq request-plist (plist-put request-plist :num_predict (llm-chat-prompt-max-tokens prompt))))
+      (setq options (plist-put options :num_predict (llm-chat-prompt-max-tokens prompt))))
     (setq options (append options (llm-provider-utils-non-standard-params-plist prompt)))
     (when options
       (setq request-plist (plist-put request-plist :options options)))

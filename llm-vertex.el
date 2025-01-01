@@ -183,12 +183,12 @@ the key must be regenerated every hour."
              ((eq 'tool-results (llm-chat-prompt-interaction-role interaction))
               (vconcat
                (mapcar (lambda (fc)
-                         `((:functionResponse
-                            (:name ,(llm-chat-prompt-tool-result-tool-name fc))
-                            (:response
-                             (:name ,(llm-chat-prompt-tool-result-tool-name fc)
-                                    :content ,(llm-chat-prompt-tool-result-tool-result-result fc))))))
-                       (llm-chat-prompt-interaction-function-call-results interaction))))
+                         `(:functionResponse
+                           (:name ,(llm-chat-prompt-tool-result-tool-name fc)
+                                  :response
+                                  (:name ,(llm-chat-prompt-tool-result-tool-name fc)
+                                         :content ,(llm-chat-prompt-tool-result-result fc)))))
+                       (llm-chat-prompt-interaction-tool-results interaction))))
              ((and (consp (llm-chat-prompt-interaction-content interaction))
                    (llm-provider-utils-tool-use-p (car (llm-chat-prompt-interaction-content interaction))))
               (vconcat
@@ -219,7 +219,7 @@ the key must be regenerated every hour."
                          (unless (eq 'system (llm-chat-prompt-interaction-role interaction))
                            (list (llm-vertex--interaction interaction))))
                        (llm-chat-prompt-interactions prompt))))
-   (when (llm-chat-prompt-functions prompt)
+   (when (llm-chat-prompt-tools prompt)
      ;; Although Gemini claims to be compatible with Open AI's function declaration,
      ;; it's only somewhat compatible.
      `(:tools
@@ -230,7 +230,7 @@ the key must be regenerated every hour."
                               :description ,(llm-tool-function-description tool)
                               :parameters ,(llm-provider-utils-openai-arguments
                                             (llm-tool-function-args tool))))
-                    (llm-chat-prompt-functions prompt))))]))
+                    (llm-chat-prompt-tools prompt))))]))
    (llm-vertex--chat-parameters prompt)))
 
 (defun llm-vertex--response-schema (schema)
