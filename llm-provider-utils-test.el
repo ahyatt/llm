@@ -34,9 +34,13 @@
              :required t)
            ;; A string arg with an enum
            '(:name "unit"
-             :type "string"  ;; we should be able to take strings or symbols here.
+             :type string  ;; we should be able to take strings or symbols here.
              :description "The unit of temperature, either 'celsius' or 'fahrenheit'"
-             :enum ("celsius" "fahrenheit"))))
+             :enum ("celsius" "fahrenheit"))
+           '(:name "postal_codes"
+             :type array
+             :description "Specific postal codes"
+             :items (:type string))))
          (result (llm-provider-utils-openai-arguments args))
          (expected
           '(:type object
@@ -47,7 +51,10 @@
              :unit
              (:type string
               :description "The unit of temperature, either 'celsius' or 'fahrenheit'"
-              :enum ["celsius" "fahrenheit"]))
+              :enum ["celsius" "fahrenheit"])
+             :postal_codes (:type array
+                            :description "Specific postal codes"
+                            :items (:type string)))
             :required [location])))
     (should (equal result expected))))
 
