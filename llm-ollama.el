@@ -142,27 +142,27 @@ PROVIDER is the llm-ollama provider."
       (push `(:role system
                     :content ,(llm-provider-utils-get-system-prompt prompt llm-ollama-example-prelude))
             messages))
-    (plist-put request-plist :messages messages)
-    (plist-put request-plist :model (llm-ollama-chat-model provider))
+    (setq request-plist (plist-put request-plist :messages messages))
+    (setq request-plist (plist-put request-plist :model (llm-ollama-chat-model provider)))
     (when (and streaming (llm-chat-prompt-functions prompt))
       (signal 'not-implemented
               "Ollama does not support streaming with function calls"))
     (when (llm-chat-prompt-tools prompt)
-      (plist-put request-plist :tools
-                 (mapcar #'llm-provider-utils-openai-tool-spec
-                         (llm-chat-prompt-tools prompt))))
+      (setq request-plist (plist-put request-plist :tools
+                                     (mapcar #'llm-provider-utils-openai-tool-spec
+                                             (llm-chat-prompt-tools prompt)))))
     (when (llm-chat-prompt-response-format prompt)
-      (plist-put request-plist :format
-                 (llm-ollama--response-format
-                  (llm-chat-prompt-response-format prompt))))
-    (plist-put request-plist :stream (if streaming t :json-false))
+      (setq request-plist (plist-put request-plist :format
+                                     (llm-ollama--response-format
+                                      (llm-chat-prompt-response-format prompt)))))
+    (setq request-plist (plist-put request-plist :stream (if streaming t :json-false)))
     (when (llm-chat-prompt-temperature prompt)
-      (plist-put request-plist :temperature (llm-chat-prompt-temperature prompt)))
+      (setq request-plist (plist-put request-plist :temperature (llm-chat-prompt-temperature prompt))))
     (when (llm-chat-prompt-max-tokens prompt)
-      (plist-put request-plist :num_predict (llm-chat-prompt-max-tokens prompt)))
+      (setq request-plist (plist-put request-plist :num_predict (llm-chat-prompt-max-tokens prompt))))
     (setq options (append options (llm-provider-utils-non-standard-params-plist prompt)))
     (when options
-      (plist-put request-plist :options options))
+      (setq request-plist (plist-put request-plist :options options)))
     request-plist))
 
 (cl-defmethod llm-provider-extract-tool-uses ((_ llm-ollama) response)

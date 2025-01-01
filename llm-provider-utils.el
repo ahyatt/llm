@@ -547,7 +547,8 @@ Each plist has the structure:
    :type STRING-OR-PLIST
    :description STRING
    :required BOOLEAN
-   :enum LIST-OF-STRINGS)
+   :enum LIST-OF-STRINGS
+   :items (PLIST :type STRING-OR-PLIST))
 
 :type can be either a simple string (e.g. \"string\")
 or a JSON Schema object plist (see `llm-provider-utils-json-schema')."
@@ -562,6 +563,7 @@ or a JSON Schema object plist (see `llm-provider-utils-json-schema')."
              (description (plist-get arg :description))
              (required (plist-get arg :required))
              (enum (plist-get arg :enum))
+             (items (plist-get arg :items))
 
              ;; Build the schema for this argument.
              ;; If :type is itself a plist with :type inside it, we treat it
@@ -585,6 +587,9 @@ or a JSON Schema object plist (see `llm-provider-utils-json-schema')."
         (when enum
           ;; Vectors generally serialize nicely to JSON arrays, but a list is fine too.
           (setq schema (plist-put schema :enum (apply #'vector enum))))
+
+        (when items
+          (setq schema (plist-put schema :items items)))
 
         ;; Track required argument names if :required is t
         (when required
@@ -722,25 +727,26 @@ have returned results."
                                 collect (cdr (seq-find (lambda (a)
                                                          (eq (intern (plist-get arg :name))
                                                              (car a)))
-                                                       arguments)))))
-          (apply (llm-tool-function-function tool)
-                 (append
-                  (list (lambda (result)
-                          (llm--log
-                           'api-funcall
-                           :provider provider
-                           :msg (format "%s --> %s"
-                                        (format "%S" (cons name call-args))
-                                        (format "%s" result)))
-                          ;; Push in reverse order to build the plist
-                          (push result tool-use-and-results)
-                          (push (llm-provider-utils--encolon name) tool-use-and-results)
-                          (push (cons tool-use result) results)
-                          (when (= (length results) (length tool-uses))
-                            (llm-provider-utils-populate-tool-uses
-                             provider prompt results)
-                            (funcall success-callback tool-use-and-results))))
-                  call-args)))))
+                                                       arguments))))
+               (end-func (lambda (result)
+                           (llm--log
+                            'api-funcall
+                            :provider provider
+                            :msg (format "%s --> %s"
+                                         (format "%S" (cons name call-args))
+                                         (format "%s" result)))
+                           ;; Push in reverse order to build the plist
+                           (push result tool-use-and-results)
+                           (push (llm-provider-utils--encolon name) tool-use-and-results)
+                           (push (cons tool-use result) results)
+                           (when (= (length results) (length tool-uses))
+                             (llm-provider-utils-populate-tool-uses
+                              provider prompt results)
+                             (funcall success-callback tool-use-and-results)))))
+          (if (llm-tool-function-async tool)
+              (apply (llm-tool-function-function tool)
+                     (append (list end-fund) call-args))
+            (funcall end-func (apply (llm-tool-function-function tool) call-args))))))
 
 
 ;; This is a useful method for getting out of the request buffer when it's time

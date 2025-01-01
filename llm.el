@@ -103,8 +103,9 @@ LLM.
 All fields are required.
 
 FUNCTION is a function to call.  The first argument for FUNCTION should
-take a callback that should be called back with the result.  The other
-arguments correspond to the arguments defined in the tool.
+take a callback that should be called back with the result, if ASYNC is
+non-nil.  The other arguments correspond to the arguments defined in the
+tool.
 
 NAME is a human readable name of the function.
 
@@ -114,11 +115,16 @@ ARGS is a list of plists, each plist having the keys `:name', `:type',
 `:description', and `:required'.  `:type' is a string, and the same set
 of types as in `RESPONSE-FORMAT' arg in `llm-make-chat-prompt':
 `string', `integer', `boolean', `float', or `array'.  There can be an
-`:enum' field as well, with a vector of possible values."
+`:enum' field as well, with a vector of possible values.
+
+ASYNC, if non-nil, means the function will be passed a callback which
+takes the return value, otherwise the callback is not passed, and the
+function's return value will be used."
   function
   name
   description
-  args)
+  args
+  async)
 
 (cl-defstruct llm-media
   "Contains media that can be sent as part of an interaction.
