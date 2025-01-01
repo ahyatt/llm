@@ -193,7 +193,7 @@ ERR-RECEIVER with the error message.")
 ;; Methods for chat function calling
 
 (cl-defgeneric llm-provider-extract-tool-uses (provider response)
-  "Return the tool uses from RESPONSE for the PROVIDER.
+  "Return the tool-uses from RESPONSE for the PROVIDER.
 
 If there are no tool uses, return nil.  If there are tool uses, return a
 list of `llm-provider-utils-tool-use'.")
@@ -203,12 +203,12 @@ list of `llm-provider-utils-tool-use'.")
   nil)
 
 (cl-defgeneric llm-provider-populate-tool-uses (provider prompt tool-uses)
-  "For PROVIDER, in PROMPT, record tool uses.
+  "For PROVIDER, in PROMPT, record TOOL-USES.
 This is the recording before the function calls were executed, in the prompt.
 CALLS are a list of `llm-provider-utils-tool-use'.")
 
 (cl-defgeneric llm-provider-collect-streaming-tool-uses (provider data)
-  "Transform a list of streaming tool uses DATA responses.
+  "Transform a list of streaming tool-uses DATA responses.
 
 PROVIDER is the struct specifying the LLM provider and its configuration.
 

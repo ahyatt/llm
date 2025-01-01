@@ -166,7 +166,7 @@ PROVIDER is the Open AI provider struct."
                                       '(("additionalProperties" . :json-false)))))))))
 
 (defun llm-openai--build-model (provider)
-  "Get the model field for the request."
+  "Get the model field for the request for PROVIDER."
   (list :model (llm-openai-chat-model provider)))
 
 (defun llm-openai--build-streaming (streaming)
