@@ -256,7 +256,7 @@ of by calling the `describe_function' function."
           :description "Takes an elisp function name and shows the user the functions and their descriptions."
           :args '((:name "function_name"
                    :description "A function name to describe."
-                   :type 'string
+                   :type string
                    :required t))
           :async nil))))
 
