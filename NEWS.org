@@ -1,3 +1,6 @@
+* Version 0.21.0
+- Incompatible change to function calling, which is now tool use, affecting arguments and methods.
+- Support image understanding in Claude
 * Version 0.20.0
 - Add ability to output according to a JSON spec.
 - Add Gemini 2.0 Flash, Gemini 2.0 Flash Thinking, and Llama 3.3 and QwQ models.
