@@ -48,7 +48,7 @@ You can get this at https://makersuite.google.com/app/apikey."
   (format "https://generativelanguage.googleapis.com/v1beta/models/%s:embedContent?key=%s"
           (llm-gemini-embedding-model provider)
           (if (functionp (llm-gemini-key provider))
-              (funcall (llm-claude-key provider))
+              (funcall (llm-gemini-key provider))
             (llm-gemini-key provider))))
 
 (cl-defmethod llm-provider-embedding-request ((provider llm-gemini) string)
@@ -74,9 +74,6 @@ If STREAMING-P is non-nil, use the streaming endpoint."
 
 (cl-defmethod llm-provider-chat-streaming-url ((provider llm-gemini))
   (llm-gemini--chat-url provider t))
-
-(cl-defmethod llm-provider-populate-tool-uses ((_ llm-gemini) prompt calls)
-  (cl-call-next-method))
 
 (cl-defmethod llm-provider-chat-request ((_ llm-gemini) _ _)
   ;; Temporary, can be removed in the next version.  Without this the old

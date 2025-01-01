@@ -246,7 +246,7 @@ nothing to add, in which case it is nil."
       (push (* (llm-chat-prompt-temperature prompt) 2.0) params-plist)
       (push :temperature params-plist))
     (when (llm-chat-prompt-max-tokens prompt)
-      (push ,(llm-chat-prompt-max-tokens prompt) params-plist)
+      (push (llm-chat-prompt-max-tokens prompt) params-plist)
       (push :maxOutputTokens params-plist))
     (when-let ((format (llm-chat-prompt-response-format prompt)))
       (push 'application/json params-plist)
@@ -272,7 +272,7 @@ nothing to add, in which case it is nil."
              (funcall err-receiver err-response))
            (if-let ((response (llm-provider-chat-extract-result provider element)))
                (funcall msg-receiver response)
-             (when-let ((fc (llm-provider-extract-function-calls provider element)))
+             (when-let ((fc (llm-provider-extract-tool-uses provider element)))
                (funcall fc-receiver fc)))))))
 
 (cl-defmethod llm-provider-collect-streaming-tool-uses ((_ llm-google) data)
