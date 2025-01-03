@@ -1,6 +1,6 @@
 ;;; llm-intgration-test.el --- Integration tests for the llm module -*- lexical-binding: t; package-lint-main-file: "llm.el"; -*-
 
-;; Copyright (c) 2024  Free Software Foundation, Inc.
+;; Copyright (c) 2024-2025  Free Software Foundation, Inc.
 
 ;; Author: Andrew Hyatt <ahyatt@gmail.com>
 ;; SPDX-License-Identifier: GPL-3.0-or-later
@@ -67,16 +67,16 @@
   "Return a function call prompt for testing."
   (llm-make-chat-prompt
    "What is the capital of France?"
-   :functions
-   (list (make-llm-function-call
-          :function (lambda (f) f)
+   :tools
+   (list (llm-make-tool-function
+          :function (lambda (callback result) (funcall callback result))
           :name "capital_of_country"
           :description "Get the capital of a country."
-          :args (list (make-llm-function-arg
-                       :name "country"
-                       :description "The country whose capital to look up."
-                       :type 'string
-                       :required t))))))
+          :args '((:name "country"
+                   :description "The country whose capital to look up."
+                   :type string
+                   :required t))
+          :async t))))
 
 (defconst llm-integration-test-fc-answer
   '(("capital_of_country" . "France"))
@@ -85,21 +85,16 @@
 (defun llm-integration-test-fc-multiple-prompt ()
   (llm-make-chat-prompt
    "What is the capital of France, and also what is the capital of Italy?"
-   :functions
-   (list (make-llm-function-call
+   :tools
+   (list (llm-make-tool-function
           :function (lambda (f) f)
           :name "capital_of_country"
           :description "Get the capital of a country."
-          :args (list (make-llm-function-arg
-                       :name "country"
-                       :description "The country whose capital to look up."
-                       :type 'string
-                       :required t))))))
-
-(defconst llm-integration-test-fc-multiple-answer
-  '(("capital_of_country" . "France")
-    ("capital_of_country" . "Italy"))
-  "The correct answer to the function call prompt.")
+          :args '((:name "country"
+                   :description "The country whose capital to look up."
+                   :type string
+                   :required t))
+          :async nil))))
 
 (defun llm-integration-test-rate-limit (provider)
   (cond ((eq (type-of provider) 'llm-azure)
@@ -260,7 +255,7 @@ else.  We really just want to see if it's in the right ballpark."
       (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim returned-result)))
       (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim streamed-result))))))
 
-(llm-def-integration-test llm-function-call (provider)
+(llm-def-integration-test llm-tool-use (provider)
   (when (member 'function-calls (llm-capabilities provider))
     (let ((prompt (llm-integration-test-fc-prompt)))
       (should (equal
@@ -269,7 +264,7 @@ else.  We really just want to see if it's in the right ballpark."
       ;; Test that we can send the function back to the provider without error.
       (llm-chat provider prompt))))
 
-(llm-def-integration-test llm-function-call-multiple (provider)
+(llm-def-integration-test llm-tool-use-multiple (provider)
   (when (member 'function-calls (llm-capabilities provider))
     (let ((prompt (llm-integration-test-fc-multiple-prompt)))
       ;; Sending back multiple answers often doesn't happen, so we can't reliably
@@ -304,9 +299,9 @@ else.  We really just want to see if it's in the right ballpark."
                     "List the 3 largest cities in France in order of population, giving the results in JSON."
                     :response-format
                     '(:type object
-                            :properties
-                            (:cities (:type array :items (:type string)))
-                            :required (cities))))))
+                      :properties
+                      (:cities (:type array :items (:type string)))
+                      :required (cities))))))
       (should (equal
                '(:cities ["Paris" "Marseille" "Lyon"])
                (let ((json-object-type 'plist))

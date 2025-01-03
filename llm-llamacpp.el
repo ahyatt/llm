@@ -1,6 +1,6 @@
 ;;; llm-llamacpp.el --- llm module for integrating with llama.cpp. -*- lexical-binding: t; package-lint-main-file: "llm.el"; -*-
 
-;; Copyright (c) 2023, 2024  Free Software Foundation, Inc.
+;; Copyright (c) 2023-2025  Free Software Foundation, Inc.
 
 ;; Author: Andrew Hyatt <ahyatt@gmail.com>
 ;; Homepage: https://github.com/ahyatt/llm

@@ -1,6 +1,6 @@
 ;;; llm-prompt.el --- Utilities for LLM prompting -*- lexical-binding: t -*-
 
-;; Copyright (c) 2024  Free Software Foundation, Inc.
+;; Copyright (c) 2024-2025  Free Software Foundation, Inc.
 
 ;; Author: Andrew Hyatt <ahyatt@gmail.com>
 ;; Homepage: https://github.com/ahyatt/llm
@@ -147,18 +147,18 @@ counting the tickets not specified, which should equal this number."
     (while using-vars
       (let ((r (random total)))
         (cl-loop for v in using-vars
-                 with count = 0
-                 do
-                 (cl-incf count (llm-prompt-variable-tickets v))
-                 until (> count r)
-                 finally
-                 (condition-case nil
-                     (iter-yield (cons (llm-prompt-variable-name v)
-                                       (iter-next (llm-prompt-variable-full-generator v))))
-                   (iter-end-of-sequence
-                    (progn
-                      (setq using-vars (remove v using-vars)
-                            total (- total (llm-prompt-variable-tickets v)))))))))))
+              with count = 0
+              do
+              (cl-incf count (llm-prompt-variable-tickets v))
+              until (> count r)
+              finally
+              (condition-case nil
+                  (iter-yield (cons (llm-prompt-variable-name v)
+                                    (iter-next (llm-prompt-variable-full-generator v))))
+                (iter-end-of-sequence
+                 (progn
+                   (setq using-vars (remove v using-vars)
+                         total (- total (llm-prompt-variable-tickets v)))))))))))
 
 (defun llm-prompt--ensure-iterator (var)
   "Return an iterator for VAR, if it's not already one.
@@ -267,17 +267,17 @@ from the variable."
                     (push (cons var (list sval)) final-vals)))))
           (iter-end-of-sequence nil)))
       (cl-loop for (var-name . val) in final-vals
-               do
-               (goto-char
-                (llm-prompt-variable-marker
-                 (seq-find (lambda (e) (eq (llm-prompt-variable-name e)
-                                           var-name))
-                           vars)))
-               (insert (format "%s" (if (listp val)
-                                        (mapconcat (lambda (e)
-                                                     (format "%s" e))
-                                                   (reverse val) " ")
-                                      val)))))
+            do
+            (goto-char
+             (llm-prompt-variable-marker
+              (seq-find (lambda (e) (eq (llm-prompt-variable-name e)
+                                        var-name))
+                        vars)))
+            (insert (format "%s" (if (listp val)
+                                     (mapconcat (lambda (e)
+                                                  (format "%s" e))
+                                                (reverse val) " ")
+                                   val)))))
     (buffer-substring-no-properties (point-min) (point-max))))
 
 (defun llm-prompt-get (name)
