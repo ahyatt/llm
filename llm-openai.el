@@ -313,9 +313,10 @@ STREAMING if non-nil, turn on response streaming."
               (make-llm-provider-utils-tool-use
                :id (assoc-default 'id call)
                :name (assoc-default 'name tool)
-               :args (json-read-from-string
+               :args (json-parse-string
                       (let ((args (assoc-default 'arguments tool)))
-                        (if (= (length args) 0) "{}" args))))))
+                        (if (= (length args) 0) "{}" args))
+                      :object-type 'alist))))
           (assoc-default 'tool_calls
                          (assoc-default 'message
                                         (aref (assoc-default 'choices response) 0)))))
@@ -343,7 +344,7 @@ RESPONSE can be nil if the response is complete."
                        (let ((data (plz-event-source-event-data event)))
                          (unless (equal data "[DONE]")
                            (when-let ((response (llm-openai--get-partial-chat-response
-                                                 (json-read-from-string data))))
+                                                 (json-parse-string data :object-type 'alist))))
                              (funcall (if (stringp response) msg-receiver fc-receiver) response))))))))))
 
 (cl-defmethod llm-provider-collect-streaming-tool-uses ((_ llm-openai) data)
@@ -367,7 +368,8 @@ RESPONSE can be nil if the response is complete."
                                       arguments)))))
     (cl-loop for call in (append cvec nil)
              do (setf (llm-provider-utils-tool-use-args call)
-                      (json-read-from-string (llm-provider-utils-tool-use-args call)))
+                      (json-parse-string (llm-provider-utils-tool-use-args call)
+                                         :object-type 'alist))
              finally return (when (> (length cvec) 0)
                               (append cvec nil)))))
 
