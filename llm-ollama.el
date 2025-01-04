@@ -91,8 +91,8 @@ EMBEDDING-MODEL is the model to use for embeddings.  It is required."
 (cl-defmethod llm-provider-embedding-request ((provider llm-ollama) string)
   "Return the request to the server for the embedding of STRING.
 PROVIDER is the llm-ollama provider."
-  `(("input" . ,string)
-    ("model" . ,(llm-ollama-embedding-model provider))))
+  `(:input ,string
+           :model ,(llm-ollama-embedding-model provider)))
 
 (cl-defmethod llm-provider-batch-embeddings-request ((provider llm-ollama) strings)
   (llm-provider-embedding-request provider strings))
@@ -112,7 +112,7 @@ PROVIDER is the llm-ollama provider."
   "Return the response format for FORMAT."
   (if (eq format 'json)
       :json
-    (llm-provider-utils-json-schema format)))
+    format))
 
 (cl-defmethod llm-provider-chat-request ((provider llm-ollama) prompt streaming)
   (llm-provider-utils-combine-to-system-prompt prompt llm-ollama-example-prelude)
@@ -130,9 +130,9 @@ PROVIDER is the llm-ollama provider."
                                        (if (llm-media-p part)
                                            (setq images (append images (list part)))
                                          (setq content-text (concat content-text part))))
-                                   (setq content-text (json-encode content))))
+                                   (setq content-text (json-serialize content))))
                                (append
-                                `(:role ,(llm-provider-utils--safe-intern role)
+                                `(:role ,(symbol-name role)
                                         :content ,content-text)
                                 (when images
                                   `(:images
@@ -153,7 +153,7 @@ PROVIDER is the llm-ollama provider."
       (setq request-plist (plist-put request-plist :format
                                      (llm-ollama--response-format
                                       (llm-chat-prompt-response-format prompt)))))
-    (setq request-plist (plist-put request-plist :stream (if streaming t :json-false)))
+    (setq request-plist (plist-put request-plist :stream (if streaming t :false)))
     (when (llm-chat-prompt-temperature prompt)
       (setq options (plist-put options :temperature (llm-chat-prompt-temperature prompt))))
     (when (llm-chat-prompt-max-tokens prompt)
@@ -176,7 +176,7 @@ PROVIDER is the llm-ollama provider."
    prompt
    (mapcar (lambda (tool-use)
              `(:function (:name ,(llm-provider-utils-tool-use-name tool-use)
-                                :arguments (json-encode
+                                :arguments (json-serialize
                                             (llm-provider-utils-tool-use-args call)))))
            tool-uses)))
 

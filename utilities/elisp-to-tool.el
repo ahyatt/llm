@@ -35,7 +35,7 @@
 ;; An example of the output - you can remove the function call definition and
 ;; call `elisp-to-tool-insert' to see this in action.
 (defconst elisp-to-tool-switch-to-buffer
-  (llm-make-function-call :function
+  (llm-make-tool-function :function
                           'switch-to-buffer
                           :name
                           "switch_to_buffer"
@@ -76,7 +76,7 @@ the available buffers in the prompt."
                   (llm-make-chat-prompt
                    instructions
                    :context (format "The user wishes to switch to a buffer.  The available buffers to switch to are: %s.  Please call the switch_to_buffer function and make your best guess at what which of the buffers the user wants, or a new buffer if that is appropriate."
-                                    (json-encode
+                                    (json-serialize
                                      (seq-filter (lambda (s) (not (string-match "^\s" s)))
                                                  (mapcar #'buffer-name (buffer-list)))))
                    :tools (list elisp-to-tool-switch-to-buffer))
@@ -126,7 +126,7 @@ Documentation strings should start with uppercase and end with a period."
                            (save-excursion
                              (goto-char marker)
                              (cl-prettyprint
-                              `(llm-make-function-call
+                              `(llm-make-tool-function
                                 :function ,(list 'quote f)
                                 :name ,(elisp-to-tool-el-to-js-name (symbol-name f))
                                 :args (,@(mapcar
@@ -145,24 +145,24 @@ Documentation strings should start with uppercase and end with a period."
                        :name "elisp-to-tool-info"
                        :description "The function to create a OpenAI-compatible tool use spec, given the arguments and their documentation.  Some of the aspects of the tool can be automatically retrieved, so this function is supplying the parts that cannot be automatically retrieved."
                        :args '((:name "args"
-                                :type array
-                                :items (:type object
-                                        :properties (:name
-                                                     (:type string
-                                                            :description "The name of the argument")
-                                                     :type
-                                                     (:type string
-                                                            :enum (string number integer boolean)
-                                                            :description "The type of the argument.  It could be 'string', 'number', 'integer', 'boolean', or the more special forms.")
-                                                     :description
-                                                     (:type string
-                                                            :description "The description of the argument")
-                                                     :required
-                                                     (:type boolean
-                                                            :description "Whether the argument is required or not"))))
+                                      :type array
+                                      :items (:type object
+                                                    :properties (:name
+                                                                 (:type string
+                                                                        :description "The name of the argument")
+                                                                 :type
+                                                                 (:type string
+                                                                        :enum (string number integer boolean)
+                                                                        :description "The type of the argument.  It could be 'string', 'number', 'integer', 'boolean', or the more special forms.")
+                                                                 :description
+                                                                 (:type string
+                                                                        :description "The description of the argument")
+                                                                 :required
+                                                                 (:type boolean
+                                                                        :description "Whether the argument is required or not"))))
                                (:name "description"
-                                :type string
-                                :description "The documentation of the function to transform.")))))
+                                      :type string
+                                      :description "The documentation of the function to transform.")))))
                     (lambda (result) (message "Result: %S" result))
                     (lambda (_ msg) (error msg)))))
 

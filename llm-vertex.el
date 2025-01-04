@@ -134,7 +134,7 @@ the key must be regenerated every hour."
                     (assoc-default 'safetyRatings (aref candidates 0))))))))
 
 (cl-defmethod llm-provider-embedding-request ((_ llm-vertex) string)
-  `(("instances" . [(("content" . ,string))])))
+  `(:instances [(:content ,string)]))
 
 (cl-defmethod llm-provider-headers ((provider llm-vertex))
   `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider)))))
@@ -175,37 +175,37 @@ the key must be regenerated every hour."
 (defun llm-vertex--interaction (interaction)
   "Return the interaction from INTERACTION to be used in the request."
   `(:role ,(pcase (llm-chat-prompt-interaction-role interaction)
-             ('user 'user)
-             ('assistant 'model)
-             ('tool 'function))
+             ('user "user")
+             ('assistant "model")
+             ('tool "function"))
           :parts
           ,(cond
-             ((eq 'tool-results (llm-chat-prompt-interaction-role interaction))
-              (vconcat
-               (mapcar (lambda (fc)
-                         `(:functionResponse
-                           (:name ,(llm-chat-prompt-tool-result-tool-name fc)
-                                  :response
-                                  (:name ,(llm-chat-prompt-tool-result-tool-name fc)
-                                         :content ,(llm-chat-prompt-tool-result-result fc)))))
-                       (llm-chat-prompt-interaction-tool-results interaction))))
-             ((and (consp (llm-chat-prompt-interaction-content interaction))
-                   (llm-provider-utils-tool-use-p (car (llm-chat-prompt-interaction-content interaction))))
-              (vconcat
-               (mapcar (lambda (tool-use)
-                         `(:functionCall
-                           (:name ,(llm-provider-utils-tool-use-name tool-use)
-                                  :args ,(llm-provider-utils-tool-use-args tool-use))))
-                       (llm-chat-prompt-interaction-content interaction))))
-             ((llm-multipart-p (llm-chat-prompt-interaction-content interaction))
-              (vconcat (mapcar (lambda (part)
-                                 (if (llm-media-p part)
-                                     `(:inline_data
-                                       (:mime_type ,(llm-media-mime-type part)
-                                                   :data ,(base64-encode-string (llm-media-data part) t)))
-                                   `(:text ,part)))
-                               (llm-multipart-parts (llm-chat-prompt-interaction-content interaction)))))
-             (t `[(:text ,(llm-chat-prompt-interaction-content interaction))]))))
+            ((eq 'tool-results (llm-chat-prompt-interaction-role interaction))
+             (vconcat
+              (mapcar (lambda (fc)
+                        `(:functionResponse
+                          (:name ,(llm-chat-prompt-tool-result-tool-name fc)
+                                 :response
+                                 (:name ,(llm-chat-prompt-tool-result-tool-name fc)
+                                        :content ,(llm-chat-prompt-tool-result-result fc)))))
+                      (llm-chat-prompt-interaction-tool-results interaction))))
+            ((and (consp (llm-chat-prompt-interaction-content interaction))
+                  (llm-provider-utils-tool-use-p (car (llm-chat-prompt-interaction-content interaction))))
+             (vconcat
+              (mapcar (lambda (tool-use)
+                        `(:functionCall
+                          (:name ,(llm-provider-utils-tool-use-name tool-use)
+                                 :args ,(llm-provider-utils-tool-use-args tool-use))))
+                      (llm-chat-prompt-interaction-content interaction))))
+            ((llm-multipart-p (llm-chat-prompt-interaction-content interaction))
+             (vconcat (mapcar (lambda (part)
+                                (if (llm-media-p part)
+                                    `(:inline_data
+                                      (:mime_type ,(llm-media-mime-type part)
+                                                  :data ,(base64-encode-string (llm-media-data part) t)))
+                                  `(:text ,part)))
+                              (llm-multipart-parts (llm-chat-prompt-interaction-content interaction)))))
+            (t `[(:text ,(llm-chat-prompt-interaction-content interaction))]))))
 
 (cl-defmethod llm-provider-chat-request ((_ llm-google) prompt _)
   (llm-provider-utils-combine-to-system-prompt prompt llm-vertex-example-prelude)
@@ -233,28 +233,23 @@ the key must be regenerated every hour."
                     (llm-chat-prompt-tools prompt))))]))
    (llm-vertex--chat-parameters prompt)))
 
-(defun llm-vertex--response-schema (schema)
-  "Return vertex SCHEMA from our standard schema spec."
-  (llm-provider-utils-json-schema schema))
-
 (defun llm-vertex--chat-parameters (prompt)
   "From PROMPT, create the parameters section.
 Return value is a cons for adding to an alist, unless there is
 nothing to add, in which case it is nil."
   (let ((params-plist (llm-provider-utils-non-standard-params-plist prompt)))
     (when (llm-chat-prompt-temperature prompt)
-      (push (* (llm-chat-prompt-temperature prompt) 2.0) params-plist)
-      (push :temperature params-plist))
+      (setq params-plist (plist-put params-plist :temperature
+                                    (* (llm-chat-prompt-temperature prompt) 2.0))))
     (when (llm-chat-prompt-max-tokens prompt)
-      (push (llm-chat-prompt-max-tokens prompt) params-plist)
-      (push :maxOutputTokens params-plist))
+      (setq params-plist (plist-put params-plist :maxOutputTokens
+                                    (llm-chat-prompt-max-tokens prompt))))
     (when-let ((format (llm-chat-prompt-response-format prompt)))
-      (push 'application/json params-plist)
-      (push :response_mime_type params-plist)
+      (setq params-plist (plist-put params-plist :response_mime_type
+                                    "application/json"))
       (unless (eq 'json format)
-        (push (llm-vertex--response-schema (llm-chat-prompt-response-format prompt))
-              params-plist)
-        (push :response_schema params-plist)))
+        (setq params-plist (plist-put params-plist :response_schema
+                                      (llm-chat-prompt-response-format prompt)))))
     (when params-plist
       `(:generationConfig ,params-plist))))
 

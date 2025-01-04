@@ -71,8 +71,8 @@ https://api.example.com/v1/chat, then URL should be
 (cl-defmethod llm-provider-embedding-request ((provider llm-openai) string-or-list)
   "Return the request to the server for the embedding of STRING-OR-LIST.
 PROVIDER is the Open AI provider struct."
-  `(("input" . ,string-or-list)
-    ("model" . ,(llm-openai-embedding-model provider))))
+  `(:input ,string-or-list
+           :model ,(llm-openai-embedding-model provider)))
 
 (cl-defmethod llm-provider-batch-embeddings-request ((provider llm-openai) batch)
   (llm-provider-embedding-request provider batch))
@@ -156,14 +156,14 @@ PROVIDER is the Open AI provider struct."
 
 (defun llm-openai--response-format (format)
   "Return the Open AI response format for FORMAT."
-  (if (eq format 'json) '(("type" . "json_object"))
+  (if (eq format 'json) '(:type "json_object")
     ;; If not JSON, this must be a json response spec.
-    `(("type" . "json_schema")
-      ("json_schema" . (("name" . "response")
-                        ("strict" . t)
-                        ("schema" . ,(append
-                                      (llm-provider-utils-json-schema format)
-                                      '(("additionalProperties" . :json-false)))))))))
+    `(:type "json_schema"
+            :json_schema (:name "response"
+                                :strict t
+                                :schema ,(append
+                                          format
+                                          '(:additionalProperties :false))))))
 
 (defun llm-openai--build-model (provider)
   "Get the model field for the request for PROVIDER."
@@ -202,7 +202,7 @@ PROVIDER is the Open AI provider struct."
    (lambda (tool-result)
      (let ((msg-plist
             (list
-             :role 'tool
+             :role "tool"
              :name (llm-chat-prompt-tool-result-tool-name tool-result)
              :content (format "Result of tool call is %s" (llm-chat-prompt-tool-result-result tool-result)))))
        (when (llm-chat-prompt-tool-result-call-id tool-result)
@@ -221,7 +221,7 @@ FCS is a list of `llm-provider-utils-tool-use' structs."
                    :type "function"
                    :function
                    (:name ,(llm-provider-utils-tool-use-name fc)
-                          :arguments ,(json-encode
+                          :arguments ,(json-serialize
                                        (llm-provider-utils-tool-use-args fc)))))
            fcs)))
 
@@ -238,7 +238,7 @@ FCS is a list of `llm-provider-utils-tool-use' structs."
            ;; Handle regular interactions
            (list
             (let ((msg-plist
-                   (list :role (llm-chat-prompt-interaction-role interaction))))
+                   (list :role (symbol-name (llm-chat-prompt-interaction-role interaction)))))
               (when-let ((content (llm-chat-prompt-interaction-content interaction)))
                 (if (and (consp content)
                          (llm-provider-utils-tool-use-p (car content)))
@@ -248,23 +248,23 @@ FCS is a list of `llm-provider-utils-tool-use' structs."
                   (setq msg-plist
                         (plist-put msg-plist :content
                                    (cond
-                                     ((llm-multipart-p content)
-                                      (vconcat
-                                       (mapcar
-                                        (lambda (part)
-                                          (if (llm-media-p part)
-                                              (list :type "image_url"
-                                                    :image_url
-                                                    (list :url
-                                                          (concat
-                                                           "data:"
-                                                           (llm-media-mime-type part)
-                                                           ";base64,"
-                                                           (base64-encode-string
-                                                            (llm-media-data part) t))))
-                                            (list :type "text" :text part)))
-                                        (llm-multipart-parts content))))
-                                     (t content))))))
+                                    ((llm-multipart-p content)
+                                     (vconcat
+                                      (mapcar
+                                       (lambda (part)
+                                         (if (llm-media-p part)
+                                             (list :type "image_url"
+                                                   :image_url
+                                                   (list :url
+                                                         (concat
+                                                          "data:"
+                                                          (llm-media-mime-type part)
+                                                          ";base64,"
+                                                          (base64-encode-string
+                                                           (llm-media-data part) t))))
+                                           (list :type "text" :text part)))
+                                       (llm-multipart-parts content))))
+                                    (t content))))))
               msg-plist))))
        interactions)))))
 
@@ -352,24 +352,24 @@ RESPONSE can be nil if the response is complete."
     (dotimes (i num-index)
       (setf (aref cvec i) (make-llm-provider-utils-tool-use)))
     (cl-loop for part in data do
-          (cl-loop for call in (append part nil) do
-                (let* ((index (assoc-default 'index call))
-                       (id (assoc-default 'id call))
-                       (function (assoc-default 'function call))
-                       (name (assoc-default 'name function))
-                       (arguments (assoc-default 'arguments function)))
-                  (when id
-                    (setf (llm-provider-utils-tool-use-id (aref cvec index)) id))
-                  (when name
-                    (setf (llm-provider-utils-tool-use-name (aref cvec index)) name))
-                  (setf (llm-provider-utils-tool-use-args (aref cvec index))
-                        (concat (llm-provider-utils-tool-use-args (aref cvec index))
-                                arguments)))))
+             (cl-loop for call in (append part nil) do
+                      (let* ((index (assoc-default 'index call))
+                             (id (assoc-default 'id call))
+                             (function (assoc-default 'function call))
+                             (name (assoc-default 'name function))
+                             (arguments (assoc-default 'arguments function)))
+                        (when id
+                          (setf (llm-provider-utils-tool-use-id (aref cvec index)) id))
+                        (when name
+                          (setf (llm-provider-utils-tool-use-name (aref cvec index)) name))
+                        (setf (llm-provider-utils-tool-use-args (aref cvec index))
+                              (concat (llm-provider-utils-tool-use-args (aref cvec index))
+                                      arguments)))))
     (cl-loop for call in (append cvec nil)
-          do (setf (llm-provider-utils-tool-use-args call)
-                   (json-read-from-string (llm-provider-utils-tool-use-args call)))
-          finally return (when (> (length cvec) 0)
-                           (append cvec nil)))))
+             do (setf (llm-provider-utils-tool-use-args call)
+                      (json-read-from-string (llm-provider-utils-tool-use-args call)))
+             finally return (when (> (length cvec) 0)
+                              (append cvec nil)))))
 
 (cl-defmethod llm-name ((_ llm-openai))
   "Return the name of the provider."

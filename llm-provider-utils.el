@@ -505,40 +505,6 @@ If MODEL cannot be found, warn and return DEFAULT, which by default is 4096."
         (intern (substring s 1))
       sym)))
 
-(defun llm-provider-utils--safe-intern (s)
-  "Intern S, but if it already a symbol, return it."
-  (if (symbolp s) s (intern s)))
-
-(defun llm-provider-utils-json-schema (spec)
-  "Return a JSON schema object from SPEC.
-This is a plist that represents a JSON type specification.
-An example is `(:type object
-                      :properties
-                      (:cities (:type array :items (:type string)))
-                      :required (cities))'"
-  (let ((schema `((type . ,(plist-get spec :type)))))
-    (pcase (plist-get spec :type)
-      ('object
-       (let ((properties (plist-get spec :properties)))
-         (setq schema
-               (push (cons 'properties
-                           (mapcar (lambda (pair)
-                                     (cons (llm-provider-utils--decolon (car pair))
-                                           (llm-provider-utils-json-schema (cadr pair))))
-                                   (seq-partition properties 2)))
-                     schema))
-         (when (plist-get spec :required)
-           (push (cons 'required (plist-get spec :required)) schema))
-         (nreverse schema)))
-      ('array
-       (let ((items (plist-get spec :items)))
-         (push (cons 'items (llm-provider-utils-json-schema items)) schema))
-       (nreverse schema))
-      ('nil (if (plist-get spec :enum)
-                `((enum . ,(plist-get spec :enum)))
-              (error "Unknown JSON schema type: %s" (plist-get spec :type))))
-      (_ schema))))
-
 (defun llm-provider-utils-openai-arguments (args)
   "Convert ARGS to the OpenAI function calling spec.
 ARGS is a list of llm argument plists.
@@ -550,34 +516,33 @@ Each plist has the structure:
    :enum LIST-OF-STRINGS
    :items (PLIST :type STRING-OR-PLIST))
 
-:type can be either a simple string (e.g. \"string\")
-or a JSON Schema object plist (see `llm-provider-utils-json-schema')."
+:type can be either a simple string (e.g. \"string\") or a JSON Schema
+object plist, a direct representation of JSON schema as a plist."
   (let ((properties '())
         (required-names '()))
     (dolist (arg args)
       (let* ((arg-name (plist-get arg :name))
              (type-or-schema (let ((raw-type (plist-get arg :type)))
-                               (if (stringp raw-type)
-                                   (intern raw-type)
+                               (if (symbolp raw-type)
+                                   (symbol-name raw-type)
                                  raw-type)))
              (description (plist-get arg :description))
              (required (plist-get arg :required))
              (enum (plist-get arg :enum))
              (items (plist-get arg :items))
 
-             ;; Build the schema for this argument.
-             ;; If :type is itself a plist with :type inside it, we treat it
-             ;; as a JSON Schema object (via `llm-provider-utils-json-schema`).
-             ;; Otherwise we just create a simple schema with :type = string etc.
+             ;; Build the schema for this argument.  If :type is itself a plist
+             ;; with :type inside it, we treat it as a JSON Schema object.
+             ;; Otherwise we just create a simple schema with :type "string"
+             ;; etc.
              (schema
               (cond
-                ((and (consp type-or-schema)
-                      (plist-get type-or-schema :type))
-                 ;; It's a JSON Schema plist
-                 (llm-provider-utils-json-schema type-or-schema))
-                (t
-                 ;; It's just a string type, or something simple
-                 (list :type type-or-schema)))))
+               ((and (consp type-or-schema)
+                     (plist-get type-or-schema :type))
+                ;; It's a JSON Schema plist, use it as-is
+                type-or-schema)
+               (t ;; It's just a string type, or something simple
+                (list :type type-or-schema)))))
 
         ;; Add :description if present
         (when description
@@ -593,15 +558,15 @@ or a JSON Schema object plist (see `llm-provider-utils-json-schema')."
 
         ;; Track required argument names if :required is t
         (when required
-          (push (if (stringp arg-name)
-                    (intern arg-name)
+          (push (if (symbolp arg-name)
+                    (symbol-name arg-name)
                   arg-name) required-names))
 
         ;; Finally, put this schema into the :properties
         (setq properties
               (plist-put properties (intern (concat ":" arg-name)) schema))))
     ;; Build the final spec
-    (let ((spec `(:type object :properties ,properties)))
+    (let ((spec `(:type "object" :properties ,properties)))
       (when required-names
         (setq spec (plist-put spec :required (apply #'vector
                                                     (nreverse required-names)))))
@@ -618,7 +583,7 @@ Open AI's function spec is a standard way to do this, and will be
 applicable to many endpoints.
 
 This returns a JSON object (a list that can be converted to JSON)."
-  `(:type function
+  `(:type "function"
           :function
           (:name ,(llm-tool-function-name tool)
                  :description ,(llm-tool-function-description tool)
@@ -716,34 +681,34 @@ have returned results."
   (llm-provider-populate-tool-uses provider prompt tool-uses)
   (let (results tool-use-and-results)
     (cl-loop
-          for tool-use in tool-uses do
-          (let* ((name (llm-provider-utils-tool-use-name tool-use))
-                 (arguments (llm-provider-utils-tool-use-args tool-use))
-                 (tool (seq-find
-                        (lambda (f) (equal name (llm-tool-function-name f)))
-                        (llm-chat-prompt-tools prompt)))
-                 (call-args (cl-loop for arg in (llm-tool-function-args tool)
-                                  collect (cdr (seq-find (lambda (a)
-                                                           (eq (intern (plist-get arg :name))
-                                                               (car a)))
-                                                         arguments))))
-                 (end-func (lambda (result)
-                             (llm--log
-                              'api-funcall
-                              :provider provider
-                              :msg (format "%s --> %s"
-                                           (format "%S" (cons name call-args))
-                                           (format "%s" result)))
-                             (push (cons name result) tool-use-and-results)
-                             (push (cons tool-use result) results)
-                             (when (= (length results) (length tool-uses))
-                               (llm-provider-utils-populate-tool-uses
-                                provider prompt results)
-                               (funcall success-callback tool-use-and-results)))))
-            (if (llm-tool-function-async tool)
-                (apply (llm-tool-function-function tool)
-                       (append (list end-func) call-args))
-              (funcall end-func (apply (llm-tool-function-function tool) call-args)))))))
+     for tool-use in tool-uses do
+     (let* ((name (llm-provider-utils-tool-use-name tool-use))
+            (arguments (llm-provider-utils-tool-use-args tool-use))
+            (tool (seq-find
+                   (lambda (f) (equal name (llm-tool-function-name f)))
+                   (llm-chat-prompt-tools prompt)))
+            (call-args (cl-loop for arg in (llm-tool-function-args tool)
+                                collect (cdr (seq-find (lambda (a)
+                                                         (eq (intern (plist-get arg :name))
+                                                             (car a)))
+                                                       arguments))))
+            (end-func (lambda (result)
+                        (llm--log
+                         'api-funcall
+                         :provider provider
+                         :msg (format "%s --> %s"
+                                      (format "%S" (cons name call-args))
+                                      (format "%s" result)))
+                        (push (cons name result) tool-use-and-results)
+                        (push (cons tool-use result) results)
+                        (when (= (length results) (length tool-uses))
+                          (llm-provider-utils-populate-tool-uses
+                           provider prompt results)
+                          (funcall success-callback tool-use-and-results)))))
+       (if (llm-tool-function-async tool)
+           (apply (llm-tool-function-function tool)
+                  (append (list end-func) call-args))
+         (funcall end-func (apply (llm-tool-function-function tool) call-args)))))))
 
 
 ;; This is a useful method for getting out of the request buffer when it's time

@@ -29,33 +29,33 @@
           (list
            ;; A required string arg
            '(:name "location"
-             :type string
-             :description "The city and state, e.g. San Francisco, CA"
-             :required t)
+                   :type "string"
+                   :description "The city and state, e.g. San Francisco, CA"
+                   :required t)
            ;; A string arg with an enum
            '(:name "unit"
-             :type string  ;; we should be able to take strings or symbols here.
-             :description "The unit of temperature, either 'celsius' or 'fahrenheit'"
-             :enum ("celsius" "fahrenheit"))
+                   :type "string"
+                   :description "The unit of temperature, either 'celsius' or 'fahrenheit'"
+                   :enum ("celsius" "fahrenheit"))
            '(:name "postal_codes"
-             :type array
-             :description "Specific postal codes"
-             :items (:type string))))
+                   :type "array"
+                   :description "Specific postal codes"
+                   :items (:type "string"))))
          (result (llm-provider-utils-openai-arguments args))
          (expected
-          '(:type object
-            :properties
-            (:location
-             (:type string
-              :description "The city and state, e.g. San Francisco, CA")
-             :unit
-             (:type string
-              :description "The unit of temperature, either 'celsius' or 'fahrenheit'"
-              :enum ["celsius" "fahrenheit"])
-             :postal_codes (:type array
-                            :description "Specific postal codes"
-                            :items (:type string)))
-            :required [location])))
+          '(:type "object"
+                  :properties
+                  (:location
+                   (:type "string"
+                          :description "The city and state, e.g. San Francisco, CA")
+                   :unit
+                   (:type "string"
+                          :description "The unit of temperature, either 'celsius' or 'fahrenheit'"
+                          :enum ["celsius" "fahrenheit"])
+                   :postal_codes (:type "array"
+                                        :description "Specific postal codes"
+                                        :items (:type "string")))
+                  :required ["location"])))
     (should (equal result expected))))
 
 (ert-deftest llm-provider-utils-combine-to-system-prompt ()
@@ -128,28 +128,6 @@
     (should (= 1 (length (llm-chat-prompt-interactions prompt-for-first-request))))
     (should (equal "Previous interactions:\n\nUser: Hello\nAssistant: Hi! How can I assist you?\n\nThe current conversation follows:\n\nEarl Grey, hot."
                    (llm-chat-prompt-interaction-content (nth 0 (llm-chat-prompt-interactions prompt-for-second-request)))))))
-
-(ert-deftest llm-provider-utils-json-schema ()
-  (should (equal '((type . object)
-                   (properties
-                    (cities
-                     (type . array)
-                     (items
-                      (type . string))))
-                   (required . (cities)))
-                 (llm-provider-utils-json-schema
-                  '(:type object
-                    :properties
-                    (:cities (:type array :items (:type string)))
-                    :required (cities)))))
-  (should (equal '((type . boolean))
-                 (llm-provider-utils-json-schema '(:type boolean))))
-  (should (equal '((type . object)
-                   (properties . ((data . ((enum . ("pizza" "calzone" "pasta")))))))
-                 (llm-provider-utils-json-schema
-                  '(:type object
-                    :properties
-                    (:data (:enum ("pizza" "calzone" "pasta"))))))))
 
 (provide 'llm-provider-utils-test)
 ;;; llm-provider-utils-test.el ends here

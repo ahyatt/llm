@@ -52,33 +52,33 @@
 
 (cl-defmethod llm-provider-chat-request ((provider llm-claude) prompt stream)
   (let ((request
-            `(:model ,(llm-claude-chat-model provider)
-                     :stream ,(if stream t :json-false)
-                     ;; Claude requires max_tokens
-                     :max_tokens ,(or (llm-chat-prompt-max-tokens prompt) 4096)
-                     :messages
-                     ,(vconcat
-                       (mapcar (lambda (interaction)
-                                 `(:role  ,(pcase (llm-chat-prompt-interaction-role interaction)
-                                             ('tool_results 'user)
-                                             ('tool_use 'assistant)
-                                             ('assistant 'assistant)
-                                             ('user 'user))
-                                          :content
-                                          ,(cond ((llm-chat-prompt-interaction-tool-results interaction)
-                                                  (vconcat (mapcar (lambda (result)
-                                                                     `(:type tool_result
-                                                                             :tool_use_id
-                                                                             ,(llm-chat-prompt-tool-result-call-id result)
-                                                                             :content
-                                                                             ,(llm-chat-prompt-tool-result-result result)))
-                                                                   (llm-chat-prompt-interaction-tool-results interaction))))
-                                                 ((llm-multipart-p (llm-chat-prompt-interaction-content interaction))
-                                                  (llm-claude--multipart-content
-                                                   (llm-chat-prompt-interaction-content interaction)))
-                                                 (t
-                                                  (llm-chat-prompt-interaction-content interaction)))))
-                               (llm-chat-prompt-interactions prompt)))))
+          `(:model ,(llm-claude-chat-model provider)
+                   :stream ,(if stream t :false)
+                   ;; Claude requires max_tokens
+                   :max_tokens ,(or (llm-chat-prompt-max-tokens prompt) 4096)
+                   :messages
+                   ,(vconcat
+                     (mapcar (lambda (interaction)
+                               `(:role  ,(pcase (llm-chat-prompt-interaction-role interaction)
+                                           ('tool_results "user")
+                                           ('tool_use "assistant")
+                                           ('assistant "assistant")
+                                           ('user "user"))
+                                        :content
+                                        ,(cond ((llm-chat-prompt-interaction-tool-results interaction)
+                                                (vconcat (mapcar (lambda (result)
+                                                                   `(:type tool_result
+                                                                           :tool_use_id
+                                                                           ,(llm-chat-prompt-tool-result-call-id result)
+                                                                           :content
+                                                                           ,(llm-chat-prompt-tool-result-result result)))
+                                                                 (llm-chat-prompt-interaction-tool-results interaction))))
+                                               ((llm-multipart-p (llm-chat-prompt-interaction-content interaction))
+                                                (llm-claude--multipart-content
+                                                 (llm-chat-prompt-interaction-content interaction)))
+                                               (t
+                                                (llm-chat-prompt-interaction-content interaction)))))
+                             (llm-chat-prompt-interactions prompt)))))
         (system (llm-provider-utils-get-system-prompt prompt)))
     (when (llm-chat-prompt-tools prompt)
       (plist-put request :tools
@@ -94,11 +94,11 @@
   "Return CONTENT as a list of Claude multipart content."
   (vconcat (mapcar (lambda (part)
                      (cond ((stringp part)
-                            `(:type text
+                            `(:type "text"
                                     :text ,part))
                            ((llm-media-p part)
-                            `(:type image
-                                    :source (:type base64
+                            `(:type "image"
+                                    :source (:type "base64"
                                                    :media_type ,(llm-media-mime-type part)
                                                    :data ,(base64-encode-string (llm-media-data part) t))))
                            (t
@@ -108,11 +108,11 @@
 (cl-defmethod llm-provider-extract-tool-uses ((_ llm-claude) response)
   (let ((content (append (assoc-default 'content response) nil)))
     (cl-loop for item in content
-          when (equal "tool_use" (assoc-default 'type item))
-          collect (make-llm-provider-utils-tool-use
-                   :id (assoc-default 'id item)
-                   :name (assoc-default 'name item)
-                   :args (assoc-default 'input item)))))
+             when (equal "tool_use" (assoc-default 'type item))
+             collect (make-llm-provider-utils-tool-use
+                      :id (assoc-default 'id item)
+                      :name (assoc-default 'name item)
+                      :args (assoc-default 'input item)))))
 
 (cl-defmethod llm-provider-populate-tool-uses ((_ llm-claude) prompt tool-uses)
   (llm-provider-utils-append-to-prompt
