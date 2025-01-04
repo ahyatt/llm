@@ -174,11 +174,11 @@ PROVIDER is the llm-ollama provider."
 (cl-defmethod llm-provider-populate-tool-uses ((_ llm-ollama) prompt tool-uses)
   (llm-provider-utils-append-to-prompt
    prompt
-   (mapcar (lambda (tool-use)
-             `(:function (:name ,(llm-provider-utils-tool-use-name tool-use)
-                                :arguments (json-serialize
-                                            (llm-provider-utils-tool-use-args call)))))
-           tool-uses)))
+   (vconcat (mapcar (lambda (tool-use)
+                      `(:function (:name ,(llm-provider-utils-tool-use-name tool-use)
+                                         :arguments ,(json-serialize
+                                                      (llm-provider-utils-tool-use-args tool-use)))))
+                    tool-uses))))
 
 (cl-defmethod llm-provider-streaming-media-handler ((_ llm-ollama) msg-receiver _ _)
   (cons 'application/x-ndjson

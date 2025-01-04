@@ -177,7 +177,7 @@ the key must be regenerated every hour."
   `(:role ,(pcase (llm-chat-prompt-interaction-role interaction)
              ('user "user")
              ('assistant "model")
-             ('tool "function"))
+             ('tool-results "function"))
           :parts
           ,(cond
             ((eq 'tool-results (llm-chat-prompt-interaction-role interaction))
