@@ -81,7 +81,7 @@
 
 (defun llm-test-normalize (json-obj)
   "Normalize JSON-OBJ for comparison."
-  (cond ((plistp json-obj)
+  (cond ((consp json-obj)
          (mapcan (lambda (x) (list (car x) (llm-test-normalize (cadr x))))
                  ;; We need to use seq-sort, due to sort incompatibilities in
                  ;; emacs 30.
