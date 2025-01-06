@@ -36,7 +36,7 @@
            '(:name "unit"
                    :type "string"
                    :description "The unit of temperature, either 'celsius' or 'fahrenheit'"
-                   :enum ("celsius" "fahrenheit"))
+                   :enum ["celsius" "fahrenheit"])
            '(:name "postal_codes"
                    :type "array"
                    :description "Specific postal codes"

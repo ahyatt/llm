@@ -551,7 +551,7 @@ object plist, a direct representation of JSON schema as a plist."
         ;; Add :enum if present
         (when enum
           ;; Vectors generally serialize nicely to JSON arrays, but a list is fine too.
-          (setq schema (plist-put schema :enum (apply #'vector enum))))
+          (setq schema (plist-put schema :enum enum)))
 
         (when items
           (setq schema (plist-put schema :items items)))
