@@ -512,7 +512,7 @@ Each plist has the structure:
   (:name STRING
    :type STRING-OR-PLIST
    :description STRING
-   :required BOOLEAN
+   :optional BOOLEAN
    :enum LIST-OF-STRINGS
    :items (PLIST :type STRING-OR-PLIST))
 
@@ -527,7 +527,7 @@ object plist, a direct representation of JSON schema as a plist."
                                    (symbol-name raw-type)
                                  raw-type)))
              (description (plist-get arg :description))
-             (required (plist-get arg :required))
+             (required (not (plist-get arg :optional)))
              (enum (plist-get arg :enum))
              (items (plist-get arg :items))
 

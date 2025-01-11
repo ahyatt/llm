@@ -112,7 +112,7 @@ NAME is a human readable name of the function.
 DESCRIPTION is a human readable description of the function.
 
 ARGS is a list of plists, each plist having the keys `:name', `:type',
-`:description', and `:required'.  `:type' is a string, and the same set
+`:description', and `:optional'.  `:type' is a string, and the same set
 of types as in `RESPONSE-FORMAT' arg in `llm-make-chat-prompt':
 `string', `integer', `boolean', `float', or `array'.  There can be an
 `:enum' field as well, with a vector of possible values.

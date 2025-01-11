@@ -30,17 +30,18 @@
            ;; A required string arg
            '(:name "location"
                    :type "string"
-                   :description "The city and state, e.g. San Francisco, CA"
-                   :required t)
+                   :description "The city and state, e.g. San Francisco, CA")
            ;; A string arg with an enum
            '(:name "unit"
                    :type "string"
                    :description "The unit of temperature, either 'celsius' or 'fahrenheit'"
-                   :enum ["celsius" "fahrenheit"])
+                   :enum ["celsius" "fahrenheit"]
+                   :optional t)
            '(:name "postal_codes"
                    :type "array"
                    :description "Specific postal codes"
-                   :items (:type "string"))))
+                   :items (:type "string")
+                   :optional t)))
          (result (llm-provider-utils-openai-arguments args))
          (expected
           '(:type "object"

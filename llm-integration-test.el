@@ -93,8 +93,7 @@
           :description "Get the capital of a country."
           :args '((:name "country"
                          :description "The country whose capital to look up."
-                         :type string
-                         :required t))
+                         :type string))
           :async nil))))
 
 (defun llm-integration-test-rate-limit (provider)
@@ -152,164 +151,164 @@ else.  We really just want to see if it's in the right ballpark."
            ,@body)))))
 
 (llm-def-integration-test llm-embedding (provider)
-  (when (member 'embeddings (llm-capabilities provider))
-    (let ((result (llm-embedding provider "Paris")))
-      (should (vectorp result))
-      (should (> (length result) 0)))))
+                          (when (member 'embeddings (llm-capabilities provider))
+                            (let ((result (llm-embedding provider "Paris")))
+                              (should (vectorp result))
+                              (should (> (length result) 0)))))
 
 (llm-def-integration-test llm-embedding-async (provider)
-  (when (member 'embeddings (llm-capabilities provider))
-    (let ((result nil)
-          (buf (current-buffer))
-          (llm-warn-on-nonfree nil))
-      (llm-embedding-async
-       provider
-       "Paris"
-       (lambda (response)
-         (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
-         (setq result response))
-       (lambda (error)
-         (error "Error: %s" error)))
-      (while (null result)
-        (sleep-for 0.1))
-      (should (vectorp result))
-      (should (> (length result) 0)))))
+                          (when (member 'embeddings (llm-capabilities provider))
+                            (let ((result nil)
+                                  (buf (current-buffer))
+                                  (llm-warn-on-nonfree nil))
+                              (llm-embedding-async
+                               provider
+                               "Paris"
+                               (lambda (response)
+                                 (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
+                                 (setq result response))
+                               (lambda (error)
+                                 (error "Error: %s" error)))
+                              (while (null result)
+                                (sleep-for 0.1))
+                              (should (vectorp result))
+                              (should (> (length result) 0)))))
 
 (llm-def-integration-test llm-batch-embeddings (provider)
-  (when (member 'embeddings-batch (llm-capabilities provider))
-    (let ((result (llm-batch-embeddings provider '("Paris" "France"))))
-      (should (listp result))
-      (should (= (length result) 2))
-      (should (vectorp (aref result 0)))
-      (should (vectorp (aref result 1))))))
+                          (when (member 'embeddings-batch (llm-capabilities provider))
+                            (let ((result (llm-batch-embeddings provider '("Paris" "France"))))
+                              (should (listp result))
+                              (should (= (length result) 2))
+                              (should (vectorp (aref result 0)))
+                              (should (vectorp (aref result 1))))))
 
 (llm-def-integration-test llm-batch-embedding-async (provider)
-  (when (member 'embeddings-batch (llm-capabilities provider))
-    (let ((result nil)
-          (buf (current-buffer))
-          (llm-warn-on-nonfree nil))
-      (llm-batch-embeddings-async
-       provider
-       '("Paris" "France")
-       (lambda (response)
-         (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
-         (setq result response))
-       (lambda (error)
-         (error "Error: %s" error)))
-      (while (null result)
-        (sleep-for 0.1))
-      (should (listp result))
-      (should (= (length result) 2))
-      (should (vectorp (aref result 0)))
-      (should (vectorp (aref result 1))))))
+                          (when (member 'embeddings-batch (llm-capabilities provider))
+                            (let ((result nil)
+                                  (buf (current-buffer))
+                                  (llm-warn-on-nonfree nil))
+                              (llm-batch-embeddings-async
+                               provider
+                               '("Paris" "France")
+                               (lambda (response)
+                                 (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
+                                 (setq result response))
+                               (lambda (error)
+                                 (error "Error: %s" error)))
+                              (while (null result)
+                                (sleep-for 0.1))
+                              (should (listp result))
+                              (should (= (length result) 2))
+                              (should (vectorp (aref result 0)))
+                              (should (vectorp (aref result 1))))))
 
 (llm-def-integration-test llm-chat (provider)
-  (should (equal
-           (string-trim (llm-chat
-                         provider
-                         (llm-make-chat-prompt llm-integration-test-chat-prompt)))
-           llm-integration-test-chat-answer)))
+                          (should (equal
+                                   (string-trim (llm-chat
+                                                 provider
+                                                 (llm-make-chat-prompt llm-integration-test-chat-prompt)))
+                                   llm-integration-test-chat-answer)))
 
 (llm-def-integration-test llm-chat-async (provider)
-  (let ((result nil)
-        (buf (current-buffer))
-        (llm-warn-on-nonfree nil)
-        (err-result nil))
-    (llm-chat-async
-     provider
-     (llm-make-chat-prompt llm-integration-test-chat-prompt)
-     (lambda (response)
-       (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
-       (setq result response))
-     (lambda (_ err)
-       (setq err-result err)))
-    (while (not (or result err-result))
-      (sleep-for 0.1))
-    (if err-result (error err-result))
-    (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim result)))))
+                          (let ((result nil)
+                                (buf (current-buffer))
+                                (llm-warn-on-nonfree nil)
+                                (err-result nil))
+                            (llm-chat-async
+                             provider
+                             (llm-make-chat-prompt llm-integration-test-chat-prompt)
+                             (lambda (response)
+                               (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
+                               (setq result response))
+                             (lambda (_ err)
+                               (setq err-result err)))
+                            (while (not (or result err-result))
+                              (sleep-for 0.1))
+                            (if err-result (error err-result))
+                            (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim result)))))
 
 (llm-def-integration-test llm-chat-streaming (provider)
-  (when (member 'streaming (llm-capabilities provider))
-    (let ((streamed-result "")
-          (returned-result nil)
-          (llm-warn-on-nonfree nil)
-          (buf (current-buffer))
-          (start-time (current-time))
-          (err-result nil))
-      (llm-chat-streaming
-       provider
-       (llm-make-chat-prompt llm-integration-test-chat-prompt)
-       (lambda (partial-response)
-         (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
-         (setq streamed-result (concat streamed-result partial-response)))
-       (lambda (response)
-         (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
-         (setq returned-result response))
-       (lambda (_ err)
-         (setq err-result err)))
-      (while (and (or (null returned-result)
-                      (= (length streamed-result) 0))
-                  (null err-result)
-                  (time-less-p (time-subtract (current-time) start-time) 60))
-        (sleep-for 0.1))
-      (if err-result (error err-result))
-      (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim returned-result)))
-      (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim streamed-result))))))
+                          (when (member 'streaming (llm-capabilities provider))
+                            (let ((streamed-result "")
+                                  (returned-result nil)
+                                  (llm-warn-on-nonfree nil)
+                                  (buf (current-buffer))
+                                  (start-time (current-time))
+                                  (err-result nil))
+                              (llm-chat-streaming
+                               provider
+                               (llm-make-chat-prompt llm-integration-test-chat-prompt)
+                               (lambda (partial-response)
+                                 (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
+                                 (setq streamed-result (concat streamed-result partial-response)))
+                               (lambda (response)
+                                 (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
+                                 (setq returned-result response))
+                               (lambda (_ err)
+                                 (setq err-result err)))
+                              (while (and (or (null returned-result)
+                                              (= (length streamed-result) 0))
+                                          (null err-result)
+                                          (time-less-p (time-subtract (current-time) start-time) 60))
+                                (sleep-for 0.1))
+                              (if err-result (error err-result))
+                              (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim returned-result)))
+                              (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim streamed-result))))))
 
 (llm-def-integration-test llm-tool-use (provider)
-  (when (member 'function-calls (llm-capabilities provider))
-    (let ((prompt (llm-integration-test-tool-use-prompt)))
-      (should (equal
-               (llm-chat provider prompt)
-               llm-integration-test-fc-answer))
-      ;; Test that we can send the function back to the provider without error.
-      (llm-chat provider prompt))))
+                          (when (member 'function-calls (llm-capabilities provider))
+                            (let ((prompt (llm-integration-test-tool-use-prompt)))
+                              (should (equal
+                                       (llm-chat provider prompt)
+                                       llm-integration-test-fc-answer))
+                              ;; Test that we can send the function back to the provider without error.
+                              (llm-chat provider prompt))))
 
 (llm-def-integration-test llm-tool-use-multiple (provider)
-  (when (member 'function-calls (llm-capabilities provider))
-    (let ((prompt (llm-integration-test-fc-multiple-prompt)))
-      ;; Sending back multiple answers often doesn't happen, so we can't reliably
-      ;; check for this yet.
-      (llm-chat provider prompt)
-      ;; Test that we can send the function back to the provider without error.
-      (llm-chat provider prompt))))
+                          (when (member 'function-calls (llm-capabilities provider))
+                            (let ((prompt (llm-integration-test-fc-multiple-prompt)))
+                              ;; Sending back multiple answers often doesn't happen, so we can't reliably
+                              ;; check for this yet.
+                              (llm-chat provider prompt)
+                              ;; Test that we can send the function back to the provider without error.
+                              (llm-chat provider prompt))))
 
 (llm-def-integration-test llm-image-chat (provider)
-  ;; On github, the emacs we use doesn't have image support, so we can't use
-  ;; image objects.
-  (when (member 'image-input (llm-capabilities provider))
-    (let* ((image-bytes
-            (with-temp-buffer (set-buffer-multibyte nil)
-                              (insert-file-contents-literally
-                               (expand-file-name "animal.jpeg" llm-integration-current-directory))
-                              (buffer-string)))
-           (result (llm-chat
-                    provider
-                    (llm-make-chat-prompt
-                     (llm-make-multipart
-                      "What is this animal?  You should have an image, if not please let me know.  If you do have the image, please answer in one word, without punctuation or whitespace."
-                      (make-llm-media :mime-type "image/jpeg" :data image-bytes))))))
-      (should (stringp result))
-      (should (llm-integration-test-string-eq "owl" (string-trim (downcase result)))))))
+                          ;; On github, the emacs we use doesn't have image support, so we can't use
+                          ;; image objects.
+                          (when (member 'image-input (llm-capabilities provider))
+                            (let* ((image-bytes
+                                    (with-temp-buffer (set-buffer-multibyte nil)
+                                                      (insert-file-contents-literally
+                                                       (expand-file-name "animal.jpeg" llm-integration-current-directory))
+                                                      (buffer-string)))
+                                   (result (llm-chat
+                                            provider
+                                            (llm-make-chat-prompt
+                                             (llm-make-multipart
+                                              "What is this animal?  You should have an image, if not please let me know.  If you do have the image, please answer in one word, without punctuation or whitespace."
+                                              (make-llm-media :mime-type "image/jpeg" :data image-bytes))))))
+                              (should (stringp result))
+                              (should (llm-integration-test-string-eq "owl" (string-trim (downcase result)))))))
 
 (llm-def-integration-test llm-json-test (provider)
-  (when (member 'json-response (llm-capabilities provider))
-    (let ((result (llm-chat
-                   provider
-                   (llm-make-chat-prompt
-                    "List the 3 largest cities in France in order of population, giving the results in JSON."
-                    :response-format
-                    '(:type "object"
-                            :properties
-                            (:cities (:type "array" :items (:type "string")))
-                            :required ["cities"])))))
-      (should (equal
-               (llm-test-normalize '(:cities ["Lyon" "Marseille" "Paris"]))
-               (llm-test-normalize (json-parse-string result :object-type 'plist)))))))
+                          (when (member 'json-response (llm-capabilities provider))
+                            (let ((result (llm-chat
+                                           provider
+                                           (llm-make-chat-prompt
+                                            "List the 3 largest cities in France in order of population, giving the results in JSON."
+                                            :response-format
+                                            '(:type "object"
+                                                    :properties
+                                                    (:cities (:type "array" :items (:type "string")))
+                                                    :required ["cities"])))))
+                              (should (equal
+                                       (llm-test-normalize '(:cities ["Lyon" "Marseille" "Paris"]))
+                                       (llm-test-normalize (json-parse-string result :object-type 'plist)))))))
 
 (llm-def-integration-test llm-count-tokens (provider)
-  (let ((result (llm-count-tokens provider "What is the capital of France?")))
-    (should (integerp result))
-    (should (> result 0))))
+                          (let ((result (llm-count-tokens provider "What is the capital of France?")))
+                            (should (integerp result))
+                            (should (> result 0))))
 
 (provide 'llm-integration-test)
