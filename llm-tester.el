@@ -255,9 +255,8 @@ of by calling the `describe_function' function."
           :name "describe_function"
           :description "Takes an elisp function name and shows the user the functions and their descriptions."
           :args '((:name "function_name"
-                   :description "A function name to describe."
-                   :type string
-                   :required t))
+                         :description "A function name to describe."
+                         :type "string"))
           :async nil))))
 
 (defun llm-tester-tool-use-sync (provider)
@@ -360,14 +359,14 @@ of by calling the `describe_function' function."
 PROVIDER is the provider that is being tested."
   (lambda (type message)
     (cond
-      ((not (symbolp type))
-       (llm-tester-log "ERROR: Provider %s returned an error on %s with a non-symbol type %s with message %s" (type-of provider) call type message))
-      ((not (stringp message))
-       (llm-tester-log "ERROR: Provider %s returned an error on %s with a non-string message %s with type %s" (type-of provider) call message type))
-      ((string-match-p "Unknown Error" message)
-       (llm-tester-log "ERROR: Provider %s returned a message on %s with 'Unknown Error' instead of more specific error message" (type-of provider) call))
-      (t
-       (llm-tester-log "SUCCESS: Provider %s on %s returned an error of type %s with message %s" (type-of provider) call type message)))))
+     ((not (symbolp type))
+      (llm-tester-log "ERROR: Provider %s returned an error on %s with a non-symbol type %s with message %s" (type-of provider) call type message))
+     ((not (stringp message))
+      (llm-tester-log "ERROR: Provider %s returned an error on %s with a non-string message %s with type %s" (type-of provider) call message type))
+     ((string-match-p "Unknown Error" message)
+      (llm-tester-log "ERROR: Provider %s returned a message on %s with 'Unknown Error' instead of more specific error message" (type-of provider) call))
+     (t
+      (llm-tester-log "SUCCESS: Provider %s on %s returned an error of type %s with message %s" (type-of provider) call type message)))))
 
 (defun llm-tester-bad-provider-async (provider)
   "When PROVIDER is bad in a some way, test error handling."
