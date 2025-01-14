@@ -75,8 +75,7 @@
           :description "Get the capital of a country."
           :args '((:name "country"
                          :description "The country whose capital to look up."
-                         :type "string"
-                         :required t))
+                         :type "string"))
           :async t))))
 
 (defconst llm-integration-test-fc-answer
