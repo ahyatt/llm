@@ -331,9 +331,10 @@ RESPONSE can be nil if the response is complete."
     (let* ((choices (assoc-default 'choices response))
            (delta (when (> (length choices) 0)
                     (assoc-default 'delta (aref choices 0))))
-           (content-or-call (or (and (assoc-default 'content delta)
-                                     (not (eq (assoc-default 'content delta) :null)))
-                                (assoc-default 'tool_calls delta))))
+           (content-or-call (or (llm-provider-utils-json-val
+                                 (assoc-default 'content delta))
+                                (llm-provider-utils-json-val
+                                 (assoc-default 'tool_calls delta)))))
       content-or-call)))
 
 (cl-defmethod llm-provider-streaming-media-handler ((_ llm-openai) msg-receiver fc-receiver _)

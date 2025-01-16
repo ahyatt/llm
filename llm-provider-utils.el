@@ -722,5 +722,10 @@ If F is nil, nothing is done."
         (with-current-buffer buf (apply f args))
       (with-temp-buffer (apply f args)))))
 
+(defun llm-provider-utils-json-val (val)
+  "Return VAL if it is not nil, otherwise return nil."
+  (when (and val (not (eq val :null)))
+    val))
+
 (provide 'llm-provider-utils)
 ;;; llm-provider-utils.el ends here
