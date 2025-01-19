@@ -162,7 +162,8 @@ PROVIDER is the Open AI provider struct."
             :json_schema (:name "response"
                                 :strict t
                                 :schema ,(append
-                                          format
+                                          (llm-provider-utils-convert-to-serializable
+                                           format)
                                           '(:additionalProperties :false))))))
 
 (defun llm-openai--build-model (provider)

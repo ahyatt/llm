@@ -161,7 +161,7 @@ Some examples:
 (llm-chat my-provider (llm-make-chat-prompt
                                 "How many countries are there?  Return the result as JSON."
                                 :response-format
-                                '(:type "object" :properties (:num (:type "integer")) :required ["num"])))
+                                '(:type object :properties (:num (:type "integer")) :required ["num"])))
 #+end_src
 
 #+RESULTS:
@@ -171,7 +171,7 @@ Some examples:
 (llm-chat my-provider (llm-make-chat-prompt
                                 "Which editor is hard to quit?  Return the result as JSON."
                                 :response-format
-                                '(:type "object" :properties (:editor (:enum ["emacs" "vi" "vscode"])
+                                '(:type object :properties (:editor (:enum ["emacs" "vi" "vscode"])
                                                                     :authors (:type "array" :items (:type "string")))
                                         :required ["editor" "authors"])))
 #+end_src
@@ -223,7 +223,7 @@ The way to call functions is to attach a list of functions to the =tools= slot i
           :description "Get the capital of a country."
           :args '((:name "country"
                    :description "The country whose capital to look up."
-                   :type "string"))
+                   :type string))
           :async t))))
 #+end_src
 

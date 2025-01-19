@@ -29,18 +29,18 @@
           (list
            ;; A required string arg
            '(:name "location"
-                   :type "string"
+                   :type string
                    :description "The city and state, e.g. San Francisco, CA")
-           ;; A string arg with an enum
+           ;; A string arg with an name
            '(:name "unit"
-                   :type "string"
+                   :type string
                    :description "The unit of temperature, either 'celsius' or 'fahrenheit'"
                    :enum ["celsius" "fahrenheit"]
                    :optional t)
            '(:name "postal_codes"
-                   :type "array"
+                   :type array
                    :description "Specific postal codes"
-                   :items (:type "string")
+                   :items (:type string)
                    :optional t)))
          (result (llm-provider-utils-openai-arguments args))
          (expected
@@ -58,6 +58,14 @@
                                         :items (:type "string")))
                   :required ["location"])))
     (should (equal result expected))))
+
+(ert-deftest llm-provider-utils-convert-to-serializable ()
+  (should (equal (llm-provider-utils-convert-to-serializable '(:a 1 :b 2))
+                 '(:a 1 :b 2)))
+  (should (equal (llm-provider-utils-convert-to-serializable '(:a "1" :b foo))
+                 '(:a "1" :b "foo")))
+  (should (equal (llm-provider-utils-convert-to-serializable '(:inner '(:a foo :b bar)))
+                 '(:inner '(:a "foo" :b "bar")))))
 
 (ert-deftest llm-provider-utils-combine-to-system-prompt ()
   (let* ((interaction1 (make-llm-chat-prompt-interaction :role 'user :content "Hello"))

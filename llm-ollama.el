@@ -112,7 +112,7 @@ PROVIDER is the llm-ollama provider."
   "Return the response format for FORMAT."
   (if (eq format 'json)
       :json
-    format))
+    (llm-provider-utils-convert-to-serializable format)))
 
 (cl-defmethod llm-provider-chat-request ((provider llm-ollama) prompt streaming)
   (llm-provider-utils-combine-to-system-prompt prompt llm-ollama-example-prelude)

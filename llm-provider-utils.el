@@ -505,44 +505,47 @@ If MODEL cannot be found, warn and return DEFAULT, which by default is 4096."
         (intern (substring s 1))
       sym)))
 
+(defun llm-provider-utils-convert-to-serializable (plist)
+  "Convert PLIST to a serializable form.
+
+The expectation is that any symbol values will be converted to strings
+for plist and any nested plists."
+  (mapcan (lambda (elem-pair)
+            (cond ((symbolp (nth 1 elem-pair))
+                   (list (car elem-pair)
+                         (symbol-name (nth 1 elem-pair))))
+                  ((consp (nth 1 elem-pair))
+                   (list (car elem-pair)
+                         (llm-provider-utils-convert-to-serializable (nth 1 elem-pair))))
+                  (t elem-pair)))
+          (seq-partition plist 2)))
+
 (defun llm-provider-utils-openai-arguments (args)
   "Convert ARGS to the OpenAI function calling spec.
 ARGS is a list of llm argument plists.
 Each plist has the structure:
   (:name STRING
-   :type STRING-OR-PLIST
+   :type SYMBOL
    :description STRING
    :optional BOOLEAN
-   :enum LIST-OF-STRINGS
-   :items (PLIST :type STRING-OR-PLIST))
+   :properties PLIST
+   :enum VECTOR
+   :items (PLIST :type SYMBOL :enum VECTOR :properties PLIST))
 
-:type can be either a simple string (e.g. \"string\") or a JSON Schema
-object plist, a direct representation of JSON schema as a plist."
+:type is a symbol, one of `string', `number', `boolean', `object', or
+`array'."
   (let ((properties '())
         (required-names '()))
     (dolist (arg args)
       (let* ((arg-name (plist-get arg :name))
-             (type-or-schema (let ((raw-type (plist-get arg :type)))
-                               (if (symbolp raw-type)
-                                   (symbol-name raw-type)
-                                 raw-type)))
+             (type (symbol-name (plist-get arg :type)))
              (description (plist-get arg :description))
              (required (not (plist-get arg :optional)))
              (enum (plist-get arg :enum))
              (items (plist-get arg :items))
-
-             ;; Build the schema for this argument.  If :type is itself a plist
-             ;; with :type inside it, we treat it as a JSON Schema object.
-             ;; Otherwise we just create a simple schema with :type "string"
-             ;; etc.
-             (schema
-              (cond
-               ((and (consp type-or-schema)
-                     (plist-get type-or-schema :type))
-                ;; It's a JSON Schema plist, use it as-is
-                type-or-schema)
-               (t ;; It's just a string type, or something simple
-                (list :type type-or-schema)))))
+             (obj-properties (llm-provider-utils-convert-to-serializable
+                              (plist-get arg :properties)))
+             (schema (list :type type)))
 
         ;; Add :description if present
         (when description
@@ -554,7 +557,12 @@ object plist, a direct representation of JSON schema as a plist."
           (setq schema (plist-put schema :enum enum)))
 
         (when items
-          (setq schema (plist-put schema :items items)))
+          (setq schema (plist-put schema
+                                  :items
+                                  (llm-provider-utils-convert-to-serializable items))))
+
+        (when obj-properties
+          (setq schema (plist-put schema :properties obj-properties)))
 
         ;; Track required argument names if :required is t
         (when required
@@ -564,7 +572,8 @@ object plist, a direct representation of JSON schema as a plist."
 
         ;; Finally, put this schema into the :properties
         (setq properties
-              (plist-put properties (intern (concat ":" arg-name)) schema))))
+              (plist-put properties (llm-provider-utils--encolon arg-name)
+                         schema))))
     ;; Build the final spec
     (let ((spec `(:type "object" :properties ,properties)))
       (when required-names

@@ -249,7 +249,8 @@ nothing to add, in which case it is nil."
                                     "application/json"))
       (unless (eq 'json format)
         (setq params-plist (plist-put params-plist :response_schema
-                                      (llm-chat-prompt-response-format prompt)))))
+                                      (llm-provider-utils-convert-to-serializable
+                                       (llm-chat-prompt-response-format prompt))))))
     (when params-plist
       `(:generationConfig ,params-plist))))
 

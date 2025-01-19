@@ -75,7 +75,7 @@
           :description "Get the capital of a country."
           :args '((:name "country"
                          :description "The country whose capital to look up."
-                         :type "string"))
+                         :type string))
           :async t))))
 
 (defconst llm-integration-test-fc-answer
@@ -299,7 +299,7 @@ else.  We really just want to see if it's in the right ballpark."
                                             :response-format
                                             '(:type "object"
                                                     :properties
-                                                    (:cities (:type "array" :items (:type "string")))
+                                                    (:cities (:type array :items (:type string)))
                                                     :required ["cities"])))))
                               (should (equal
                                        (llm-test-normalize '(:cities ["Lyon" "Marseille" "Paris"]))

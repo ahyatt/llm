@@ -209,8 +209,8 @@
                                :tools (list (llm-make-tool-function
                                              :name "func"
                                              :description "desc"
-                                             :args '((:name "arg1" :description "desc1" :type "string")
-                                                     (:name "arg2" :description "desc2" :type "integer" :optional t))))))
+                                             :args '((:name "arg1" :description "desc1" :type string)
+                                                     (:name "arg2" :description "desc2" :type integer :optional t))))))
            :openai
            (:model "model"
                    :messages [(:role "user" :content "Hello world")]
