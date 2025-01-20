@@ -65,6 +65,13 @@ effect.  New values will have an effect, however."
 (cl-defstruct (llm-standard-full-provider (:include llm-standard-chat-provider))
   "A struct for providers that implements chat and embeddings.")
 
+(cl-defstruct llm-provider-utils-tool-use
+  "A struct to hold information about a tool use.
+ID is a call ID, which is optional.
+NAME is the tool name.
+ARG is an alist of arguments to their values."
+  id name args)
+
 ;; Methods necessary for both embedding and chat requests.
 
 (cl-defgeneric llm-provider-request-prelude (provider)
@@ -648,13 +655,6 @@ ROLE will be `assistant' by default, but can be passed in for other roles."
                                     output
                                   (format "%s" output))
                        :tool-results tool-results)))))
-
-(cl-defstruct llm-provider-utils-tool-use
-  "A struct to hold information about a tool use.
-ID is a call ID, which is optional.
-NAME is the tool name.
-ARG is an alist of arguments to their values."
-  id name args)
 
 (defun llm-provider-utils-process-result (provider prompt text tool-uses success-callback)
   "Process the RESPONSE from the provider for PROMPT.
