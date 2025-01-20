@@ -607,7 +607,7 @@ This returns a JSON object (a list that can be converted to JSON)."
                                (llm-tool-function-args tool)))))
 
 (defun llm-provider-utils-openai-collect-streaming-tool-uses (data)
-  "Read Open AI compatible streaming output DATA to collect tool uses."
+  "Read Open AI compatible streaming output DATA to collect tool-uses."
   (let* ((num-index (+ 1 (assoc-default 'index (aref (car (last data)) 0))))
          (cvec (make-vector num-index nil)))
     (dotimes (i num-index)
