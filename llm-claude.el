@@ -151,6 +151,9 @@
                          (when (equal type "text_delta")
                            (funcall msg-receiver (assoc-default 'text delta))))))))))
 
+(cl-defmethod llm-provider-collect-streaming-tool-uses ((_ llm-claude) data)
+  (llm-provider-utils-openai-collect-streaming-tool-uses data))
+
 (cl-defmethod llm-provider-headers ((provider llm-claude))
   `(("x-api-key" . ,(if (functionp (llm-claude-key provider))
                         (funcall (llm-claude-key provider))

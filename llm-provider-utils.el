@@ -599,6 +599,33 @@ This returns a JSON object (a list that can be converted to JSON)."
                  :parameters ,(llm-provider-utils-openai-arguments
                                (llm-tool-function-args tool)))))
 
+(defun llm-provider-utils-openai-collect-streaming-tool-uses (data)
+  "Handle an open AI compatible way to collect streaming tool uses."
+  (let* ((num-index (+ 1 (assoc-default 'index (aref (car (last data)) 0))))
+         (cvec (make-vector num-index nil)))
+    (dotimes (i num-index)
+      (setf (aref cvec i) (make-llm-provider-utils-tool-use)))
+    (cl-loop for part in data do
+             (cl-loop for call in (append part nil) do
+                      (let* ((index (assoc-default 'index call))
+                             (id (assoc-default 'id call))
+                             (function (assoc-default 'function call))
+                             (name (assoc-default 'name function))
+                             (arguments (assoc-default 'arguments function)))
+                        (when id
+                          (setf (llm-provider-utils-tool-use-id (aref cvec index)) id))
+                        (when name
+                          (setf (llm-provider-utils-tool-use-name (aref cvec index)) name))
+                        (setf (llm-provider-utils-tool-use-args (aref cvec index))
+                              (concat (llm-provider-utils-tool-use-args (aref cvec index))
+                                      arguments)))))
+    (cl-loop for call in (append cvec nil)
+             do (setf (llm-provider-utils-tool-use-args call)
+                      (json-parse-string (llm-provider-utils-tool-use-args call)
+                                         :object-type 'alist))
+             finally return (when (> (length cvec) 0)
+                              (append cvec nil)))))
+
 (defun llm-provider-utils-append-to-prompt (prompt output &optional tool-results role)
   "Append OUTPUT to PROMPT as an assistant interaction.
 
