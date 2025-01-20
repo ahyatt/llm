@@ -1,6 +1,6 @@
 ;;; llm-tester.el --- Helpers for testing LLM implementation -*- lexical-binding: t; package-lint-main-file: "llm.el"; -*-
 
-;; Copyright (c) 2023, 2024  Free Software Foundation, Inc.
+;; Copyright (c) 2023-2025  Free Software Foundation, Inc.
 
 ;; Author: Andrew Hyatt <ahyatt@gmail.com>
 ;; SPDX-License-Identifier: GPL-3.0-or-later
@@ -241,28 +241,27 @@
                (llm-tester-verify-prompt prompt)
                (kill-buffer buf))))))))))
 
-(defun llm-tester-create-test-function-prompt ()
-  "Create a function to test function calling with."
+(defun llm-tester-create-test-tool-prompt ()
+  "Create a function to test tool use with."
   (llm-make-chat-prompt
    "I'm looking for a function that will return the current buffer's file name."
    :context "The user will describe an emacs lisp function they are looking
 for, and you need to provide the most likely function you know
 of by calling the `describe_function' function."
    :temperature 0.1
-   :functions
-   (list (make-llm-function-call
+   :tools
+   (list (llm-make-tool-function
           :function (lambda (f) f)
           :name "describe_function"
           :description "Takes an elisp function name and shows the user the functions and their descriptions."
-          :args (list (make-llm-function-arg
-                       :name "function_name"
-                       :description "A function name to describe."
-                       :type 'string
-                       :required t))))))
+          :args '((:name "function_name"
+                         :description "A function name to describe."
+                         :type string))
+          :async nil))))
 
-(defun llm-tester-function-calling-sync (provider)
+(defun llm-tester-tool-use-sync (provider)
   "Test that PROVIDER can call functions."
-  (let ((result (llm-chat provider (llm-tester-create-test-function-prompt))))
+  (let ((result (llm-chat provider (llm-tester-create-test-tool-prompt))))
     (cond ((stringp result)
            (llm-tester-log
             "ERROR: Provider %s returned a string instead of a function result"
@@ -274,9 +273,9 @@ of by calling the `describe_function' function."
           (t (llm-tester-log "ERROR: Provider %s returned a %s result: %s"
                              (type-of provider) (type-of result) result)))))
 
-(defun llm-tester-function-calling-conversation-sync (provider)
-  "Test that PROVIDER can call functions in a conversation."
-  (let ((prompt (llm-tester-create-test-function-prompt))
+(defun llm-tester-tool-use-conversation-sync (provider)
+  "Test that PROVIDER can use tools in a conversation."
+  (let ((prompt (llm-tester-create-test-tool-prompt))
         (responses nil))
     (push (llm-chat provider prompt) responses)
     (push (llm-chat provider prompt) responses)
@@ -287,9 +286,9 @@ of by calling the `describe_function' function."
                     (type-of provider)
                     (nreverse responses))))
 
-(defun llm-tester-function-calling-async (provider)
-  "Test that PROVIDER can call functions asynchronously."
-  (let ((prompt (llm-tester-create-test-function-prompt)))
+(defun llm-tester-tool-use-async (provider)
+  "Test that PROVIDER can use tools asynchronously."
+  (let ((prompt (llm-tester-create-test-tool-prompt)))
     (llm-chat-async provider prompt
                     (lambda (result)
                       (llm-tester-log "SUCCESS: Provider %s called a function and got a result of %s"
@@ -298,9 +297,9 @@ of by calling the `describe_function' function."
                       (llm-tester-log "ERROR: Provider %s returned an error of type %s with message %s"
                                       (type-of provider) type message)))))
 
-(defun llm-tester-function-calling-conversation-async (provider)
-  "Test that PROVIDER can call functions in a conversation."
-  (let* ((prompt (llm-tester-create-test-function-prompt))
+(defun llm-tester-tool-use-conversation-async (provider)
+  "Test that PROVIDER can use tools in a conversation."
+  (let* ((prompt (llm-tester-create-test-tool-prompt))
          (responses nil)
          (error-callback (lambda (type msg) (llm-tester-log "FAILURE: async function calling conversation for %s, error of type %s received: %s" (type-of provider) type msg)))
          (last-callback (lambda (result)
@@ -317,19 +316,19 @@ of by calling the `describe_function' function."
                            (llm-chat-async provider prompt second-callback error-callback))))
     (llm-chat-async provider prompt first-callback error-callback)))
 
-(defun llm-tester-function-calling-streaming (provider)
-  "Test that PROVIDER can call functions with the streaming API."
+(defun llm-tester-tool-use-streaming (provider)
+  "Test that PROVIDER can use tools with the streaming API."
   (let ((partial-counts 0))
     (llm-chat-streaming
      provider
-     (llm-tester-create-test-function-prompt)
+     (llm-tester-create-test-tool-prompt)
      (lambda (_)
        (cl-incf partial-counts))
      (lambda (text)
        (llm-tester-log "SUCCESS: Provider %s called a function and got a final result of %s"
                        (type-of provider) text)
        (unless (= 0 partial-counts)
-         (llm-tester-log "WARNING: Provider %s returned partial updates, but it shouldn't for function calling" (type-of provider))))
+         (llm-tester-log "WARNING: Provider %s returned partial updates, but it shouldn't for tool use" (type-of provider))))
      (lambda (type message)
        (llm-tester-log "ERROR: Provider %s returned an error of type %s with message %s"
                        (type-of provider) type message)))))
@@ -438,16 +437,16 @@ default is 1.  Delays can help avoid rate limiting."
     (sleep-for delay)
     ;; This is too flaky at the moment, subject to race conditions.
     ;; (llm-tester-cancel provider)
-    (when (member 'function-calls (llm-capabilities provider))
-      (llm-tester-function-calling-sync provider)
+    (when (member 'tool-use (llm-capabilities provider))
+      (llm-tester-tool-use-sync provider)
       (sleep-for delay)
-      (llm-tester-function-calling-async provider)
+      (llm-tester-tool-use-async provider)
       (sleep-for delay)
-      (llm-tester-function-calling-streaming provider)
+      (llm-tester-tool-use-streaming provider)
       (sleep-for delay)
-      (llm-tester-function-calling-conversation-sync provider)
+      (llm-tester-tool-use-conversation-sync provider)
       (sleep-for delay)
-      (llm-tester-function-calling-conversation-async provider)
+      (llm-tester-tool-use-conversation-async provider)
       (sleep-for delay))
     (dolist (bad-variant bad-variants)
       (llm-tester-bad-provider-async bad-variant)

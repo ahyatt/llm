@@ -1,6 +1,6 @@
 ;;; llm-fake.el --- Use for developers looking at llm calls. -*- lexical-binding: t; package-lint-main-file: "llm.el"; -*-
 
-;; Copyright (c) 2023, 2024  Free Software Foundation, Inc.
+;; Copyright (c) 2023-2025  Free Software Foundation, Inc.
 
 ;; Author: Andrew Hyatt <ahyatt@gmail.com>
 ;; Homepage: https://github.com/ahyatt/llm
@@ -31,7 +31,7 @@
 ;;; Code:
 
 (cl-defstruct llm-fake
- "A provider for the fake LLM provider.
+  "A provider for the fake LLM provider.
 
 OUTPUT-TO-BUFFER can be nil, in which case, nothing will be
 output.  If a string or a buffer, it will append the request as
@@ -44,7 +44,7 @@ message cons.  If nil, the response will be a short text string.
 EMBEDDING-ACTION-FUNC will be called with no arguments to produce
 either a vector response for the chat, or a signal symbol and
 message cons.  If nil, the response will be a simple vector."
- output-to-buffer chat-action-func embedding-action-func)
+  output-to-buffer chat-action-func embedding-action-func)
 
 (cl-defmethod llm-chat-async ((provider llm-fake) prompt response-callback error-callback)
   (condition-case err
@@ -104,9 +104,9 @@ message cons.  If nil, the response will be a simple vector."
       (let* ((f (llm-fake-embedding-action-func provider))
              (result (funcall f)))
         (pcase (type-of result)
-                ('vector result)
-                ('cons (signal (car result) (cdr result)))
-                (_ (error "Incorrect type found in `chat-embedding-func': %s" (type-of result)))))
+          ('vector result)
+          ('cons (signal (car result) (cdr result)))
+          (_ (error "Incorrect type found in `chat-embedding-func': %s" (type-of result)))))
     [0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9]))
 
 (cl-defmethod llm-embedding-async ((provider llm-fake) string vector-callback error-callback)

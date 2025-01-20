@@ -6,7 +6,7 @@ This library provides an interface for interacting with Large Language Models (L
 This library abstracts several kinds of features:
    - Chat functionality: the ability to query the LLM and get a response, and continue to take turns writing to the LLM and receiving responses.  The library supports both synchronous, asynchronous, and streaming responses.
    - Chat with image and other kinda of media inputs are also supported, so that the user can input images and discuss them with the LLM.
-   - Function calling (aka "tool use") is supported, for having the LLM call elisp functions that it chooses, with arguments it provides.
+   - Tool use is supported, for having the LLM call elisp functions that it chooses, with arguments it provides.
    - Embeddings: Send text and receive a vector that encodes the semantic meaning of the underlying text.  Can be used in a search system to find similar passages.
    - Prompt construction: Create a prompt to give to an LLM from one more sources of data.
 
@@ -50,7 +50,7 @@ You can set up with ~make-llm-openai~, with the following parameters:
 There are many Open AI compatible APIs and proxies of Open AI.  You can set up one with ~make-llm-openai-compatible~, with the following parameter:
 - ~:url~, the URL of leading up to the command ("embeddings" or "chat/completions").  So, for example, "https://api.openai.com/v1/" is the URL to use Open AI (although if you wanted to do that, just use ~make-llm-openai~ instead.
 ** Azure's Open AI
-Microsoft Azure has an Open AI integration, although it doesn't support everything Open AI does, such as function calling.  You can set it up with ~make-llm-azure~, with the following parameter:
+Microsoft Azure has an Open AI integration, although it doesn't support everything Open AI does, such as tool use.  You can set it up with ~make-llm-azure~, with the following parameter:
 - ~:url~, the endpoint URL, such as "https://docs-test-001.openai.azure.com/".
 - ~:key~, the Azure key for Azure OpenAI service.
 - ~:chat-model~, the  chat model, which must be deployed in Azure.
@@ -78,17 +78,17 @@ In addition to the provider, which you may want multiple of (for example, to cha
   gcloud beta services identity create --service=aiplatform.googleapis.com --project=PROJECT_ID
   #+end_src
 ** Claude
-[[https://docs.anthropic.com/claude/docs/intro-to-claude][Claude]] is Anthropic's large language model.  It does not support embeddings.  It does support function calling, but currently not in streaming.  You can set it up with the following parameters:
+[[https://docs.anthropic.com/claude/docs/intro-to-claude][Claude]] is Anthropic's large language model.  It does not support embeddings.  You can set it up with the following parameters:
 
 =:key=: The API key you get from [[https://console.anthropic.com/settings/keys][Claude's settings page]].  This is required.
 =:chat-model=: One of the [[https://docs.anthropic.com/claude/docs/models-overview][Claude models]].  Defaults to "claude-3-opus-20240229", the most powerful model.
 ** Ollama
-[[https://ollama.ai/][Ollama]] is a way to run large language models locally. There are [[https://ollama.ai/library][many different models]] you can use with it, and some of them support function calling. You set it up with the following parameters:
+[[https://ollama.ai/][Ollama]] is a way to run large language models locally. There are [[https://ollama.ai/library][many different models]] you can use with it, and some of them [[https://ollama.com/search?c=tools][support tool use]]. You set it up with the following parameters:
 - ~:scheme~: The scheme (http/https) for the connection to ollama.  This default to "http".
 - ~:host~: The host that ollama is run on.  This is optional and will default to localhost.
 - ~:port~: The port that ollama is run on.  This is optional and will default to the default ollama port.
 - ~:chat-model~: The model name to use for chat.  This is not optional for chat use, since there is no default.
-- ~:embedding-model~: The model name to use for embeddings (only [some models](https://ollama.com/search?q=&c=embedding) can be used for embeddings.  This is not optional for embedding use, since there is no default.
+- ~:embedding-model~: The model name to use for embeddings.  Only [[https://ollama.com/search?q=&c=embedding][some models]] can be used for embeddings.  This is not optional for embedding use, since there is no default.
 ** GPT4All
 [[https://gpt4all.io/index.html][GPT4All]] is a way to run large language models locally.  To use it with =llm= package, you must click "Enable API Server" in the settings.  It does not offer embeddings or streaming functionality, though, so Ollama might be a better fit for users who are not already set up with local models.  You can set it up with the following parameters:
 - ~:host~: The host that GPT4All is run on.  This is optional and will default to localhost.
@@ -147,32 +147,31 @@ For all callbacks, the callback will be executed in the buffer the function was 
 - ~llm-chat-token-limit~.  Gets the token limit for the chat model.  This isn't possible for some backends like =llama.cpp=, in which the model isn't selected or known by this library.
 
   And the following helper functions:
-  - ~llm-make-chat-prompt text &keys context examples functions temperature max-tokens response-format non-standard-params~: This is how you make prompts.  ~text~ can be a string (the user input to the llm chatbot), or a list representing a series of back-and-forth exchanges, of odd number, with the last element of the list representing the user's latest input.  This supports inputting context (also commonly called a system prompt, although it isn't guaranteed to replace the actual system prompt), examples, and other important elements, all detailed in the docstring for this function.  ~response-format~ can be ~'json~, to force JSON output, or a JSON schema (see below) but the prompt also needs to mention and ideally go into detail about what kind of JSON response is desired.  Providers with the ~json-response~ capability support JSON output, and it will be ignored if unsupported.  The ~non-standard-params~ let you specify other options that might vary per-provider, and for this, the correctness is up to the client.
+  - ~llm-make-chat-prompt text &keys context examples tools temperature max-tokens response-format non-standard-params~: This is how you make prompts.  ~text~ can be a string (the user input to the llm chatbot), or a list representing a series of back-and-forth exchanges, of odd number, with the last element of the list representing the user's latest input.  This supports inputting context (also commonly called a system prompt, although it isn't guaranteed to replace the actual system prompt), examples, and other important elements, all detailed in the docstring for this function.  ~response-format~ can be ~'json~, to force JSON output, or a JSON schema (see below) but the prompt also needs to mention and ideally go into detail about what kind of JSON response is desired.  Providers with the ~json-response~ capability support JSON output, and it will be ignored if unsupported.  The ~non-standard-params~ let you specify other options that might vary per-provider, and for this, the correctness is up to the client.
   - ~llm-chat-prompt-to-text prompt~: From a prompt, return a string representation.  This is not usually suitable for passing to LLMs, but for debugging purposes.
   - ~llm-chat-streaming-to-point provider prompt buffer point finish-callback~: Same basic arguments as ~llm-chat-streaming~, but will stream to ~point~ in ~buffer~.
   - ~llm-chat-prompt-append-response prompt response role~: Append a new response (from the user, usually) to the prompt.  The ~role~ is optional, and defaults to ~'user~.
 *** JSON schema
-By using the ~response-format~ argument to ~llm-make-chat-prompt~, you can ask the LLM to return items according to a specified JSON schema, based on the [[https://json-schema.org][JSON Schema Spec]].  Not everything is supported, but the most commonly used parts are.  To specify the JSON schema, we use a plist-based approach.  JSON objects are defined with ~(:type object :properties (:<var1> <schema1> :<var2> <schema2> ... :<varn> <scheman>) :required (<req var1> ... <req varn>))~.  Arrays are defined with ~(:type array :items <schema>)~.  Enums are defined with ~(:enum (<val1> <val2> <val3>))~.  You can also request integers, strings, and other types defined by the JSON Schema Spec, by just having ~(:type <type>)~.  Typically, LLMs often require the top-level schema object to be an object, and often that all properties on the top-level object must be required.
+By using the ~response-format~ argument to ~llm-make-chat-prompt~, you can ask the LLM to return items according to a specified JSON schema, based on the [[https://json-schema.org][JSON Schema Spec]].  Not everything is supported, but the most commonly used parts are.  To specify the JSON schema, we use a plist-based approach.  JSON objects are defined with ~(:type object :properties (:<var1> <schema1> :<var2> <schema2> ... :<varn> <scheman>) :required (<req var1> ... <req varn>))~.  Arrays are defined with ~(:type array :items <schema>)~.  Enums are defined with ~(:enum [<val1> <val2> <val3>])~.  You can also request integers, strings, and other types defined by the JSON Schema Spec, by just having ~(:type <type>)~.  Typically, LLMs often require the top-level schema object to be an object, and often that all properties on the top-level object must be required.
 
 Some examples:
 #+begin_src emacs-lisp
 (llm-chat my-provider (llm-make-chat-prompt
                                 "How many countries are there?  Return the result as JSON."
                                 :response-format
-                                '(:type object :properties (:num (:type integer)) :required (num))))
+                                '(:type object :properties (:num (:type "integer")) :required ["num"])))
 #+end_src
 
 #+RESULTS:
 : {"num":195}
 
 #+begin_src emacs-lisp
-(llm-chat my-provider
-          (llm-make-chat-prompt
-           "Which editor is hard to quit?  Return the result as JSON."
-           :response-format
-           '(:type object :properties (:editor (:enum ("emacs" "vi" "vscode"))
-                                               :authors (:type array :items (:type string)))
-                   :required (editor authors))))
+(llm-chat my-provider (llm-make-chat-prompt
+                                "Which editor is hard to quit?  Return the result as JSON."
+                                :response-format
+                                '(:type object :properties (:editor (:enum ["emacs" "vi" "vscode"])
+                                                                    :authors (:type "array" :items (:type "string")))
+                                        :required ["editor" "authors"])))
 #+end_src
 
 #+RESULTS:
@@ -194,55 +193,47 @@ Conversations can take place by repeatedly calling ~llm-chat~ and its variants. 
 #+end_src
 ** Caution about ~llm-chat-prompt-interactions~
 The interactions in a prompt may be modified by conversation or by the conversion of the context and examples to what the LLM understands.  Different providers require different things from the interactions.  Some can handle system prompts, some cannot.  Some require alternating user and assistant chat interactions, others can handle anything.  It's important that clients keep to behaviors that work on all providers.  Do not attempt to read or manipulate ~llm-chat-prompt-interactions~ after initially setting it up for the first time, because you are likely to make changes that only work for some providers.  Similarly, don't directly create a prompt with ~make-llm-chat-prompt~, because it is easy to create something that wouldn't work for all providers.
-** Function calling
-*Note: function calling functionality is currently beta quality.  If you want to use function calling, please watch the =llm= [[https://github.com/ahyatt/llm/discussions][discussions]] for any announcements about changes.*
+** Tool use
+*Note: tool use is currently beta quality.  If you want to use tool use, please watch the =llm= [[https://github.com/ahyatt/llm/discussions][discussions]] for any announcements about changes.*
 
-Function calling is a way to give the LLM a list of functions it can call, and have it call the functions for you.  The standard interaction has the following steps:
-1. The client sends the LLM a prompt with functions it can call.
-2. The LLM may return which functions to execute, and with what arguments, or text as normal.
-3. If the LLM has decided to call one or more functions, those functions should be called, and their results sent back to the LLM.
-4. The LLM will return with a text response based on the initial prompt and the results of the function calling.
+Tool use is a way to give the LLM a list of functions it can call, and have it call the functions for you.  The standard interaction has the following steps:
+1. The client sends the LLM a prompt with tools it can use.
+2. The LLM may return which tools to use, and with what arguments, or text as normal.
+3. If the LLM has decided to use one or more tools, those tool's functions should be called, and their results sent back to the LLM.  This could be the final step depending on if any follow-on is needed.
+4. The LLM will return with a text response based on the initial prompt and the results of the tool use.
 5. The client can now can continue the conversation.
 
-This basic structure is useful because it can guarantee a well-structured output
-(if the LLM does decide to call the function). *Not every LLM can handle function
-calling, and those that do not will ignore the functions entirely*. The function
-=llm-capabilities= will return a list with =function-calls= in it if the LLM
-supports function calls. Right now only Gemini, Vertex, Claude, and Open AI
-support function calling. Ollama should get function calling soon. However, even
-for LLMs that handle function calling, there is a fair bit of difference in the
-capabilities. Right now, it is possible to write function calls that succeed in
-Open AI but cause errors in Gemini, because Gemini does not appear to handle
-functions that have types that contain other types.  So client programs are
-advised for right now to keep function to simple types.
+This basic structure is useful because it can guarantee a well-structured output (if the LLM does decide to use the tool). *Not every LLM can handle tool use, and those that do not will ignore the tools entirely*. The function =llm-capabilities= will return a list with =tool-use= in it if the LLM supports tool use. Right now only Gemini, Vertex, Claude, and Open AI support tool use.  However, even for LLMs that handle tool use, there is sometimes a difference in the capabilities. Right now, it is possible to write tools that succeed in Open AI but cause errors in Gemini, because Gemini does not appear to handle tools that have types that contain other types.  So client programs are advised for right now to keep function to simple types.
 
-The way to call functions is to attach a list of functions to the
-=llm-function-call= slot in the prompt. This is a list of =llm-function-call=
-structs, which takes a function, a name, a description, and a list of
-=llm-function-arg= structs. The docstrings give an explanation of the format.
+The way to call functions is to attach a list of functions to the =tools= slot in the prompt. This is a list of =llm-tool-function= structs, which is a tool that is an elisp function, with a name, a description, and a list of arguments. The docstrings give an explanation of the format.  An example is:
 
-The various chat APIs will execute the functions defined in =llm-function-call=
-with the arguments supplied by the LLM. Instead of returning (or passing to a
-callback) a string, instead an alist will be returned of function names and
-return values.
+#+begin_src emacs-lisp
+(llm-chat-async my-llm-provider (llm-make-chat-prompt
+   "What is the capital of France?"
+   :tools
+   (list (llm-make-tool-function
+          :function (lambda (callback result)
+                      ;; In this example function the assumption is that the
+                      ;; callback will be called after processing the result is
+                      ;; complete.
+                      (notify-user-of-capital result callback))
+          :name "capital_of_country"
+          :description "Get the capital of a country."
+          :args '((:name "country"
+                   :description "The country whose capital to look up."
+                   :type string))
+          :async t))))
+#+end_src
 
-After sending a function call, the client could use the result, but if you want
-to proceed with the conversation, or get a textual response that accompany the
-function you should just send the prompt back with no modifications.  This is
-because the LLM gives the function call to make as a response, and then expects
-to get back the results of that function call.  The results were already
-executed at the end of the previous call, which also stores the result of that
-execution in the prompt.  This is why it should be sent back without further
-modifications.
+Note that tools have the same arguments and structure as the tool definitions in [[https://github.com/karthink/gptel][GTPel]].
 
-Be aware that there is no gaurantee that the function will be called correctly.
-While the LLMs mostly get this right, they are trained on Javascript functions,
-so imitating Javascript names is recommended. So, "write_email" is a better name
-for a function than "write-email".
+The various chat APIs will execute the functions defined in =tools= slot with the arguments supplied by the LLM. The chat functions will, Instead of returning (or passing to a callback) a string, instead a list will be returned of tool names and return values.  This is not technically an alist because the same tool might be used several times, so the =car= can be equivalent.
 
-Examples can be found in =llm-tester=. There is also a function call to generate
-function calls from existing elisp functions in
-=utilities/elisp-to-function-call.el=.
+After the tool is called, the client could use the result, but if you want to proceed with the conversation, or get a textual response that accompany the function you should just send the prompt back with no modifications.  This is because the LLM gives the tool use to perform, and then expects to get back the results of that tool use.  The results were already executed at the end of the call which returned the tools used, which also stores the result of that execution in the prompt.  This is why it should be sent back without further modifications.
+
+Be aware that there is no gaurantee that the tool will be called correctly.  While the LLMs mostly get this right, they are trained on Javascript functions, so imitating Javascript names is recommended. So, "write_email" is a better name for a function than "write-email".
+
+Examples can be found in =llm-tester=. There is also a function call to generate function calls from existing elisp functions in =utilities/elisp-to-tool.el=.
 ** Media input
 *Note:  media input functionality is currently alpha quality.  If you want to use it, please watch the =llm= [[https://github.com/ahyatt/llm/discussions][discussions]] for any announcements about changes.*
 

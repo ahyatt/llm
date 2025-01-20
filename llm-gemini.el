@@ -1,6 +1,6 @@
 ;;; llm-gemini.el --- LLM implementation of Google Cloud Gemini AI -*- lexical-binding: t; package-lint-main-file: "llm.el"; -*-
 
-;; Copyright (c) 2023, 2024  Free Software Foundation, Inc.
+;; Copyright (c) 2023-2025  Free Software Foundation, Inc.
 
 ;; Author: Andrew Hyatt <ahyatt@gmail.com>
 ;; Homepage: https://github.com/ahyatt/llm
@@ -48,12 +48,12 @@ You can get this at https://makersuite.google.com/app/apikey."
   (format "https://generativelanguage.googleapis.com/v1beta/models/%s:embedContent?key=%s"
           (llm-gemini-embedding-model provider)
           (if (functionp (llm-gemini-key provider))
-              (funcall (llm-claude-key provider))
+              (funcall (llm-gemini-key provider))
             (llm-gemini-key provider))))
 
 (cl-defmethod llm-provider-embedding-request ((provider llm-gemini) string)
-  `((model . ,(llm-gemini-embedding-model provider))
-    (content . ((parts . (((text . ,string))))))))
+  `(:model ,(llm-gemini-embedding-model provider)
+           :content (:parts [(:text ,string)])))
 
 (cl-defmethod llm-provider-embedding-extract-result ((_ llm-gemini) response)
   (assoc-default 'values (assoc-default 'embedding response)))
@@ -75,22 +75,10 @@ If STREAMING-P is non-nil, use the streaming endpoint."
 (cl-defmethod llm-provider-chat-streaming-url ((provider llm-gemini))
   (llm-gemini--chat-url provider t))
 
-(cl-defmethod llm-provider-populate-function-calls ((_ llm-gemini) prompt calls)
-  (llm-provider-utils-append-to-prompt
-   prompt
-   ;; For Vertex there is just going to be one call
-   (mapcar (lambda (fc)
-             `((functionCall
-                .
-                ((name . ,(llm-provider-utils-function-call-name fc))
-                 (args . ,(llm-provider-utils-function-call-args fc))))))
-           calls)))
-
 (cl-defmethod llm-provider-chat-request ((_ llm-gemini) _ _)
-  (mapcar (lambda (c) (if (eq (car c) 'generation_config)
-                          (cons 'generationConfig (cdr c))
-                        c))
-          (cl-call-next-method)))
+  ;; Temporary, can be removed in the next version.  Without this the old
+  ;; definition will cause problems when users upgrade.
+  (cl-call-next-method))
 
 (cl-defmethod llm-name ((_ llm-gemini))
   "Return the name of PROVIDER."

@@ -1,6 +1,6 @@
 ;;; llm-test.el --- Unit tests for the llm module -*- lexical-binding: t; package-lint-main-file: "llm.el"; -*-
 
-;; Copyright (c) 2023, 2024  Free Software Foundation, Inc.
+;; Copyright (c) 2023-2025  Free Software Foundation, Inc.
 
 ;; Author: Andrew Hyatt <ahyatt@gmail.com>
 ;; SPDX-License-Identifier: GPL-3.0-or-later
@@ -33,6 +33,8 @@
 (require 'llm-vertex)
 (require 'llm-ollama)
 (require 'llm-gpt4all)
+(require 'llm-claude)
+(require 'seq)
 
 (ert-deftest llm-test-embedding ()
   (should-error (llm-embedding nil "Test"))
@@ -76,6 +78,210 @@
                  (make-llm-chat-prompt
                   :interactions (list (make-llm-chat-prompt-interaction
                                        :role 'user :content "a"))))))
+
+(defun llm-test-normalize (json-obj)
+  "Normalize JSON-OBJ for comparison."
+  (cond ((consp json-obj)
+         (mapcan (lambda (x) (list (car x) (llm-test-normalize (cadr x))))
+                 ;; We need to use seq-sort, due to sort incompatibilities in
+                 ;; emacs 30.
+                 (seq-sort (lambda (a b)
+                             (string< (symbol-name (car a))
+                                      (symbol-name (car b))))
+                           (seq-partition json-obj 2))))
+        ((vectorp json-obj)
+         (vconcat
+          (seq-sort (lambda (a b)
+                      (string< (format "%s" a) (format "%s" b)))
+                    (mapcar #'llm-test-normalize json-obj))))
+        (t json-obj)))
+
+(defconst llm-test-chat-requests-to-responses
+  `((:name "Simple request"
+           :prompt (lambda () (llm-make-chat-prompt "Hello world"))
+           :openai-stream (:model "model"
+                                  :messages [(:role "user" :content "Hello world")]
+                                  :stream t)
+           :openai (:model "model"
+                           :messages [(:role "user" :content "Hello world")])
+
+           :gemini (:contents [(:role "user" :parts [(:text "Hello world")])])
+           :ollama (:model "model"
+                           :messages [(:role "user" :content "Hello world")]
+                           :stream :false)
+           :claude (:model "model"
+                           :max_tokens 4096
+                           :messages [(:role "user" :content "Hello world")]
+                           :stream :false)
+           :claude-stream (:model "model"
+                                  :max_tokens 4096
+                                  :messages [(:role "user" :content "Hello world")]
+                                  :stream t))
+    (:name "Request with temperature"
+           :prompt (lambda () (llm-make-chat-prompt "Hello world" :temperature 0.5))
+           :openai-stream (:model "model"
+                                  :messages [(:role "user" :content "Hello world")]
+                                  :stream t
+                                  :temperature 1.0)
+           :gemini (:contents [(:role "user" :parts [(:text "Hello world")])]
+                              :generationConfig (:temperature 1.0))
+           :ollama (:model "model"
+                           :messages [(:role "user" :content "Hello world")]
+                           :options (:temperature 0.5)
+                           :stream :false)
+           :claude (:model "model"
+                           :max_tokens 4096
+                           :messages [(:role "user" :content "Hello world")]
+                           :temperature 0.5
+                           :stream :false))
+    (:name "Request with context and examples"
+           :prompt (lambda () (llm-make-chat-prompt "Hello world"
+                                                    :context "context"
+                                                    :examples (list (cons "input1" "output1")
+                                                                    (cons "input2" "output2"))))
+           :openai-stream (:model "model"
+                                  :messages [(:role "system" :content "context\nExamples of how you should respond follow.\nUser: input1\nAssistant: output1\nUser: input2\nAssistant: output2")
+                                             (:role "user" :content "Hello world")]
+                                  :stream t)
+           :gemini (:system_instruction
+                    (:parts (:text "context\nExamples of how you should respond follow.\nUser: input1\nAssistant: output1\nUser: input2\nAssistant: output2"))
+                    :contents [(:role "user" :parts [(:text "Hello world")])])
+           :ollama (:model "model"
+                           :messages [(:role "system" :content "context\nExamples of how you should respond follow.\nUser: input1\nAssistant: output1\nUser: input2\nAssistant: output2")
+                                      (:role "user" :content "Hello world")]
+                           :stream :false)
+           :claude (:model "model"
+                           :max_tokens 4096
+                           :messages [(:role "user" :content "Hello world")]
+                           :system "context\nHere are 2 examples of how to respond:\n\nUser: input1\nAssistant: output1\nUser: input2\nAssistant: output2"
+                           :stream :false))
+    (:name "Request with conversation"
+           :prompt (lambda () (llm-make-chat-prompt '("Hello world" "Hello human" "I am user!")))
+           :openai (:model "model"
+                           :messages [(:role "user" :content "Hello world")
+                                      (:role "assistant" :content "Hello human")
+                                      (:role "user" :content "I am user!")])
+           :gemini (:contents [(:role "user" :parts [(:text "Hello world")])
+                               (:role "model" :parts [(:text "Hello human")])
+                               (:role "user" :parts [(:text "I am user!")])])
+           :ollama (:model "model"
+                           :messages [(:role "user" :content "Hello world")
+                                      (:role "assistant" :content "Hello human")
+                                      (:role "user" :content "I am user!")]
+                           :stream :false)
+           :claude (:model "model"
+                           :max_tokens 4096
+                           :messages [(:role "user" :content "Hello world")
+                                      (:role "assistant" :content "Hello human")
+                                      (:role "user" :content "I am user!")]
+                           :stream :false))
+    (:name "Request with image"
+           :prompt (lambda () (llm-make-chat-prompt
+                               (make-llm-multipart
+                                :parts (list "What is this?"
+                                             (make-llm-media :mime-type "image/png"
+                                                             :data "image data")))))
+           :openai (:model "model"
+                           :messages [(:role "user" :content [(:type "text" :text "What is this?")
+                                                              (:type "image_url" :image_url (:url "data:image/png;base64,aW1hZ2UgZGF0YQ=="))])])
+           :gemini (:contents
+                    [(:role
+                      "user"
+                      :parts [(:text "What is this?")
+                              (:inline_data (:mime_type "image/png"
+                                                        :data "aW1hZ2UgZGF0YQ=="))])])
+           :ollama (:model "model"
+                           :messages [(:role "user"
+                                             :content
+                                             "What is this?"
+                                             :images ["aW1hZ2UgZGF0YQ=="])]
+                           :stream :false)
+           :claude (:model "model"
+                           :max_tokens 4096
+                           :messages [(:role "user"
+                                             :content
+                                             [(:type "text" :text "What is this?")
+                                              (:type "image" :source (:type "base64" :media_type "image/png" :data "aW1hZ2UgZGF0YQ=="))])]
+                           :stream :false))
+    (:name "Request with tools"
+           :prompt (lambda () (llm-make-chat-prompt
+                               "Hello world"
+                               :tools (list (llm-make-tool-function
+                                             :name "func"
+                                             :description "desc"
+                                             :args '((:name "arg1" :description "desc1" :type string)
+                                                     (:name "arg2" :description "desc2" :type integer :optional t))))))
+           :openai
+           (:model "model"
+                   :messages [(:role "user" :content "Hello world")]
+                   :tools [(:type "function"
+                                  :function
+                                  (:name "func"
+                                         :description "desc"
+                                         :parameters
+                                         (:type "object"
+                                                :properties
+                                                (:arg1 (:description "desc1" :type "string")
+                                                       :arg2 (:description "desc2" :type "integer"))
+                                                :required ["arg1"])))])
+           :gemini
+           (:contents [(:role "user" :parts [(:text "Hello world")])]
+                      :tools [(:function_declarations
+                               [(:name "func"
+                                       :description "desc"
+                                       :parameters
+                                       (:type "object"
+                                              :properties
+                                              (:arg1 (:description "desc1" :type "string")
+                                                     :arg2 (:description "desc2" :type "integer"))
+                                              :required ["arg1"]))])])
+           :ollama (:model "model"
+                           :messages [(:role "user" :content "Hello world")]
+                           :tools
+                           [(:type "function"
+                                   :function
+                                   (:name "func"
+                                          :description "desc"
+                                          :parameters
+                                          (:type "object"
+                                                 :properties
+                                                 (:arg1 (:description "desc1" :type "string")
+                                                        :arg2 (:description "desc2" :type "integer"))
+                                                 :required ["arg1"])))]
+                           :stream :false)
+           :claude (:model "model"
+                           :max_tokens 4096
+                           :messages [(:role "user" :content "Hello world")]
+                           :tools
+                           [(:name "func"
+                                   :description "desc"
+                                   :input_schema
+                                   (:type "object"
+                                          :properties
+                                          (:arg1 (:description "desc1" :type "string")
+                                                 :arg2 (:description "desc2" :type "integer"))
+                                          :required ["arg1"]))]
+                           :stream :false)))
+  "A list of tests for `llm-provider-chat-request'.")
+
+(ert-deftest llm-test-requests ()
+  (dolist (test llm-test-chat-requests-to-responses)
+    (dolist (provider '(openai gemini ollama claude))
+      (dolist (variation (list nil 'stream))
+        (when-let*
+            ((plist-key (intern (format ":%s%s" provider (if variation "-stream" ""))))
+             (expected-stream (plist-get test plist-key))
+             (response (llm-provider-chat-request
+                        (funcall (intern (format "make-llm-%s" provider))
+                                 :chat-model "model")
+                        (funcall (plist-get test :prompt))
+                        (eq variation 'stream))))
+          (ert-info ((format "Testing %s for model %s (%s)"
+                             (plist-get test :name)
+                             provider
+                             (if variation "stream" "normal")))
+            (should (equal (llm-test-normalize expected-stream)
+                           (llm-test-normalize response)))))))))
 
 (ert-deftest llm-test-chat-token-limit-openai ()
   (cl-flet* ((token-limit-for (model)

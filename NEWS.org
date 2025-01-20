@@ -1,4 +1,7 @@
 * Version 0.21.0
+- Incompatible change to function calling, which is now tool use, affecting arguments and methods.
+- Support image understanding in Claude
+- Support streaming tool use in Claude
 - Add ~llm-models-add~ as a convenience method to add a model to the known list.
 * Version 0.20.0
 - Add ability to output according to a JSON spec.

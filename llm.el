@@ -1,11 +1,11 @@
 ;;; llm.el --- Interface to pluggable llm backends -*- lexical-binding: t; byte-compile-docstring-max-column: 200 -*-
 
-;; Copyright (c) 2023, 2024  Free Software Foundation, Inc.
+;; Copyright (c) 2023-2025  Free Software Foundation, Inc.
 
 ;; Author: Andrew Hyatt <ahyatt@gmail.com>
 ;; Homepage: https://github.com/ahyatt/llm
 ;; Package-Requires: ((emacs "28.1") (plz "0.8") (plz-event-source "0.1.1") (plz-media-type "0.2.1"))
-;; Package-Version: 0.20.0
+;; Package-Version: 0.21.0
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;
 ;; This program is free software; you can redistribute it and/or
@@ -71,66 +71,60 @@ See %s for the details on the restrictions on use." name tos)))
   "This stores all the information needed for a structured chat prompt.
 
 Use of this directly is deprecated, instead use `llm-make-chat-prompt'."
-  context examples interactions functions temperature max-tokens response-format non-standard-params)
+  context examples interactions tools temperature max-tokens response-format non-standard-params)
 
 (cl-defstruct llm-chat-prompt-interaction
   "This defines a single interaction given as part of a chat prompt.
-ROLE can a symbol, of either `user', `assistant', or `function'.
+ROLE can a symbol, of either `user', `assistant', or `tool-results'.
 
-CONTENT is the content of the interaction.  It should be either a
+CONTENT is the content of the interaction.  It should be either
 string, an `llm-multipart' object or a list of function calls.
 
-FUNCTION-CALL-RESULTS is a list of structs of type
-`llm-chat-prompt-function-call-results', which is only populated
-if `role' is `function'.  It stores the results of the function
+TOOL-RESULTS is a list of structs of type
+`llm-chat-prompt-tool-result', which is only populated
+if `role' is `tool-results'.  It stores the results of the function
 calls."
-  role content function-call-results)
+  role content tool-results)
 
-(cl-defstruct llm-chat-prompt-function-call-result
-  "This defines the result from a function call.
+(cl-defstruct llm-chat-prompt-tool-result
+  "This defines the result from a tool use.
 
 CALL-ID is an ID for this function call, if available.
 
-FUNCTION-NAME is the name of the function.  This is required.
+TOOL-NAME is the name of the tool.  This is required.
 
-RESULT is the result of the function call.  This is required."
-  call-id function-name result)
+RESULT is the result of the tool use.  This is required."
+  call-id tool-name result)
 
-(cl-defstruct llm-function-call
-  "This is a struct to represent a function call the LLM can make.
+(cl-defstruct (llm-tool-function (:constructor llm-make-tool-function))
+  "This is a struct to represent a single function tool available to the
+LLM.
 
 All fields are required.
 
-FUNCTION is a function to call.
+FUNCTION is a function to call.  The first argument for FUNCTION should
+take a callback that should be called back with the result, if ASYNC is
+non-nil.  The other arguments correspond to the arguments defined in the
+tool.
 
 NAME is a human readable name of the function.
 
 DESCRIPTION is a human readable description of the function.
 
-ARGS is a list of `llm-function-arg' structs."
+ARGS is a list of plists, each plist having the keys `:name', `:type',
+`:description', and `:optional'.  `:type' is a string, and the same set
+of types as in `RESPONSE-FORMAT' arg in `llm-make-chat-prompt':
+`string', `integer', `boolean', `float', or `array'.  There can be an
+`:enum' field as well, with a vector of possible values.
+
+ASYNC, if non-nil, means the function will be passed a callback which
+takes the return value, otherwise the callback is not passed, and the
+function's return value will be used."
   function
   name
   description
-  args)
-
-(cl-defstruct llm-function-arg
-  "An argument to an `llm-function-call'.
-
-NAME is the name of the argument.
-
-DESCRIPTION is a human readable description of the argument.  It
-can be nil for enums.
-
-TYPE is the type of the argument.  It can be one of `string',
-`integer', `float', `boolean' or the special lists, `(or <type1>
-<type2> ... <typen>)', `(enum <string1> <string2> ...
-<stringn>)', or `(list <type>)'.
-
-REQUIRED is whether this is required or not."
-  name
-  description
-  type
-  required)
+  args
+  async)
 
 (cl-defstruct llm-media
   "Contains media that can be sent as part of an interaction.
@@ -229,7 +223,7 @@ This is deprecated, and you should use `llm-make-chat-prompt'
 instead."
   (llm-make-chat-prompt text))
 
-(cl-defun llm-make-chat-prompt (content &key context examples functions
+(cl-defun llm-make-chat-prompt (content &key context examples tools
                                         temperature max-tokens response-format
                                         non-standard-params)
   "Create a `llm-chat-prompt' with CONTENT sent to the LLM provider.
@@ -263,7 +257,7 @@ to the chat as a whole.  This is optional.
 EXAMPLES is a list of conses, where the car is an example
 inputs, and cdr is the corresponding example outputs.  This is optional.
 
-FUNCTIONS is a list of `llm-function-call' structs.  These may be
+TOOLS is a list of `llm-tool-use' structs.  These may be
 called IF the LLM supports them.  If the LLM does not support
 them, a `not-implemented' signal will be thrown.  This is
 optional.  When this is given, the LLM will either call the
@@ -282,13 +276,17 @@ will attempt to force ouput to fit the format.  This should not be used
 with function calling.  If this is set the instructions to the LLM
 should tell the model about the format, for example with JSON format by
 including examples or describing the schema.  This can also be a
-structure defining the JSON schema.  The structure is plist that can be
+structure defining the JSON schema, which will be passed directly to
+`json-serialize', following the JSON schema rules (see
+http://json-schema.org).  The structure is plist that can be
 either `(:type <type> <additional-properties...>)', or in the case of
-enums `(:enum (<val1> .. <valn>))'.  LLMs will often require the
-top-level schema passed in will be an object: `(:type object
-:properties (:val schema :other-val other-schema) :required (val
-other-val))'.  Often, all properties must be required.  Arrays can be
-specified with `(:type array :items <schema>)'.
+enums `(:enum [val1 val2 ... valn])'.  All types and values used as the
+values in plists and vectors should be strings, not symbols.  LLMs will
+often require the top-level schema passed in to be an object: `(:type
+\"object\" :properties (:val <schema> :other-val <other-schema>)
+:required [\"val\" \"other-val\"])'.  Often, all properties must be
+required.  Arrays can be specified with `(:type \"array\" :items
+<schema>)'.
 
 CONTEXT, EXAMPLES, FUNCTIONS, TEMPERATURE, and MAX-TOKENS are
 usually turned into part of the interaction, and if so, they will
@@ -313,7 +311,7 @@ cdrs can be strings or numbers.  This is optional."
                                      :role (if (zerop (mod i 2)) 'user 'assistant)
                                      :content s))
                                   (if (listp content) content (list content)))
-   :functions functions
+   :tools tools
    :temperature temperature
    :max-tokens max-tokens
    :response-format response-format
@@ -547,7 +545,7 @@ won't have any partial responses, so basically just operates like
 
 `embeddings-batch': the LLM can return many vector embeddings at the same time.
 
-`function-calls': the LLM can call functions.i
+`tool-uses': the LLM can call functions.i
 
 `image-input': the LLM can accept images as input.
 
