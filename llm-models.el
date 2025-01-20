@@ -126,7 +126,7 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :name "Gemini 2.0 Flash" :symbol 'gemini-2.0-flash
     :capabilities '(generation tool-use image-input audio-input video-input)
     :context-length 1048576
-    :regex "gemini-2\\.0-flash")
+    :regex "gemini-2\\.0-flash\\(-exp\\)?$")
    (make-llm-model
     :name "Gemini 2.0 Flash Thinking" :symbol 'gemini-2.0-flash-thinking
     :capabilities '(generation)
@@ -247,6 +247,30 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
 (defun llm-models-match (name)
   "Return the model that matches NAME."
   (seq-find (lambda (model) (string-match-p (llm-model-regex model) (downcase name))) llm-models))
+
+(cl-defun llm-models-add (&key name symbol capabilities context-length regex)
+  "Add a model to the list of models.
+
+NAME is the name of the model, appropriate for showing a user.
+
+SYMBOL is a symbol representing the model, which just needs to be a
+unique symbol, and can also be searched on.
+
+CAPABILITIES is a list of symbols representing the capabilities of the
+model.  See `llm-capabilities' for the potential list of supported
+capabilities.  This may have some capabilities not yet supported by the
+`llm-capabilities'.
+
+CONTEXT-LENGTH is the maximum length of the context that can be used as
+input.
+
+REGEX is a regular expression that will be used to identify the model
+uniquely, matched against the model specified by the user."
+  (push (make-llm-model :name name
+                        :symbol symbol
+                        :capabilities capabilities
+                        :context-length context-length
+                        :regex regex) llm-models))
 
 (provide 'llm-models)
 

@@ -108,13 +108,11 @@ When picking a chat or embedding model, anything can be used, as long as the ser
 
 #+begin_src emacs-lisp
 (require 'llm-models)
-(add-to-list
- 'llm-models
- (make-llm-model
-  :name "Mistral" :symbol 'mistral
-  :capabilities '(generation tool-use free-software)
-  :context-length 8192
-  :regex "mistral"))
+(llm-models-add
+ :name "Mistral" :symbol 'mistral
+ :capabilities '(generation tool-use free-software)
+ :context-length 8192
+ :regex "mistral"))
 #+end_src
 
 The =:regex= needs to uniquely identify the model passed in from a provider's chat or embedding model.
