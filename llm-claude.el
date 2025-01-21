@@ -92,18 +92,22 @@
 
 (defun llm-claude--multipart-content (content)
   "Return CONTENT as a list of Claude multipart content."
-  (vconcat (mapcar (lambda (part)
-                     (cond ((stringp part)
-                            `(:type "text"
-                                    :text ,part))
-                           ((llm-media-p part)
-                            `(:type "image"
-                                    :source (:type "base64"
-                                                   :media_type ,(llm-media-mime-type part)
-                                                   :data ,(base64-encode-string (llm-media-data part) t))))
-                           (t
-                            (error "Unsupported multipart content: %s" part))))
-                   (llm-multipart-parts content))))
+  (vconcat
+   (mapcar (lambda (part)
+             (cond ((stringp part)
+                    `(:type "text"
+                            :text ,part))
+                   ((llm-media-p part)
+                    (let ((source (list :type "base64"
+                                        :media_type (llm-media-mime-type part)
+                                        :data (base64-encode-string (llm-media-data part) t))))
+                      `(:type ,(if (equal (llm-media-mime-type part) "application/pdf")
+                                   "document"
+                                 "image")
+                              :source ,source)))
+                   (t
+                    (error "Unsupported multipart content: %s" part))))
+           (llm-multipart-parts content))))
 
 (cl-defmethod llm-provider-extract-tool-uses ((_ llm-claude) response)
   (let ((content (append (assoc-default 'content response) nil)))
@@ -178,7 +182,7 @@
   "Claude")
 
 (cl-defmethod llm-capabilities ((_ llm-claude))
-  (list 'streaming 'function-calls 'image-input))
+  (list 'streaming 'function-calls 'image-input 'pdf-input))
 
 (cl-defmethod llm-provider-append-to-prompt ((_ llm-claude) prompt result
                                              &optional tool-use-results)

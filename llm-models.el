@@ -30,8 +30,8 @@ NAME is the name of the model, appropriate for showing a user.
 
 CAPABILITIES is a list of symbols representing the capabilities of the
 model, one of `embedding', `generation', `tool-use',
-`image-input', `image-output', `audio-input', `video-input', `caching'
-and `free-software'.
+`image-input', `image-output', `audio-input', `video-input', 'pdf-input',
+`caching' and `free-software'.
 
 REGEX is a regular expression that can be used to identify the model, uniquely (it shouldn't conflict with any other model)"
   name
@@ -103,7 +103,7 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
    ;; https://docs.anthropic.com/en/docs/about-claude/models
    (make-llm-model
     :name "Claude 3.5 Sonnet" :symbol 'claude-3.5-sonnet
-    :capabilities '(generation tool-use image-input caching)
+    :capabilities '(generation tool-use image-input pdf-input caching)
     :context-length 200000
     :regex "claude-3.5-sonnet")
    (make-llm-model
