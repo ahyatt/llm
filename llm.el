@@ -5,7 +5,7 @@
 ;; Author: Andrew Hyatt <ahyatt@gmail.com>
 ;; Homepage: https://github.com/ahyatt/llm
 ;; Package-Requires: ((emacs "28.1") (plz "0.8") (plz-event-source "0.1.1") (plz-media-type "0.2.1"))
-;; Package-Version: 0.21.0
+;; Package-Version: 0.22.0
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;
 ;; This program is free software; you can redistribute it and/or
@@ -96,9 +96,8 @@ TOOL-NAME is the name of the tool.  This is required.
 RESULT is the result of the tool use.  This is required."
   call-id tool-name result)
 
-(cl-defstruct (llm-tool-function (:constructor llm-make-tool-function))
-  "This is a struct to represent a single function tool available to the
-LLM.
+(cl-defstruct llm-tool
+  "This is a struct for a single tool available to the LLM.
 
 All fields are required.
 
@@ -223,6 +222,14 @@ This is deprecated, and you should use `llm-make-chat-prompt'
 instead."
   (llm-make-chat-prompt text))
 
+(cl-defun llm-make-tool (&key function name description args async &allow-other-keys)
+  "Create a `llm-tool' struct with FUNCTION, NAME, DESCRIPTION, ARGS, and ASYNC."
+  (make-llm-tool :function function
+                 :name name
+                 :description description
+                 :args args
+                 :async async))
+
 (cl-defun llm-make-chat-prompt (content &key context examples tools
                                         temperature max-tokens response-format
                                         non-standard-params)
@@ -257,7 +264,7 @@ to the chat as a whole.  This is optional.
 EXAMPLES is a list of conses, where the car is an example
 inputs, and cdr is the corresponding example outputs.  This is optional.
 
-TOOLS is a list of `llm-tool-use' structs.  These may be
+TOOLS is a list of `llm-tool' structs.  These may be
 called IF the LLM supports them.  If the LLM does not support
 them, a `not-implemented' signal will be thrown.  This is
 optional.  When this is given, the LLM will either call the

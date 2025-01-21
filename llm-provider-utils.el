@@ -593,7 +593,7 @@ Each plist has the structure:
 
 ;; The Open AI tool spec follows the JSON schema spec.  See
 ;; https://json-schema.org/understanding-json-schema.
-(cl-defmethod llm-provider-utils-openai-tool-spec ((tool llm-tool-function))
+(cl-defmethod llm-provider-utils-openai-tool-spec ((tool llm-tool))
   "Convert TOOL to an Open AI function spec.
 Open AI's function spec is a standard way to do this, and will be
 applicable to many endpoints.
@@ -601,10 +601,10 @@ applicable to many endpoints.
 This returns a JSON object (a list that can be converted to JSON)."
   `(:type "function"
           :function
-          (:name ,(llm-tool-function-name tool)
-                 :description ,(llm-tool-function-description tool)
+          (:name ,(llm-tool-name tool)
+                 :description ,(llm-tool-description tool)
                  :parameters ,(llm-provider-utils-openai-arguments
-                               (llm-tool-function-args tool)))))
+                               (llm-tool-args tool)))))
 
 (defun llm-provider-utils-openai-collect-streaming-tool-uses (data)
   "Read Open AI compatible streaming output DATA to collect tool-uses."
@@ -721,9 +721,9 @@ have returned results."
      (let* ((name (llm-provider-utils-tool-use-name tool-use))
             (arguments (llm-provider-utils-tool-use-args tool-use))
             (tool (seq-find
-                   (lambda (f) (equal name (llm-tool-function-name f)))
+                   (lambda (f) (equal name (llm-tool-name f)))
                    (llm-chat-prompt-tools prompt)))
-            (call-args (cl-loop for arg in (llm-tool-function-args tool)
+            (call-args (cl-loop for arg in (llm-tool-args tool)
                                 collect (cdr (seq-find (lambda (a)
                                                          (eq (intern (plist-get arg :name))
                                                              (car a)))
@@ -741,10 +741,10 @@ have returned results."
                           (llm-provider-utils-populate-tool-uses
                            provider prompt results)
                           (funcall success-callback tool-use-and-results)))))
-       (if (llm-tool-function-async tool)
-           (apply (llm-tool-function-function tool)
+       (if (llm-tool-async tool)
+           (apply (llm-tool-function tool)
                   (append (list end-func) call-args))
-         (funcall end-func (apply (llm-tool-function-function tool) call-args)))))))
+         (funcall end-func (apply (llm-tool-function tool) call-args)))))))
 
 
 ;; This is a useful method for getting out of the request buffer when it's time

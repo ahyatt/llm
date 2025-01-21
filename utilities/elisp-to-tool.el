@@ -40,11 +40,12 @@
                           :name
                           "switch_to_buffer"
                           :args
-                          '((:name "buffer_or_name" :type "string" :description "A buffer, a string (buffer name), or nil. If nil, switch to the buffer returned by 'other_buffer'." :required t) (:name "norecord" :type "boolean" :description "If non-nil, do not put the buffer at the front of the buffer list, and do not make the window displaying it the most recently selected one." :required t) (:name "force_same_window" :type "boolean" :description "If non-nil, the buffer must be displayed in the selected window when called non-interactively; if impossible, signal an error rather than calling 'pop_to_buffer'." :required t))
+                          '((:name "buffer_or_name" :type string :description "A buffer, a string (buffer name), or nil. If a string that doesn't identify an existing buffer, create a buffer with that name. If nil, switch to the buffer returned by 'other_buffer'." :required t) (:name "norecord" :type boolean :description "If non-nil, do not put the buffer at the front of the buffer list, and do not make the window displaying it the most recently selected one." :required t) (:name "force_same_window" :type boolean :description "If non-nil, the buffer must be displayed in the selected window when called non-interactively; if impossible, signal an error rather than calling 'pop_to_buffer'." :required t))
                           :description
-                          "Display buffer BUFFER_OR_NAME in the selected window. If the selected window cannot display the specified buffer because it is a minibuffer window or strongly dedicated to another buffer, call 'pop_to_buffer' to select the buffer in another window. Returns the buffer switched to."
+                          "Display buffer BUFFER_OR_NAME in the selected window. WARNING: This is NOT the way to work on another buffer temporarily within a Lisp program! Use 'set_buffer' instead. That avoids messing with the 'window_buffer' correspondences. If the selected window cannot display the specified buffer because it is a minibuffer window or strongly dedicated to another buffer, call 'pop_to_buffer' to select the buffer in another window. In interactive use, if the selected window is strongly dedicated to its buffer, the value of the option 'switch_to_buffer_in_dedicated_window' specifies how to proceed. Return the buffer switched to."
                           :async
-                          nil))
+                          nil)
+  )
 
 ;; A demonstration of the resulting function call in action.
 (defun elisp-to-tool-llm-switch-buffer (instructions)
@@ -115,7 +116,7 @@ Documentation strings should start with uppercase and end with a period."
                                               (list
                                                :name (downcase (elisp-to-tool-el-to-js-name
                                                                 (assoc-default 'name arg)))
-                                               :type (assoc-default 'type arg)
+                                               :type (intern (assoc-default 'type arg))
                                                :description (assoc-default 'description arg))
                                               (if (assoc-default 'required arg)
                                                   (list :required t))))
@@ -125,23 +126,23 @@ Documentation strings should start with uppercase and end with a period."
                        :name "elisp-to-tool-info"
                        :description "The function to create a OpenAI-compatible tool use spec, given the arguments and their documentation.  Some of the aspects of the tool can be automatically retrieved, so this function is supplying the parts that cannot be automatically retrieved."
                        :args '((:name "args"
-                                      :type "array"
-                                      :items (:type "object"
+                                      :type array
+                                      :items (:type object
                                                     :properties (:name
-                                                                 (:type "string"
+                                                                 (:type string
                                                                         :description "The name of the argument")
                                                                  :type
-                                                                 (:type "string"
+                                                                 (:type string
                                                                         :enum ["string""number" "integer" "boolean"]
                                                                         :description "The type of the argument.  It could be 'string', 'number', 'integer', 'boolean', or the more special forms.")
                                                                  :description
-                                                                 (:type "string"
+                                                                 (:type string
                                                                         :description "The description of the argument")
                                                                  :required
-                                                                 (:type "boolean"
+                                                                 (:type boolean
                                                                         :description "Whether the argument is required or not"))))
                                (:name "description"
-                                      :type "string"
+                                      :type string
                                       :description "The documentation of the function to transform.")))))
                     (lambda (result) (message "Result: %S" result))
                     (lambda (_ msg) (error msg)))))

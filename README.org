@@ -205,13 +205,13 @@ Tool use is a way to give the LLM a list of functions it can call, and have it c
 
 This basic structure is useful because it can guarantee a well-structured output (if the LLM does decide to use the tool). *Not every LLM can handle tool use, and those that do not will ignore the tools entirely*. The function =llm-capabilities= will return a list with =tool-use= in it if the LLM supports tool use. Right now only Gemini, Vertex, Claude, and Open AI support tool use.  However, even for LLMs that handle tool use, there is sometimes a difference in the capabilities. Right now, it is possible to write tools that succeed in Open AI but cause errors in Gemini, because Gemini does not appear to handle tools that have types that contain other types.  So client programs are advised for right now to keep function to simple types.
 
-The way to call functions is to attach a list of functions to the =tools= slot in the prompt. This is a list of =llm-tool-function= structs, which is a tool that is an elisp function, with a name, a description, and a list of arguments. The docstrings give an explanation of the format.  An example is:
+The way to call functions is to attach a list of functions to the =tools= slot in the prompt. This is a list of =llm-tool= structs, which is a tool that is an elisp function, with a name, a description, and a list of arguments. The docstrings give an explanation of the format.  An example is:
 
 #+begin_src emacs-lisp
 (llm-chat-async my-llm-provider (llm-make-chat-prompt
    "What is the capital of France?"
    :tools
-   (list (llm-make-tool-function
+   (list (llm-make-tool
           :function (lambda (callback result)
                       ;; In this example function the assumption is that the
                       ;; callback will be called after processing the result is
