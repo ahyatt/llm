@@ -250,7 +250,7 @@ for, and you need to provide the most likely function you know
 of by calling the `describe_function' function."
    :temperature 0.1
    :tools
-   (list (llm-make-tool-function
+   (list (llm-make-tool
           :function (lambda (f) f)
           :name "describe_function"
           :description "Takes an elisp function name and shows the user the functions and their descriptions."
