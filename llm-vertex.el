@@ -226,10 +226,10 @@ the key must be regenerated every hour."
        [(:function_declarations
          ,(vconcat (mapcar
                     (lambda (tool)
-                      `(:name ,(llm-tool-function-name tool)
-                              :description ,(llm-tool-function-description tool)
+                      `(:name ,(llm-tool-name tool)
+                              :description ,(llm-tool-description tool)
                               :parameters ,(llm-provider-utils-openai-arguments
-                                            (llm-tool-function-args tool))))
+                                            (llm-tool-args tool))))
                     (llm-chat-prompt-tools prompt))))]))
    (llm-vertex--chat-parameters prompt)))
 

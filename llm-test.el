@@ -206,7 +206,7 @@
     (:name "Request with tools"
            :prompt (lambda () (llm-make-chat-prompt
                                "Hello world"
-                               :tools (list (llm-make-tool-function
+                               :tools (list (llm-make-tool
                                              :name "func"
                                              :description "desc"
                                              :args '((:name "arg1" :description "desc1" :type string)

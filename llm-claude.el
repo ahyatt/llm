@@ -45,10 +45,10 @@
 
 (defun llm-claude--tool-call (tool)
   "A Claude version of a function spec for TOOL."
-  `(:name ,(llm-tool-function-name tool)
-          :description ,(llm-tool-function-description tool)
+  `(:name ,(llm-tool-name tool)
+          :description ,(llm-tool-description tool)
           :input_schema ,(llm-provider-utils-openai-arguments
-                          (llm-tool-function-args tool))))
+                          (llm-tool-args tool))))
 
 (cl-defmethod llm-provider-chat-request ((provider llm-claude) prompt stream)
   (let ((request
