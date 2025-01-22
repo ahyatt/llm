@@ -290,6 +290,23 @@ else.  We really just want to see if it's in the right ballpark."
       (should (stringp result))
       (should (llm-integration-test-string-eq "owl" (string-trim (downcase result)))))))
 
+(llm-def-integration-test
+  llm-pdf-chat (provider)
+  (when (member 'pdf-input (llm-capabilities provider))
+    (let* ((pdf-data
+            (with-temp-buffer (set-buffer-multibyte nil)
+                              (insert-file-contents-literally
+                               (expand-file-name "test.pdf" llm-integration-current-directory))
+                              (buffer-string)))
+           (result (llm-chat
+                    provider
+                    (llm-make-chat-prompt
+                     (llm-make-multipart
+                      "What symbol occurs in the PDF file?  If you do not see a PDF file, please let me know.  If you do, please answer in one letter, without punctuation or whitespace."
+                      (make-llm-media :mime-type "application/pdf" :data pdf-data))))))
+      (should (stringp result))
+      (should (llm-integration-test-string-eq "x" (string-trim (downcase result)))))))
+
 (llm-def-integration-test llm-json-test (provider)
   (when (member 'json-response (llm-capabilities provider))
     (let ((result (llm-chat

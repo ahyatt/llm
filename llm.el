@@ -134,8 +134,8 @@ MIME types are accepted by all providers.
 DATA is a (binary) string containing the data.  The string should use
 unibyte encoding.
 
-This should only be used if the `image-input' or `audio-input'
-capability is available, as indicated by `llm-capabilities'."
+This should only be used if the `image-input' or `audio-input' or
+`pdf-input' capability is available, as indicated by `llm-capabilities'."
   mime-type data)
 
 (defun llm--image-to-media (image)
@@ -555,6 +555,8 @@ won't have any partial responses, so basically just operates like
 `tool-uses': the LLM can call functions.i
 
 `image-input': the LLM can accept images as input.
+
+`pdf-input': the LLM can accept PDF documents as input.
 
 `json-response': the LLM can be requested to return responses only in
 JSON format.
