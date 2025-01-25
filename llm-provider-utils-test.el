@@ -1,6 +1,6 @@
 ;;; llm-provider-utils-test.el --- Tests for llm-provider-utils -*- lexical-binding: t; package-lint-main-file: "llm.el"; -*-
 
-;; Copyright (c) 2023, 2024  Free Software Foundation, Inc.
+;; Copyright (c) 2023-2025  Free Software Foundation, Inc.
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -21,7 +21,51 @@
 
 ;;; Code:
 
+(require 'cl-macs)
 (require 'llm-provider-utils)
+
+(ert-deftest llm-provider-utils-openai-arguments ()
+  (let* ((args
+          (list
+           ;; A required string arg
+           '(:name "location"
+                   :type string
+                   :description "The city and state, e.g. San Francisco, CA")
+           ;; A string arg with an name
+           '(:name "unit"
+                   :type string
+                   :description "The unit of temperature, either 'celsius' or 'fahrenheit'"
+                   :enum ["celsius" "fahrenheit"]
+                   :optional t)
+           '(:name "postal_codes"
+                   :type array
+                   :description "Specific postal codes"
+                   :items (:type string)
+                   :optional t)))
+         (result (llm-provider-utils-openai-arguments args))
+         (expected
+          '(:type "object"
+                  :properties
+                  (:location
+                   (:type "string"
+                          :description "The city and state, e.g. San Francisco, CA")
+                   :unit
+                   (:type "string"
+                          :description "The unit of temperature, either 'celsius' or 'fahrenheit'"
+                          :enum ["celsius" "fahrenheit"])
+                   :postal_codes (:type "array"
+                                        :description "Specific postal codes"
+                                        :items (:type "string")))
+                  :required ["location"])))
+    (should (equal result expected))))
+
+(ert-deftest llm-provider-utils-convert-to-serializable ()
+  (should (equal (llm-provider-utils-convert-to-serializable '(:a 1 :b 2))
+                 '(:a 1 :b 2)))
+  (should (equal (llm-provider-utils-convert-to-serializable '(:a "1" :b foo))
+                 '(:a "1" :b "foo")))
+  (should (equal (llm-provider-utils-convert-to-serializable '(:inner '(:a foo :b bar)))
+                 '(:inner '(:a "foo" :b "bar")))))
 
 (ert-deftest llm-provider-utils-combine-to-system-prompt ()
   (let* ((interaction1 (make-llm-chat-prompt-interaction :role 'user :content "Hello"))
@@ -93,28 +137,6 @@
     (should (= 1 (length (llm-chat-prompt-interactions prompt-for-first-request))))
     (should (equal "Previous interactions:\n\nUser: Hello\nAssistant: Hi! How can I assist you?\n\nThe current conversation follows:\n\nEarl Grey, hot."
                    (llm-chat-prompt-interaction-content (nth 0 (llm-chat-prompt-interactions prompt-for-second-request)))))))
-
-(ert-deftest llm-provider-utils-json-schema ()
-  (should (equal '((type . object)
-                   (properties
-                    (cities
-                     (type . array)
-                     (items
-                      (type . string))))
-                   (required . (cities)))
-                 (llm-provider-utils-json-schema
-                  '(:type object
-                          :properties
-                          (:cities (:type array :items (:type string)))
-                          :required (cities)))))
-  (should (equal '((type . boolean))
-                 (llm-provider-utils-json-schema '(:type boolean))))
-  (should (equal '((type . object)
-                   (properties . ((data . ((enum . ("pizza" "calzone" "pasta")))))))
-                 (llm-provider-utils-json-schema
-                  '(:type object
-                          :properties
-                          (:data (:enum ("pizza" "calzone" "pasta"))))))))
 
 (provide 'llm-provider-utils-test)
 ;;; llm-provider-utils-test.el ends here
