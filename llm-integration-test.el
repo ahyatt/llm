@@ -37,6 +37,8 @@
 ;; - AZURE_EMBEDDING_MODEL: The name of the embedding model to test.
 ;; - AZURE_SLEEP: The number of seconds to sleep between tests, to avoid rate
 ;;   limiting.
+;; - GITHUB_TOKEN: The key for GitHub models. Can either be a GitHub token or
+;;   an Azure production key.
 ;;
 ;; If any of these are set (except for Azure, which needs multiple), the
 ;; corresponding provider will be tested.
@@ -132,6 +134,9 @@ else.  We really just want to see if it's in the right ballpark."
                             :chat-model (getenv "AZURE_CHAT_MODEL")
                             :embedding-model (getenv "AZURE_EMBEDDING_MODEL"))
             providers))
+    (when (getenv "GITHUB_TOKEN")
+      (require 'llm-github)
+      (push (make-llm-github :key (getenv "GITHUB_TOKEN")) providers))
     (when (getenv "OLLAMA_CHAT_MODELS")
       (require 'llm-ollama)
       ;; This variable is a list of models to test.
