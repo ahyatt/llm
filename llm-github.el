@@ -26,28 +26,13 @@
 ;;; Code:
 
 (require 'llm)
-(require 'llm-openai)
-(require 'cl-lib)
+(require 'llm-azure)
 
-(cl-defstruct (llm-github (:include llm-openai-compatible (url "https://models.inference.ai.azure.com"))))
-
-(cl-defmethod llm-nonfree-message-info ((_ llm-github))
-  "Return GitHub's nonfree terms of service."
-  "https://docs.github.com/en/site-policy/github-terms/github-terms-of-service")
+(cl-defstruct (llm-github (:include llm-azure
+                                    (url "https://models.inference.ai.azure.com"))))
 
 (cl-defmethod llm-provider-chat-url ((provider llm-github))
-  (format "%s/chat/completions"
-          (llm-github-url provider)))
-
-(cl-defmethod llm-provider-embedding-url ((provider llm-github) &optional _)
-  (format "%s/embeddings/"
-          (llm-github-url provider)))
-
-(cl-defmethod llm-provider-headers ((provider llm-github))
-  `(("api-key" . ,(llm-github-key provider))))
-
-(cl-defmethod llm-capabilities ((_ llm-github))
-  (list 'streaming 'embedding))
+  (format "%s/chat/completions" (llm-azure-url provider)))
 
 (cl-defmethod llm-name ((provider llm-github))
   (format "GitHub Models %s" (llm-github-chat-model provider)))
