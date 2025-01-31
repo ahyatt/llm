@@ -357,6 +357,11 @@ RESPONSE can be nil if the response is complete."
   "Return the name of the provider."
   "Open AI")
 
+(cl-defmethod llm-name ((provider llm-openai-compatible))
+  "Return the name of the `llm-openai-compatible' PROVIDER."
+  (or (llm-openai-compatible-chat-model provider)
+      "Open AI Compatible"))
+
 (cl-defmethod llm-chat-token-limit ((provider llm-openai))
   (llm-provider-utils-model-token-limit (llm-openai-chat-model provider)))
 
