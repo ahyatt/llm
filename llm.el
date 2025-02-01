@@ -300,12 +300,12 @@ usually turned into part of the interaction, and if so, they will
 be put in the first interaction of the prompt (before anything in
 PREVIOUS-INTERACTIONS).
 
-NON-STANDARD-PARAMS is an alist of other options that the
-provider may or may not know how to handle.  These are expected
-to be provider specific.  Don't use this if you want the prompt
-to be used amongst different providers, because it is likely to
-cause a request error.  The cars of the alist are strings and the
-cdrs can be strings or numbers.  This is optional."
+NON-STANDARD-PARAMS is an alist of other options that the provider may
+or may not know how to handle.  These are expected to be provider
+specific.  Don't use this if you want the prompt to be used amongst
+different providers, because it is likely to cause a request error.  The
+cars of the alist are strings and the cdrs can be strings, numbers or
+vectors (if a list).  This is optional."
   (unless content
     (error "CONTENT is required"))
   (when (and (listp content) (zerop (mod (length content) 2)))

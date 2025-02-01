@@ -149,11 +149,16 @@ Return nil for the standard timeout.")
         (or (llm-chat-prompt-max-tokens prompt)
             (llm-standard-chat-provider-default-chat-max-tokens provider))
         (llm-chat-prompt-non-standard-params prompt)
-        ;; We need to merge the parameteres individually.
-        (seq-union (llm-chat-prompt-non-standard-params prompt)
-                   (llm-standard-chat-provider-default-chat-non-standard-params provider)
-                   (lambda (a b)
-                     (equal (car a) (car b))))))
+        ;; We need to merge the parameters individually.
+        ;; Lists as values should be turned into vectors.
+        (mapcar (lambda (c)
+                  (if (listp (cdr c))
+                      (cons (car c) (vconcat (cdr c)))
+                    c))
+                (seq-union (llm-chat-prompt-non-standard-params prompt)
+                           (llm-standard-chat-provider-default-chat-non-standard-params provider)
+                           (lambda (a b)
+                             (equal (car a) (car b)))))))
 
 (cl-defgeneric llm-provider-chat-request (provider prompt streaming)
   "Return the request for the PROVIDER for PROMPT.
