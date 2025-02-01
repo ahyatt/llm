@@ -1,6 +1,7 @@
 * Version 0.23.0
 - Add GitHub's GitHub Models
-- Accept lists as nonstandard 
+- Accept lists as nonstandard
+- Add Deepseek R1 model.
 * Version 0.22.0
 - Change ~llm-tool-function~ to ~llm-tool~, change ~make-llm-tool-function~ to take any arguments.
 * Version 0.21.0
