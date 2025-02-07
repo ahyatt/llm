@@ -1,3 +1,5 @@
+* Version 0.23.1
+- Add Gemini 2.0 pro experimental model, default to 2.0 flash
 * Version 0.23.0
 - Add GitHub's GitHub Models
 - Accept lists as nonstandard
