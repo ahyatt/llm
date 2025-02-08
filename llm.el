@@ -1,11 +1,11 @@
 ;;; llm.el --- Interface to pluggable llm backends -*- lexical-binding: t; byte-compile-docstring-max-column: 200 -*-
 
-;; Copyright (c) 2023, 2024  Free Software Foundation, Inc.
+;; Copyright (c) 2023-2025  Free Software Foundation, Inc.
 
 ;; Author: Andrew Hyatt <ahyatt@gmail.com>
 ;; Homepage: https://github.com/ahyatt/llm
-;; Package-Requires: ((emacs "28.1") (plz "0.8"))
-;; Package-Version: 0.17.1
+;; Package-Requires: ((emacs "28.1") (plz "0.8") (plz-event-source "0.1.1") (plz-media-type "0.2.1"))
+;; Package-Version: 0.23.0
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;
 ;; This program is free software; you can redistribute it and/or
@@ -55,6 +55,7 @@ for debugging, because the log buffer will grow without bound."
   :type 'boolean)
 
 (defun llm--warn-on-nonfree (name tos)
+
   "Issue a warning if `llm-warn-on-nonfree' is non-nil.
 NAME is the human readable name of the LLM (e.g \"Open AI\").
 
@@ -70,63 +71,116 @@ See %s for the details on the restrictions on use." name tos)))
   "This stores all the information needed for a structured chat prompt.
 
 Use of this directly is deprecated, instead use `llm-make-chat-prompt'."
-  context examples interactions functions temperature max-tokens non-standard-params)
+  context examples interactions tools temperature max-tokens response-format non-standard-params)
 
 (cl-defstruct llm-chat-prompt-interaction
   "This defines a single interaction given as part of a chat prompt.
-ROLE can a symbol, of either `user', `assistant', or `function'.
+ROLE can a symbol, of either `user', `assistant', or `tool-results'.
 
-FUNCTION-CALL-RESULTS is a struct of type
-`llm-chat-prompt-function-call-results', which is only populated
-if `role' is `function'.  It stores the results of just one
-function call."
-  role content function-call-result)
+CONTENT is the content of the interaction.  It should be either
+string, an `llm-multipart' object or a list of function calls.
 
-(cl-defstruct llm-chat-prompt-function-call-result
-  "This defines the result from a function call.
+TOOL-RESULTS is a list of structs of type
+`llm-chat-prompt-tool-result', which is only populated
+if `role' is `tool-results'.  It stores the results of the function
+calls."
+  role content tool-results)
+
+(cl-defstruct llm-chat-prompt-tool-result
+  "This defines the result from a tool use.
 
 CALL-ID is an ID for this function call, if available.
 
-FUNCTION-NAME is the name of the function.  This is required.
+TOOL-NAME is the name of the tool.  This is required.
 
-RESULT is the result of the function call.  This is required."
-  call-id function-name result)
+RESULT is the result of the tool use.  This is required."
+  call-id tool-name result)
 
-(cl-defstruct llm-function-call
-  "This is a struct to represent a function call the LLM can make.
+(cl-defstruct llm-tool
+  "This is a struct for a single tool available to the LLM.
 
 All fields are required.
 
-FUNCTION is a function to call.
+FUNCTION is a function to call.  The first argument for FUNCTION should
+take a callback that should be called back with the result, if ASYNC is
+non-nil.  The other arguments correspond to the arguments defined in the
+tool.
 
 NAME is a human readable name of the function.
 
 DESCRIPTION is a human readable description of the function.
 
-ARGS is a list of `llm-function-arg' structs."
+ARGS is a list of plists, each plist having the keys `:name', `:type',
+`:description', and `:optional'.  `:type' is a string, and the same set
+of types as in `RESPONSE-FORMAT' arg in `llm-make-chat-prompt':
+`string', `integer', `boolean', `float', or `array'.  There can be an
+`:enum' field as well, with a vector of possible values.
+
+ASYNC, if non-nil, means the function will be passed a callback which
+takes the return value, otherwise the callback is not passed, and the
+function's return value will be used."
   function
   name
   description
-  args)
+  args
+  async)
 
-(cl-defstruct llm-function-arg
-  "An argument to an `llm-function-call'.
+(cl-defstruct llm-media
+  "Contains media that can be sent as part of an interaction.
 
-NAME is the name of the argument.
+MIME-TYPE is a string containing the mime type of the media.  Not all
+MIME types are accepted by all providers.
 
-DESCRIPTION is a human readable description of the argument.  It
-can be nil for enums.
+DATA is a (binary) string containing the data.  The string should use
+unibyte encoding.
 
-TYPE is the type of the argument.  It can be one of `string',
-`integer', `float', `boolean' or the special lists, `(or <type1>
-<type2> ... <typen>)', `(enum <string1> <string2> ...
-<stringn>)', or `(list <type>)'.
+This should only be used if the `image-input' or `audio-input' or
+`pdf-input' capability is available, as indicated by `llm-capabilities'."
+  mime-type data)
 
-REQUIRED is whether this is required or not."
-  name
-  description
-  type
-  required)
+(defun llm--image-to-media (image)
+  "Convert an IMAGE object to an `llm-media' object."
+  (make-llm-media
+   :mime-type (pcase (image-property image :type)
+                ('svg "image/svg+xml")
+                ('webp "image/webp")
+                ('png "image/png")
+                ('gif "image/gif")
+                ('tiff "image/tiff")
+                ('jpeg "image/jpeg")
+                ('xpm "image/x-xpixmap")
+                ('xbm "image/x-xbitmap"))
+   :data (if-let ((data (image-property image :data))) data
+           (with-temp-buffer
+             (set-buffer-multibyte nil)
+             (insert-file-contents-literally (image-property image :file))
+             (buffer-string)))))
+
+(cl-defstruct llm-multipart
+  "A multipart message that can contain both text and media.
+
+PARTS is a list of the parts of the interaction.  Each element
+should be either a string for text, or a `llm-media' object for
+media.
+
+Note that this includes the special case where there are multiple
+text parts and no media parts, although this case is only
+supported by some providers.  For example, this can be used to
+send instructions and code blocks separately."
+  parts)
+
+(defun llm-make-multipart (&rest parts)
+  "Create a multipart message from the arguments PARTS.
+
+Each argument should be either a string, image object or an
+`llm-media' object.  The arguments are combined into a single
+multipart message."
+  (make-llm-multipart
+   :parts (mapcar (lambda (part)
+                    (if (and (fboundp 'imagep) (imagep part))
+                        (llm--image-to-media part)
+                      part))
+                  parts)))
 
 (cl-defun llm--log (type &key provider prompt msg)
   "Log a MSG of TYPE, given PROVIDER, PROMPT, and MSG.
@@ -168,10 +222,18 @@ This is deprecated, and you should use `llm-make-chat-prompt'
 instead."
   (llm-make-chat-prompt text))
 
-(cl-defun llm-make-chat-prompt (text &key context examples functions
-                                     temperature max-tokens
-                                     non-standard-params)
-  "Create a `llm-chat-prompt' with TEXT sent to the LLM provider.
+(cl-defun llm-make-tool (&key function name description args async &allow-other-keys)
+  "Create a `llm-tool' struct with FUNCTION, NAME, DESCRIPTION, ARGS, and ASYNC."
+  (make-llm-tool :function function
+                 :name name
+                 :description description
+                 :args args
+                 :async async))
+
+(cl-defun llm-make-chat-prompt (content &key context examples tools
+                                        temperature max-tokens response-format
+                                        non-standard-params)
+  "Create a `llm-chat-prompt' with CONTENT sent to the LLM provider.
 
 This is the most correct and easy way to create an
 `llm-chat-prompt', and should suffice for almost all uses.
@@ -185,12 +247,14 @@ populated, a best effort is made to do something reasonable, but
 it may not be quite the same on all providers as the prompt
 mutating in terms of an actual conversation.
 
-TEXT is the latest user input to the LLM, the thing to be
-responded to.  This is required.  This can also be a string, in
-which case it represents the chat history, starting with the
-user's initial chat, followed by the response, and so on.  If it
-is a list, it MUST be an odd number, since the presumption is
-that it ends with the user's latest input to the LLM.
+CONTENT is the latest user input to the LLM, the thing to be
+responded to, in form of a string containing text or an
+`llm-multipart' object containing both text and media.  This is
+required.  This can also be a list, in which case it represents
+the chat history, starting with the user's initial chat, followed
+by the response, and so on.  If it is a list, it MUST be an odd
+number, since the presumption is that it ends with the user's
+latest input to the LLM.
 
 CONTEXT is a string given to the LLM as context for the entire
 interaction, such as instructions to the LLM on how to reply,
@@ -200,7 +264,7 @@ to the chat as a whole.  This is optional.
 EXAMPLES is a list of conses, where the car is an example
 inputs, and cdr is the corresponding example outputs.  This is optional.
 
-FUNCTIONS is a list of `llm-function-call' structs.  These may be
+TOOLS is a list of `llm-tool' structs.  These may be
 called IF the LLM supports them.  If the LLM does not support
 them, a `not-implemented' signal will be thrown.  This is
 optional.  When this is given, the LLM will either call the
@@ -214,21 +278,38 @@ This is not required.
 
 MAX-TOKENS is the maximum number of tokens to generate.  This is optional.
 
+If RESPONSE-FORMAT is `json' (the currently only accepted symbol), we
+will attempt to force ouput to fit the format.  This should not be used
+with function calling.  If this is set the instructions to the LLM
+should tell the model about the format, for example with JSON format by
+including examples or describing the schema.  This can also be a
+structure defining the JSON schema, which will be passed directly to
+`json-serialize', following the JSON schema rules (see
+http://json-schema.org).  The structure is plist that can be
+either `(:type <type> <additional-properties...>)', or in the case of
+enums `(:enum [val1 val2 ... valn])'.  All types and values used as the
+values in plists and vectors should be strings, not symbols.  LLMs will
+often require the top-level schema passed in to be an object: `(:type
+\"object\" :properties (:val <schema> :other-val <other-schema>)
+:required [\"val\" \"other-val\"])'.  Often, all properties must be
+required.  Arrays can be specified with `(:type \"array\" :items
+<schema>)'.
+
 CONTEXT, EXAMPLES, FUNCTIONS, TEMPERATURE, and MAX-TOKENS are
 usually turned into part of the interaction, and if so, they will
 be put in the first interaction of the prompt (before anything in
 PREVIOUS-INTERACTIONS).
 
-NON-STANDARD-PARAMS is an alist of other options that the
-provider may or may not know how to handle.  These are expected
-to be provider specific.  Don't use this if you want the prompt
-to be used amongst different providers, because it is likely to
-cause a request error.  The cars of the alist are strings and the
-cdrs can be strings or numbers.  This is optional."
-  (unless text
-    (error "TEXT is required"))
-  (when (and (listp text) (zerop (mod (length text) 2)))
-    (error "TEXT, as a list, must have an odd number of elements"))
+NON-STANDARD-PARAMS is an alist of other options that the provider may
+or may not know how to handle.  These are expected to be provider
+specific.  Don't use this if you want the prompt to be used amongst
+different providers, because it is likely to cause a request error.  The
+cars of the alist are strings and the cdrs can be strings, numbers or
+vectors (if a list).  This is optional."
+  (unless content
+    (error "CONTENT is required"))
+  (when (and (listp content) (zerop (mod (length content) 2)))
+    (error "CONTENT, as a list, must have an odd number of elements"))
   (make-llm-chat-prompt
    :context context
    :examples examples
@@ -236,10 +317,11 @@ cdrs can be strings or numbers.  This is optional."
                                     (make-llm-chat-prompt-interaction
                                      :role (if (zerop (mod i 2)) 'user 'assistant)
                                      :content s))
-                                  (if (listp text) text (list text)))
-   :functions functions
+                                  (if (listp content) content (list content)))
+   :tools tools
    :temperature temperature
    :max-tokens max-tokens
+   :response-format response-format
    :non-standard-params non-standard-params))
 
 (defun llm-chat-prompt-append-response (prompt response &optional role)
@@ -343,9 +425,6 @@ be passed to `llm-cancel-request'."
                                       new-error-callback)))
     result))
 
-(cl-defmethod llm-chat-function-call ((_ (eql nil)) _ _ _)
-  (error "LLM provider was nil.  Please set the provider in the application you are using"))
-
 (cl-defgeneric llm-chat-streaming (provider prompt partial-callback response-callback error-callback)
   "Stream a response to PROMPT from PROVIDER.
 PROMPT is a `llm-chat-prompt'.
@@ -393,7 +472,6 @@ be passed to `llm-cancel-request'."
   ;; We need to wrap the callbacks before we set llm-log to nil.
   (let* ((new-partial-callback (lambda (response)
                                  (when partial-callback
-                                   (llm--log 'api-receive-partial :provider provider :msg response)
                                    (let ((llm-log nil))
                                      (funcall partial-callback response)))))
          (new-response-callback (lambda (response)
@@ -430,8 +508,18 @@ be passed to `llm-cancel-request'."
                     (with-current-buffer (marker-buffer start)
                       (save-excursion
                         (goto-char start)
-                        (delete-region start end)
-                        (insert text)))))
+                        (let* ((current-text
+                                (buffer-substring-no-properties start end))
+                               (common-prefix
+                                (fill-common-string-prefix current-text text))
+                               (prefix-length (length common-prefix)))
+                          ;; Skip over common prefix of current text
+                          ;; and new text.
+                          (when (> prefix-length 0)
+                            (goto-char (+ start prefix-length)))
+                          (delete-region (point) end)
+                          ;; Insert new text, minus common prefix.
+                          (insert (substring text prefix-length)))))))
           (llm-chat-streaming provider prompt
                               (lambda (text) (insert-text text))
                               (lambda (text) (insert-text text)
@@ -462,7 +550,20 @@ won't have any partial responses, so basically just operates like
 
 `embeddings': the LLM can return vector embeddings of text.
 
-`function-calls': the LLM can call functions."
+`embeddings-batch': the LLM can return many vector embeddings at the same time.
+
+`tool-uses': the LLM can call functions.i
+
+`image-input': the LLM can accept images as input.
+
+`pdf-input': the LLM can accept PDF documents as input.
+
+`json-response': the LLM can be requested to return responses only in
+JSON format.
+
+`video-input': the LLM can accept video as input.
+
+`audio-input': the LLM can accept audio as input."
   (ignore provider)
   nil)
 
@@ -507,6 +608,44 @@ be passed to `llm-cancel-request'."
   (error "LLM provider was nil.  Please set the provider in the application you are using"))
 
 (cl-defmethod llm-embedding-async :before (provider _ _ _)
+  "Issue a warning if the LLM is non-free."
+  (when-let (info (llm-nonfree-message-info provider))
+    (llm--warn-on-nonfree (llm-name provider) info)))
+
+(cl-defmethod llm-batch-embeddings (provider string-list)
+  "Return a list of embedding vectors of STRING-LIST.
+
+The list of vectors is in an order corresponding to the order of
+STRING-LIST.
+
+PROVIDER is the provider struct that will be used for an LLM call."
+  (ignore provider string-list)
+  (signal 'not-implemented nil))
+
+(cl-defmethod llm-batch-embeddings ((_ (eql nil)) _)
+  "Catch trivial configuration mistake."
+  (error "LLM provider was nil.  Please set the provider in the application you are using"))
+
+(cl-defmethod llm-batch-embeddings :before (provider _)
+  "Issue a warning if the LLM is non-free."
+  (when-let (info (llm-nonfree-message-info provider))
+    (llm--warn-on-nonfree (llm-name provider) info)))
+
+(cl-defmethod llm-batch-embeddings-async (provider string-list vector-callback error-callback)
+  "Calculate a list of vector embeddings of STRING-LIST from PROVIDER.
+
+VECTOR-CALLBACK will be called with the list of vector embeddings.
+
+ERROR-CALLBACK will be called in the event of an error, with a signal
+and a string message."
+  (ignore provider string-list vector-callback error-callback)
+  (signal 'not-implemented nil))
+
+(cl-defmethod llm-batch-embeddings-async ((_ (eql nil)) _ _ _)
+  "Catch trivial configuration mistake."
+  (error "LLM provider was nil.  Please set the provider in the application you are using"))
+
+(cl-defmethod llm-batch-embeddings-async :before (provider _ _ _)
   "Issue a warning if the LLM is non-free."
   (when-let (info (llm-nonfree-message-info provider))
     (llm--warn-on-nonfree (llm-name provider) info)))
@@ -568,7 +707,15 @@ This should only be used for logging or debugging."
                           ('user "User")
                           ('system "System")
                           ('assistant "Assistant"))
-                        (llm-chat-prompt-interaction-content i)))
+                        (let ((content (llm-chat-prompt-interaction-content i)))
+                          (if (llm-multipart-p content)
+                              (mapcar (lambda (part) (if (llm-media-p part)
+                                                         (format "[%s data, %d bytes]"
+                                                                 (llm-media-mime-type part)
+                                                                 (length (llm-media-data part)))
+                                                       part))
+                                      (llm-multipart-parts content))
+                            content))))
               (llm-chat-prompt-interactions prompt) "\n")
    "\n"
    (when (llm-chat-prompt-temperature prompt)

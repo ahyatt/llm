@@ -1,6 +1,48 @@
+* Version 0.23.0
+- Add GitHub's GitHub Models
+- Accept lists as nonstandard
+- Add Deepseek R1 model
+- Show the chat model as the name for Open-AI compatible models (via [[https://github.com/whhone][@whhone]])
+* Version 0.22.0
+- Change ~llm-tool-function~ to ~llm-tool~, change ~make-llm-tool-function~ to take any arguments.
+* Version 0.21.0
+- Incompatible change to function calling, which is now tool use, affecting arguments and methods.
+- Support image understanding in Claude
+- Support streaming tool use in Claude
+- Add ~llm-models-add~ as a convenience method to add a model to the known list.
+* Version 0.20.0
+- Add ability to output according to a JSON spec.
+- Add Gemini 2.0 Flash, Gemini 2.0 Flash Thinking, and Llama 3.3 and QwQ models.
+* Version 0.19.1
+- Fix Open AI context length sizes, which are mostly smaller than advertised.
+* Version 0.19.0
+- Add JSON mode, for most providers with the exception of Claude.
+- Add ability for keys to be functions, thanks to Daniel Mendler.
+* Version 0.18.1
+- Fix extra argument in ~llm-batch-embeddings-async~.
+* Version 0.18.0
+- Add media handling, for images, videos, and audio.
+- Add batch embeddings capability (currently for just Open AI and Ollama).
+- Add Microsoft Azure's Open AI
+- Remove testing and other development files from ELPA packaging.
+- Remove vendored =plz-event-source= and =plz-media-type=, and add requirements.
+- Update list of Ollama models for function calling.
+- Centralize model list so things like Vertex and Open AI compatible libraries can have more accurate context lengths and capabilities.
+- Update default Gemini chat model to Gemini 1.5 Pro.
+- Update default Claude chat model to latest Sonnet version.
+- Fix issue in some Open AI compatible providers with empty function call arguments
+* Version 0.17.4
+- Fix problem with Open AI's =llm-chat-token-limit=.
+- Fix Open AI and Gemini's parallel function calling.
+- Add variable =llm-prompt-default-max-tokens= to put a cap on number of tokens regardless of model size.
+* Version 0.17.3
+- More fixes with Claude and Ollama function calling conversation, thanks to Paul Nelson.
+- Make =llm-chat-streaming-to-point= more efficient, just inserting new text, thanks to Paul Nelson.
+- Don't output streaming information when =llm-debug= is true, since it tended to be overwhelming.
 * Version 0.17.2
 - Fix compiled functions not being evaluated in =llm-prompt=.
 - Use Ollama's new =embed= API instead of the obsolete one.
+- Fix Claude function calling conversations
 - Fix issue in Open AI streaming function calling.
 - Update Open AI and Claude default chat models to the later models.
 * Version 0.17.1

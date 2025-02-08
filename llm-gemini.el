@@ -1,6 +1,6 @@
 ;;; llm-gemini.el --- LLM implementation of Google Cloud Gemini AI -*- lexical-binding: t; package-lint-main-file: "llm.el"; -*-
 
-;; Copyright (c) 2023, 2024  Free Software Foundation, Inc.
+;; Copyright (c) 2023-2025  Free Software Foundation, Inc.
 
 ;; Author: Andrew Hyatt <ahyatt@gmail.com>
 ;; Homepage: https://github.com/ahyatt/llm
@@ -37,21 +37,23 @@
 
 KEY is the API key for the client.
 You can get this at https://makersuite.google.com/app/apikey."
-  key (embedding-model "embedding-001") (chat-model "gemini-pro"))
+  key (embedding-model "embedding-001") (chat-model "gemini-1.5-pro"))
 
 (cl-defmethod llm-nonfree-message-info ((_ llm-gemini))
   "Return nonfree terms of service for Gemini."
   "https://policies.google.com/terms/generative-ai")
 
-(cl-defmethod llm-provider-embedding-url ((provider llm-gemini))
+(cl-defmethod llm-provider-embedding-url ((provider llm-gemini) &optional _)
   "Return the URL for the EMBEDDING request for STRING from PROVIDER."
   (format "https://generativelanguage.googleapis.com/v1beta/models/%s:embedContent?key=%s"
           (llm-gemini-embedding-model provider)
-          (llm-gemini-key provider)))
+          (if (functionp (llm-gemini-key provider))
+              (funcall (llm-gemini-key provider))
+            (llm-gemini-key provider))))
 
 (cl-defmethod llm-provider-embedding-request ((provider llm-gemini) string)
-  `((model . ,(llm-gemini-embedding-model provider))
-    (content . ((parts . (((text . ,string))))))))
+  `(:model ,(llm-gemini-embedding-model provider)
+           :content (:parts [(:text ,string)])))
 
 (cl-defmethod llm-provider-embedding-extract-result ((_ llm-gemini) response)
   (assoc-default 'values (assoc-default 'embedding response)))
@@ -63,7 +65,9 @@ If STREAMING-P is non-nil, use the streaming endpoint."
   (format "https://generativelanguage.googleapis.com/v1beta/models/%s:%s?key=%s"
           (llm-gemini-chat-model provider)
           (if streaming-p "streamGenerateContent" "generateContent")
-          (llm-gemini-key provider)))
+          (if (functionp (llm-gemini-key provider))
+              (funcall (llm-gemini-key provider))
+            (llm-gemini-key provider))))
 
 (cl-defmethod llm-provider-chat-url ((provider llm-gemini))
   (llm-gemini--chat-url provider nil))
@@ -71,33 +75,27 @@ If STREAMING-P is non-nil, use the streaming endpoint."
 (cl-defmethod llm-provider-chat-streaming-url ((provider llm-gemini))
   (llm-gemini--chat-url provider t))
 
-(cl-defmethod llm-provider-populate-function-calls ((_ llm-gemini) prompt calls)
-  (llm-provider-utils-append-to-prompt
-   prompt
-   ;; For Vertex there is just going to be one call
-   (mapcar (lambda (fc)
-             `((functionCall
-                .
-                ((name . ,(llm-provider-utils-function-call-name fc))
-                 (args . ,(llm-provider-utils-function-call-args fc))))))
-           calls)))
-
 (cl-defmethod llm-provider-chat-request ((_ llm-gemini) _ _)
-  (mapcar (lambda (c) (if (eq (car c) 'generation_config)
-                          (cons 'generationConfig (cdr c))
-                        c))
-          (cl-call-next-method)))
+  ;; Temporary, can be removed in the next version.  Without this the old
+  ;; definition will cause problems when users upgrade.
+  (cl-call-next-method))
 
 (cl-defmethod llm-name ((_ llm-gemini))
   "Return the name of PROVIDER."
   "Gemini")
 
-;; From https://ai.google.dev/models/gemini.
 (cl-defmethod llm-chat-token-limit ((provider llm-gemini))
-  (llm-vertex--chat-token-limit (llm-gemini-chat-model provider)))
+  (llm-provider-utils-model-token-limit (llm-gemini-chat-model provider)
+                                        1048576))
 
-(cl-defmethod llm-capabilities ((_ llm-gemini))
-  (list 'streaming 'embeddings 'function-calls))
+(cl-defmethod llm-capabilities ((provider llm-gemini))
+  (append
+   (list 'streaming 'embeddings)
+   (when-let ((model (llm-models-match (llm-gemini-chat-model provider)))
+              (capabilities (llm-model-capabilities model)))
+     (append
+      (when (member 'tool-use capabilities) '(function-calls))
+      (seq-intersection capabilities '(image-input audio-input video-input))))))
 
 (provide 'llm-gemini)
 

@@ -1,6 +1,6 @@
 ;;; llm-prompt-test.el --- Tests for LLM prompting -*- lexical-binding: t -*-
 
-;; Copyright (c) 2024  Free Software Foundation, Inc.
+;; Copyright (c) 2024-2025  Free Software Foundation, Inc.
 
 ;; Author: Andrew Hyatt <ahyatt@gmail.com>
 ;; Homepage: https://github.com/ahyatt/llm
@@ -61,21 +61,21 @@ to converge."
                       :name 'var-1 :tickets 10
                       :generator (funcall
                                   (iter-lambda ()
-                                    (while t (iter-yield 'a)))))
+                                      (while t (iter-yield 'a)))))
                      (make-llm-prompt-variable-full
                       :name 'var-2 :tickets 20
                       :generator (funcall
                                   (iter-lambda ()
-                                    (while t (iter-yield 'b)))))
+                                      (while t (iter-yield 'b)))))
                      (make-llm-prompt-variable-full
                       :name 'var-3 :tickets 30
                       :generator (funcall
                                   (iter-lambda ()
-                                    (while t (iter-yield 'c)))))
+                                      (while t (iter-yield 'c)))))
                      (make-llm-prompt-variable-full
                       :name 'var-4 :tickets 30
                       :generator (funcall (iter-lambda ()
-                                            (iter-yield 'd))))))
+                                              (iter-yield 'd))))))
          (selector (llm-prompt--select-tickets vars))
          (iters 20000))
     (dotimes (_ iters)
@@ -98,7 +98,7 @@ to converge."
                       :name 'var-1 :tickets 10
                       :generator (funcall
                                   (iter-lambda ()
-                                    (while t (iter-yield 'a)))))))
+                                      (while t (iter-yield 'a)))))))
          (selector (llm-prompt--select-tickets vars)))
     (push (cdr (iter-next selector)) result)
     (push (cdr (iter-next selector)) result)
@@ -110,7 +110,7 @@ to converge."
                       :name 'var :tickets 10
                       :generator (funcall
                                   (iter-lambda ()
-                                    (iter-yield 'a))))))
+                                      (iter-yield 'a))))))
          (selector (llm-prompt--select-tickets vars)))
     (should (equal (cdr (iter-next selector)) 'a))
     (condition-case nil
@@ -180,6 +180,26 @@ to converge."
                   (make-prompt-test-llm)
                   :var1 '("this is a completely oversized item"
                           "a" "b" "c" "d")))))
+
+(ert-deftest llm-prompt-reverse-filling ()
+  (should (equal "(d c a b)"
+                 (llm-prompt-fill-text
+                  "({{var1}})"
+                  (make-prompt-test-llm)
+                  :var1 '("a" "b" ("c" . back) ("d" . back))))))
+
+(ert-deftest llm-prompt--max-tokens ()
+  (cl-flet ((should-have-max-tokens (expected max-pct max-tokens)
+              (let ((llm-prompt-default-max-pct max-pct)
+                    (llm-prompt-default-max-tokens max-tokens))
+                (should (equal expected (llm-prompt--max-tokens
+                                         (make-prompt-test-llm)))))))
+    ;; The test LLM has a 20 token limit
+    (should-have-max-tokens 10 50 nil)
+    (should-have-max-tokens 20 100 nil)
+    (should-have-max-tokens 5 50 5)
+    (should-have-max-tokens 10 50 10)
+    (should-have-max-tokens 10 50 20)))
 
 (provide 'llm-prompt-test)
 
