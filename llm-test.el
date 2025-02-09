@@ -308,7 +308,7 @@
   (should-not (member 'embeddings (llm-capabilities (make-llm-openai-compatible :chat-model "llama-3")))))
 
 (ert-deftest llm-test-chat-token-limit-gemini ()
-  (should (= 2097152 (llm-chat-token-limit (make-llm-gemini))))
+  (should (= 1048576 (llm-chat-token-limit (make-llm-gemini))))
   (should (= 1048576 (llm-chat-token-limit
                       (make-llm-gemini :chat-model "gemini-1.5-flash"))))
   (should (= 4096 (llm-chat-token-limit
