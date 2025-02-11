@@ -106,7 +106,16 @@ PROVIDER is the llm-ollama provider."
 
 (cl-defmethod llm-provider-chat-extract-result ((_ llm-ollama) response)
   "Return the chat response from the server RESPONSE."
-  (assoc-default 'content (assoc-default 'message response)))
+  (let ((raw-result (assoc-default 'content (assoc-default 'message response))))
+    ;; The raw result may have reasoning content in, which is in <think> tags
+    ;; (for DeepSeek reasoning).  We want to strip that out.
+    (replace-regexp-in-string "<think>.*</think>" "" raw-result)))
+
+(cl-defmethod llm-provider-extract-reasoning ((_ llm-ollama) response)
+  (let ((raw-result (assoc-default 'content (assoc-default 'message response))))
+    ;; Reasoning content is in <think> tags (for DeepSeek reasoning).  We want to
+    ;; extract the content between these tags.
+    (replace-regexp-in-string "<think>\\(.*\\)</think>" "\\1" raw-result)))
 
 (defun llm-ollama--response-format (format)
   "Return the response format for FORMAT."

@@ -214,6 +214,13 @@ list of `llm-provider-utils-tool-use'.")
   "By default, the standard provider has no function call extractor."
   nil)
 
+(cl-defgeneric llm-provider-extract-reasoning (provider response)
+  "Return the reasoning from RESPONSE for the PROVIDER.")
+
+(cl-defmethod llm-provider-extract-reasoning ((_ llm-standard-chat-provider) _)
+  "By default, the standard provider has no reasoning extractor."
+  nil)
+
 (cl-defgeneric llm-provider-populate-tool-uses (provider prompt tool-uses)
   "For PROVIDER, in PROMPT, record TOOL-USES.
 This is the recording before the function calls were executed, in the prompt.
@@ -304,7 +311,19 @@ return a list of `llm-chat-prompt-tool-use' structs.")
                          provider data)
                         "Unknown error")))))))
 
-(cl-defmethod llm-chat ((provider llm-standard-chat-provider) prompt)
+(defun llm-provider-utils-extract-all(provider response)
+  "Extract all from RESPONSE for the PROVIDER."
+  (let ((text
+         (llm-provider-chat-extract-result provider response))
+        (tool-uses (llm-provider-extract-tool-uses
+                    provider response))
+        (reasoning (llm-provider-extract-reasoning
+                    provider response)))
+    (append (when text `(:text ,text))
+            (when tool-uses `(:tool-uses ,tool-uses))
+            (when reasoning `(:reasoning ,reasoning)))))
+
+(cl-defmethod llm-chat ((provider llm-standard-chat-provider) prompt &optional multi-output)
   (llm-provider-request-prelude provider)
   (let ((response (llm-request-plz-sync (llm-provider-chat-url provider)
                                         :headers (llm-provider-headers provider)
@@ -313,10 +332,9 @@ return a list of `llm-chat-prompt-tool-use' structs.")
     (if-let ((err-msg (llm-provider-chat-extract-error provider response)))
         (error err-msg)
       (llm-provider-utils-process-result provider prompt
-                                         (llm-provider-chat-extract-result
+                                         (llm-provider-utils-extract-all
                                           provider response)
-                                         (llm-provider-extract-tool-uses
-                                          provider response)
+                                         multi-output
                                          (lambda (result)
                                            (setq final-result result))))
     ;; In most cases, final-result will be available immediately.  However, when
@@ -327,7 +345,7 @@ return a list of `llm-chat-prompt-tool-use' structs.")
     final-result))
 
 (cl-defmethod llm-chat-async ((provider llm-standard-chat-provider) prompt success-callback
-                              error-callback)
+                              error-callback multi-output)
   (llm-provider-request-prelude provider)
   (let ((buf (current-buffer)))
     (llm-request-plz-async
@@ -356,7 +374,7 @@ return a list of `llm-chat-prompt-tool-use' structs.")
                         "Unknown error")))))))
 
 (cl-defmethod llm-chat-streaming ((provider llm-standard-chat-provider) prompt partial-callback
-                                  response-callback error-callback)
+                                  response-callback error-callback multi-output)
   (llm-provider-request-prelude provider)
   (let ((buf (current-buffer))
         (current-text "")
@@ -388,6 +406,7 @@ return a list of `llm-chat-prompt-tool-use' structs.")
         (when fc
           (llm-provider-collect-streaming-tool-uses
            provider (nreverse fc)))
+        multi-output
         (lambda (result)
           (llm-provider-utils-callback-in-buffer
            buf response-callback result))))
@@ -661,7 +680,7 @@ ROLE will be `assistant' by default, but can be passed in for other roles."
                                   (format "%s" output))
                        :tool-results tool-results)))))
 
-(defun llm-provider-utils-process-result (provider prompt text tool-uses success-callback)
+(defun llm-provider-utils-process-result (provider prompt partial-result multi-output success-callback)
   "Process the RESPONSE from the provider for PROMPT.
 This execute function calls if there are any, does any result
 appending to the prompt, and returns an appropriate response for
@@ -671,22 +690,25 @@ PROVIDER is the struct that configures the use of the LLM.
 
 TOOL-USES is a list of tool uses in the result.
 
-TEXT is the text output from the provider, if any.  There should
-be either FUNCALLS or TEXT.
+PARTIAL-RESULT is the multipart result, without any tool results.
+
+MULTI-OUTPUT is true if multiple outputs are expected to be passed to
+SUCCESS-CALLBACK.
 
 SUCCESS-CALLBACK is the callback that will be run when all functions
 complete."
-  (if tool-uses
+  (when (plist-get partial-result :text)
+    (llm-provider-append-to-prompt provider prompt (plist-get partial-result :text)))
+  (if (plist-get partial-result :tool-uses)
       ;; If we have tool uses, execute them, and on the callback, we will
       ;; populate the results.  We don't execute the callback here because it
       ;; will be done inside `llm-provider-utils-execute-tool-uses'.
       (llm-provider-utils-execute-tool-uses
-       provider prompt tool-uses success-callback)
-    ;; We probably shouldn't be called if text is nil, but if we do,
-    ;; we shouldn't add something invalid to the prompt.
-    (when text
-      (llm-provider-append-to-prompt provider prompt text))
-    (funcall success-callback text)))
+       provider prompt tool-uses multi-output
+       partial-result success-callback)
+    (funcall success-callback
+             (if multi-output partial-result
+               (plist-get partial-result :text)))))
 
 (defun llm-provider-utils-populate-tool-uses (provider prompt results-alist)
   "Append the results in RESULTS-ALIST to the prompt.
@@ -706,7 +728,7 @@ PROVIDER is the struct that configures the user of the LLM."
                         :result (cdr c)))
            results-alist)))
 
-(defun llm-provider-utils-execute-tool-uses (provider prompt tool-uses success-callback)
+(defun llm-provider-utils-execute-tool-uses (provider prompt tool-uses multi-output partial-result success-callback)
   "Execute TOOL-USES, a list of `llm-provider-utils-tool-use'.
 
 A response suitable for returning to the client will be returned.
@@ -716,6 +738,12 @@ PROVIDER is the provider that supplied the response.
 PROMPT was the prompt given to the provider, which will get
 updated with the response from the LLM, and if there is a
 function call, the result.
+
+MULTI-OUTPUT is true if multiple outputs are expected to be passed to
+SUCCESS-CALLBACK.
+
+PARTIAL-RESULT is the result to return to the user, without the tool
+call results.
 
 SUCCESS-CALLBACK is the callback that will be run when all functions
 have returned results."
@@ -745,7 +773,11 @@ have returned results."
                         (when (= (length results) (length tool-uses))
                           (llm-provider-utils-populate-tool-uses
                            provider prompt results)
-                          (funcall success-callback tool-use-and-results)))))
+                          (funcall success-callback
+                                   (if multi-output
+                                       (append partial-result
+                                               `(:tool-results ,tool-use-and-results))
+                                     tool-use-and-results))))))
        (if (llm-tool-async tool)
            (apply (llm-tool-function tool)
                   (append (list end-func) call-args))
