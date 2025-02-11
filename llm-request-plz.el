@@ -1,6 +1,6 @@
 ;;; llm-request-plz.el --- Curl request handling code -*- lexical-binding: t; package-lint-main-file: "llm.el"; -*-
 
-;; Copyright (c) 2023, 2024  Free Software Foundation, Inc.
+;; Copyright (c) 2023-2025  Free Software Foundation, Inc.
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -49,8 +49,8 @@ not very long so that we can end stuck requests."
   "Return non-nil if STATUS is a successful HTTP status code."
   (<= 200 status 299))
 
-(cl-defun llm-request-plz-sync-raw-output (url &key headers data timeout)
-  "Make a request to URL.  The raw text response will be returned.
+(cl-defun llm-request-plz-sync (url &key headers data timeout)
+  "Make a request to URL.  The response is a JSON object.
 
 HEADERS will be added in the Authorization header, in addition to
 standard json header.  This is optional.
@@ -60,14 +60,13 @@ This is required.
 
 TIMEOUT is the number of seconds to wait for a response."
   (condition-case error
-      (let ((resp (plz-media-type-request
-        'post url
-        :as `(media-types ,plz-media-types)
-        :body (when data
-                (encode-coding-string (json-encode data) 'utf-8))
-        :connect-timeout llm-request-plz-connect-timeout
-        :headers (append headers '(("Content-Type" . "application/json")))
-        :timeout (or timeout llm-request-plz-timeout))))
+      (let ((resp (plz-media-type-request 'post url
+                    :as `(media-types ,plz-media-types)
+                    :body (when data
+                            (encode-coding-string (json-serialize data) 'utf-8))
+                    :connect-timeout llm-request-plz-connect-timeout
+                    :headers (append headers '(("Content-Type" . "application/json")))
+                    :timeout (or timeout llm-request-plz-timeout))))
         (if (llm-request-success (plz-response-status resp))
             (plz-response-body resp)
           (signal 'plz-http-error resp)))
@@ -84,21 +83,6 @@ TIMEOUT is the number of seconds to wait for a response."
               (eq 28 (car (plz-error-curl-error data))))
          (error "LLM request timed out"))
         (t (signal error-sym (list message data))))))))
-
-(cl-defun llm-request-plz-sync (url &key headers data timeout)
-  "Make a request to URL.  The parsed response will be returned.
-
-HEADERS will be added in the Authorization header, in addition to
-the standard json header.  This is optional.
-
-DATA will be jsonified and sent as the request body.
-This is required.
-
-TIMEOUT is the number of seconds to wait for a response."
-  (llm-request-plz-sync-raw-output url
-                                   :headers headers
-                                   :data data
-                                   :timeout timeout))
 
 (defun llm-request-plz--handle-error (error on-error)
   "Handle the ERROR with the ON-ERROR callback."
@@ -144,7 +128,7 @@ only used by other methods in this file."
                            (cons media-type plz-media-types)
                          plz-media-types))
     :body (when data
-            (encode-coding-string (json-encode data) 'utf-8))
+            (encode-coding-string (json-serialize data) 'utf-8))
     :connect-timeout llm-request-plz-connect-timeout
     :headers (append headers
                      '(("Content-Type" . "application/json")))

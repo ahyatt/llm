@@ -1,6 +1,6 @@
 ;;; llm-models-test.el --- Test of model capabilities spec -*- lexical-binding: t; package-lint-main-file: "llm.el" -*-
 
-;; Copyright (c) 2024  Free Software Foundation, Inc.
+;; Copyright (c) 2024-2025  Free Software Foundation, Inc.
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -29,7 +29,7 @@
   ;; the models to ensure that the first match is the unique match.
   (let ((models-names-to-test '("gpt-3.5-turbo-instructo" "gpt-4" "gpt-4o"
                                 "gemini-1.5-flash" "llama-3" "llama-3.1"
-                                "llama3" "llama3.1")))
+                                "llama3" "llama3.1" "gemini-2.0-flash-thinking")))
     (dolist (model-name models-names-to-test)
       (let ((model-forward (llm-models-match model-name))
             (model-reverse (let ((llm-models (reverse llm-models)))

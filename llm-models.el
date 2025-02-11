@@ -1,6 +1,6 @@
 ;;; llm-models.el --- Specification of model capabilities -*- lexical-binding: t; package-lint-main-file: "llm.el" -*-
 
-;; Copyright (c) 2024  Free Software Foundation, Inc.
+;; Copyright (c) 2024-2025  Free Software Foundation, Inc.
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -30,8 +30,8 @@ NAME is the name of the model, appropriate for showing a user.
 
 CAPABILITIES is a list of symbols representing the capabilities of the
 model, one of `embedding', `generation', `tool-use',
-`image-input', `image-output', `audio-input', `video-input', `caching'
-and `free-software'.
+`image-input', `image-output', `audio-input', `video-input', 'pdf-input',
+`caching' and `free-software'.
 
 REGEX is a regular expression that can be used to identify the model, uniquely (it shouldn't conflict with any other model)"
   name
@@ -103,7 +103,7 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
    ;; https://docs.anthropic.com/en/docs/about-claude/models
    (make-llm-model
     :name "Claude 3.5 Sonnet" :symbol 'claude-3.5-sonnet
-    :capabilities '(generation tool-use image-input caching)
+    :capabilities '(generation tool-use image-input pdf-input caching)
     :context-length 200000
     :regex "claude-3.5-sonnet")
    (make-llm-model
@@ -126,12 +126,17 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :name "Gemini 2.0 Flash" :symbol 'gemini-2.0-flash
     :capabilities '(generation tool-use image-input audio-input video-input)
     :context-length 1048576
-    :regex "gemini-2\\.0-flash")
+    :regex "gemini-2\\.0-flash\\(-exp\\)?$")
    (make-llm-model
     :name "Gemini 2.0 Flash Thinking" :symbol 'gemini-2.0-flash-thinking
     :capabilities '(generation)
     :context-length 32768
     :regex "gemini-2\\.0-flash-thinking")
+   (make-llm-model
+    :name "Gemini 2.0 Pro" :symbol 'gemini-2.0-pro
+    :capabilities '(generation tool-use image-input audio-input video-input)
+    :context-length 1048576
+    :regex "gemini-2\\.0-pro")
    (make-llm-model
     :name "Gemini 1.5 Flash" :symbol 'gemini-1.5-flash
     :capabilities '(generation tool-use image-input audio-input video-input)
@@ -190,6 +195,11 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 8192
     :regex "gemma-?2")
    (make-llm-model
+    :name "deepseek-r1" :symbol 'deepseek-r1
+    :capabilities '(generation free-software)  ;; MIT license
+    :context-length 128000
+    :regex "deepseek-r1")
+   (make-llm-model
     :name "Mistral" :symbol 'mistral
     :capabilities '(generation tool-use free-software)  ;; Apache license
     :context-length 8192
@@ -215,15 +225,15 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 256
     :regex "all-minilm")
    (make-llm-model
-    :name "Snowflake Artic Embed" :symbol 'snowflake-artic-embed
+    :name "Snowflake Arctic Embed" :symbol 'snowflake-arctic-embed
     :capabilities '(embedding free-software)  ;; Apache license
     :context-length 8192
-    :regex "snowflake-artic-embed")
+    :regex "snowflake-arctic-embed")
    (make-llm-model
-    :name "Snowflake Artic Embed 2.0" :symbol 'snowflake-artic-embed2
+    :name "Snowflake Arctic Embed 2.0" :symbol 'snowflake-arctic-embed2
     :capabilities '(embedding free-software)  ;; Apache license
     :context-length 8192
-    :regex "snowflake-artic-embed2")
+    :regex "snowflake-arctic-embed2")
    (make-llm-model
     :name "Qwen 2.5" :symbol 'qwen-2.5
     :capabilities '(generation tool-use)  ;; Apache license for some variations only
@@ -247,6 +257,30 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
 (defun llm-models-match (name)
   "Return the model that matches NAME."
   (seq-find (lambda (model) (string-match-p (llm-model-regex model) (downcase name))) llm-models))
+
+(cl-defun llm-models-add (&key name symbol capabilities context-length regex)
+  "Add a model to the list of models.
+
+NAME is the name of the model, appropriate for showing a user.
+
+SYMBOL is a symbol representing the model, which just needs to be a
+unique symbol, and can also be searched on.
+
+CAPABILITIES is a list of symbols representing the capabilities of the
+model.  See `llm-capabilities' for the potential list of supported
+capabilities.  This may have some capabilities not yet supported by the
+`llm-capabilities'.
+
+CONTEXT-LENGTH is the maximum length of the context that can be used as
+input.
+
+REGEX is a regular expression that will be used to identify the model
+uniquely, matched against the model specified by the user."
+  (push (make-llm-model :name name
+                        :symbol symbol
+                        :capabilities capabilities
+                        :context-length context-length
+                        :regex regex) llm-models))
 
 (provide 'llm-models)
 

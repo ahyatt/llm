@@ -1,3 +1,17 @@
+* Version 0.23.1
+- Add Gemini 2.0 pro experimental model, default to 2.0 flash
+* Version 0.23.0
+- Add GitHub's GitHub Models
+- Accept lists as nonstandard
+- Add Deepseek R1 model
+- Show the chat model as the name for Open-AI compatible models (via [[https://github.com/whhone][@whhone]])
+* Version 0.22.0
+- Change ~llm-tool-function~ to ~llm-tool~, change ~make-llm-tool-function~ to take any arguments.
+* Version 0.21.0
+- Incompatible change to function calling, which is now tool use, affecting arguments and methods.
+- Support image understanding in Claude
+- Support streaming tool use in Claude
+- Add ~llm-models-add~ as a convenience method to add a model to the known list.
 * Version 0.20.0
 - Add ability to output according to a JSON spec.
 - Add Gemini 2.0 Flash, Gemini 2.0 Flash Thinking, and Llama 3.3 and QwQ models.
