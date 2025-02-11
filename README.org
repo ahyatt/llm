@@ -228,6 +228,30 @@ with the arguments supplied by the LLM. Instead of returning (or passing to a
 callback) a string, instead an alist will be returned of function names and
 return values.
 
+#+begin_src emacs-lisp
+(llm-chat-async
+ my-llm-provider
+ (llm-make-chat-prompt
+  "What is the capital of France?"
+  :tools
+  (list (llm-make-tool
+         :function
+         (lambda (callback result)
+           ;; In this example function the assumption is that the
+           ;; callback will be called after processing the result is
+           ;; complete.
+           (notify-user-of-capital result callback))
+         :name "capital_of_country"
+         :description "Get the capital of a country."
+         :args '((:name "country"
+                        :description "The country whose capital to look up."
+                        :type string))
+         :async t)))
+ ;; We don't care about the result returned in this example.
+ #'identity
+ (lambda (_ err) (error "Failed to get capital: %s" err)))
+#+end_src
+
 After sending a function call, the client could use the result, but if you want
 to proceed with the conversation, or get a textual response that accompany the
 function you should just send the prompt back with no modifications.  This is
