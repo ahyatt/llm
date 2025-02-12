@@ -489,8 +489,8 @@ be passed to `llm-cancel-request'."
                                       new-error-callback)))
     result))
 
-(defun llm-chat-streaming-to-point (provider prompt buffer point finish-callback
-                                             &key processor)
+(cl-defun llm-chat-streaming-to-point (provider prompt buffer point finish-callback
+                                                &key processor)
   "Stream the llm output of PROMPT to POINT in BUFFER.
 PROVIDER is the backend provider of the LLM functionality.
 FINISH-CALLBACK is called with no arguments when the output has finished.
