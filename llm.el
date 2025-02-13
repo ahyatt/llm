@@ -489,10 +489,13 @@ be passed to `llm-cancel-request'."
                                       new-error-callback)))
     result))
 
-(defun llm-chat-streaming-to-point (provider prompt buffer point finish-callback)
+(cl-defun llm-chat-streaming-to-point (provider prompt buffer point finish-callback
+                                                &key processor)
   "Stream the llm output of PROMPT to POINT in BUFFER.
 PROVIDER is the backend provider of the LLM functionality.
 FINISH-CALLBACK is called with no arguments when the output has finished.
+PROCESSOR, if provided, is a function taking (text position) that processes
+the text before insertion.
 This returns an object representing the async request, which can
 be passed to `llm-cancel-request'."
   (with-current-buffer buffer
@@ -508,10 +511,14 @@ be passed to `llm-cancel-request'."
                     (with-current-buffer (marker-buffer start)
                       (save-excursion
                         (goto-char start)
-                        (let* ((current-text
+                        (let* ((processed-text (if processor
+                                                   (funcall processor text start)
+                                                 text))
+                               (current-text
                                 (buffer-substring-no-properties start end))
                                (common-prefix
-                                (fill-common-string-prefix current-text text))
+                                (fill-common-string-prefix
+                                 current-text processed-text))
                                (prefix-length (length common-prefix)))
                           ;; Skip over common prefix of current text
                           ;; and new text.
@@ -519,7 +526,7 @@ be passed to `llm-cancel-request'."
                             (goto-char (+ start prefix-length)))
                           (delete-region (point) end)
                           ;; Insert new text, minus common prefix.
-                          (insert (substring text prefix-length)))))))
+                          (insert (substring processed-text prefix-length)))))))
           (llm-chat-streaming provider prompt
                               (lambda (text) (insert-text text))
                               (lambda (text) (insert-text text)
