@@ -35,16 +35,16 @@
 ;; An example of the output - you can remove the function call definition and
 ;; call `elisp-to-tool-insert' to see this in action.
 (defconst elisp-to-tool-switch-to-buffer
-  (llm-make-tool-function :function
-                          'switch-to-buffer
-                          :name
-                          "switch_to_buffer"
-                          :args
-                          '((:name "buffer_or_name" :type string :description "A buffer, a string (buffer name), or nil. If a string that doesn't identify an existing buffer, create a buffer with that name. If nil, switch to the buffer returned by 'other_buffer'." :required t) (:name "norecord" :type boolean :description "If non-nil, do not put the buffer at the front of the buffer list, and do not make the window displaying it the most recently selected one." :required t) (:name "force_same_window" :type boolean :description "If non-nil, the buffer must be displayed in the selected window when called non-interactively; if impossible, signal an error rather than calling 'pop_to_buffer'." :required t))
-                          :description
-                          "Display buffer BUFFER_OR_NAME in the selected window. WARNING: This is NOT the way to work on another buffer temporarily within a Lisp program! Use 'set_buffer' instead. That avoids messing with the 'window_buffer' correspondences. If the selected window cannot display the specified buffer because it is a minibuffer window or strongly dedicated to another buffer, call 'pop_to_buffer' to select the buffer in another window. In interactive use, if the selected window is strongly dedicated to its buffer, the value of the option 'switch_to_buffer_in_dedicated_window' specifies how to proceed. Return the buffer switched to."
-                          :async
-                          nil)
+  (llm-make-tool :function
+                 'switch-to-buffer
+                 :name
+                 "switch_to_buffer"
+                 :args
+                 '((:name "buffer_or_name" :type string :description "A buffer, a string (buffer name), or nil. If a string that doesn't identify an existing buffer, create a buffer with that name. If nil, switch to the buffer returned by 'other_buffer'." :required t) (:name "norecord" :type boolean :description "If non-nil, do not put the buffer at the front of the buffer list, and do not make the window displaying it the most recently selected one." :required t) (:name "force_same_window" :type boolean :description "If non-nil, the buffer must be displayed in the selected window when called non-interactively; if impossible, signal an error rather than calling 'pop_to_buffer'." :required t))
+                 :description
+                 "Display buffer BUFFER_OR_NAME in the selected window. WARNING: This is NOT the way to work on another buffer temporarily within a Lisp program! Use 'set_buffer' instead. That avoids messing with the 'window_buffer' correspondences. If the selected window cannot display the specified buffer because it is a minibuffer window or strongly dedicated to another buffer, call 'pop_to_buffer' to select the buffer in another window. In interactive use, if the selected window is strongly dedicated to its buffer, the value of the option 'switch_to_buffer_in_dedicated_window' specifies how to proceed. Return the buffer switched to."
+                 :async
+                 nil)
   )
 
 ;; A demonstration of the resulting function call in action.
@@ -100,14 +100,14 @@ Use lowercase for all argument names even if you see it in uppercase in the docu
 Documentation strings should start with uppercase and end with a period."
                      :tools
                      (list
-                      (llm-make-tool-function
+                      (llm-make-tool
                        :function
                        (lambda (args description)
                          (with-current-buffer (marker-buffer marker)
                            (save-excursion
                              (goto-char marker)
                              (cl-prettyprint
-                              `(llm-make-tool-function
+                              `(llm-make-tool
                                 :function ,(list 'quote f)
                                 :name ,(elisp-to-tool-el-to-js-name (symbol-name f))
                                 :args '(,@(mapcar
