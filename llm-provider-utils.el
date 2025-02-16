@@ -186,19 +186,18 @@ TOOL-RESULTS is a list of function results, if any.")
   ;; By default, we just append to the prompt.
   (llm-provider-utils-append-to-prompt prompt result tool-results))
 
-(cl-defgeneric llm-provider-streaming-media-handler (provider msg-receiver fc-receiver err-receiver)
+(cl-defgeneric llm-provider-streaming-media-handler (provider receiver err-receiver)
   "Define how to handle streaming media for the PROVIDER.
 
 This should return a cons of the media type and an instance that
 handle objects of that type.
 
-The handlers defined can call MSG-RECEIVER when they receive part
-of a text message for the client (a chat response).  If they
-receive a function call, they should call FC-RECEIVER with the
-function call.  If they receive an error, they should call
-ERR-RECEIVER with the error message.")
+The handlers defined can call RECEIVER with a plist compatible with the
+output of the llm functions returned when `multi-output' is set.  If
+they receive an error, they should call ERR-RECEIVER with the error
+message.")
 
-(cl-defmethod llm-provider-streaming-media-handler ((_ llm-standard-chat-provider) _ _ _)
+(cl-defmethod llm-provider-streaming-media-handler ((_ llm-standard-chat-provider) _ _)
   "By default, the standard provider has no streaming media handler."
   nil)
 
@@ -359,8 +358,8 @@ return a list of `llm-chat-prompt-tool-use' structs.")
                         err-msg)
                      (llm-provider-utils-process-result
                       provider prompt
-                      (llm-provider-chat-extract-result provider data)
-                      (llm-provider-extract-tool-uses provider data)
+                      (llm-provider-utils-extract-all provider data)
+                      multi-output
                       (lambda (result)
                         (llm-provider-utils-callback-in-buffer
                          buf success-callback result)))))
@@ -373,12 +372,46 @@ return a list of `llm-chat-prompt-tool-use' structs.")
                          provider data)
                         "Unknown error")))))))
 
+(defun llm-provider-utils-streaming-accumulate (current new)
+  "Add streaming NEW to CURRENT and return the result.
+
+This is designed to accumulate responses for streaming results.  It
+assumes that CURRENT and NEW are the same type of thing..
+
+This will work with text as well as the plists that are returned when
+`multi-output' is on.
+
+Any strings will be concatenated, integers will be added, etc."
+  (if current
+      (if new
+          (progn
+            (unless (eq (type-of current) (type-of new))
+              (error "Cannot accumulate different types of streaming results: %s and %s"
+                     current new))
+            (pcase (type-of current)
+              ('string (concat current new))
+              ('integer (+ current new))
+              ('float (+ current new))
+              ('vector (vconcat current new))
+              ('cons (if (and (> (length current) 0)  ;; if plist
+                              (string-match-p "^:" (symbol-name (car current))))
+                         (cl-loop for key in
+                                  (seq-union (map-keys current)
+                                             (map-keys new))
+                                  append
+                                  (list key
+                                        (llm-provider-utils-streaming-accumulate
+                                         (plist-get current key)
+                                         (plist-get new key))))
+                       (append current new)))))
+        current)
+    new))
+
 (cl-defmethod llm-chat-streaming ((provider llm-standard-chat-provider) prompt partial-callback
                                   response-callback error-callback multi-output)
   (llm-provider-request-prelude provider)
   (let ((buf (current-buffer))
-        (current-text "")
-        (fc nil))
+        (current-result))
     (llm-request-plz-async
      (llm-provider-chat-streaming-url provider)
      :headers (llm-provider-headers provider)
@@ -386,13 +419,11 @@ return a list of `llm-chat-prompt-tool-use' structs.")
      :media-type (llm-provider-streaming-media-handler
                   provider
                   (lambda (s)
-                    (when (> (length s) 0)
-                      (setq current-text
-                            (concat current-text s))
-                      (when partial-callback
-                        (llm-provider-utils-callback-in-buffer
-                         buf partial-callback current-text))))
-                  (lambda (fc-new) (push fc-new fc))
+                    (setq current-result
+                          (llm-provider-utils-streaming-accumulate current-result s))
+                    (when partial-callback
+                      (llm-provider-utils-callback-in-buffer
+                       buf partial-callback current-result)))
                   (lambda (err)
                     (llm-provider-utils-callback-in-buffer
                      buf error-callback 'error
@@ -402,10 +433,7 @@ return a list of `llm-chat-prompt-tool-use' structs.")
        ;; We don't need the data at the end of streaming, so we can ignore it.
        (llm-provider-utils-process-result
         provider prompt
-        current-text
-        (when fc
-          (llm-provider-collect-streaming-tool-uses
-           provider (nreverse fc)))
+        current-result
         multi-output
         (lambda (result)
           (llm-provider-utils-callback-in-buffer
@@ -699,7 +727,7 @@ SUCCESS-CALLBACK is the callback that will be run when all functions
 complete."
   (when (plist-get partial-result :text)
     (llm-provider-append-to-prompt provider prompt (plist-get partial-result :text)))
-  (if (plist-get partial-result :tool-uses)
+  (if-let ((tool-uses (plist-get partial-result :tool-uses)))
       ;; If we have tool uses, execute them, and on the callback, we will
       ;; populate the results.  We don't execute the callback here because it
       ;; will be done inside `llm-provider-utils-execute-tool-uses'.

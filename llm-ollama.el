@@ -201,14 +201,24 @@ PROVIDER is the llm-ollama provider."
                                                       (llm-provider-utils-tool-use-args tool-use)))))
                     tool-uses))))
 
-(cl-defmethod llm-provider-streaming-media-handler ((_ llm-ollama) msg-receiver _ _)
+(cl-defmethod llm-provider-streaming-media-handler ((_ llm-ollama) receiver _)
   (cons 'application/x-ndjson
         (plz-media-type:application/x-ndjson
-         :handler (lambda (data)
-                    (when-let ((response (assoc-default
-                                          'content
-                                          (assoc-default 'message data))))
-                      (funcall msg-receiver response))))))
+         :handler (let ((in-reasoning))
+                    (lambda (data)
+                      (when-let ((response (assoc-default
+                                            'content
+                                            (assoc-default 'message data))))
+                        ;; The response from ollama should just have the tag and
+                        ;; nothing more.
+                        (cond
+                         ((string-match "<think>" response)
+                          (setq in-reasoning t))
+                         ((string-match "</think>" response)
+                          (setq in-reasoning nil))
+                         (t (funcall receiver (list (if in-reasoning
+                                                        :reasoning
+                                                      :text) response))))))))))
 
 (cl-defmethod llm-name ((provider llm-ollama))
   (or (llm-ollama-chat-model provider)
