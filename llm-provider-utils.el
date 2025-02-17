@@ -344,7 +344,7 @@ return a list of `llm-chat-prompt-tool-use' structs.")
     final-result))
 
 (cl-defmethod llm-chat-async ((provider llm-standard-chat-provider) prompt success-callback
-                              error-callback multi-output)
+                              error-callback &optional multi-output)
   (llm-provider-request-prelude provider)
   (let ((buf (current-buffer)))
     (llm-request-plz-async
@@ -408,7 +408,7 @@ Any strings will be concatenated, integers will be added, etc."
     new))
 
 (cl-defmethod llm-chat-streaming ((provider llm-standard-chat-provider) prompt partial-callback
-                                  response-callback error-callback multi-output)
+                                  response-callback error-callback &optional multi-output)
   (llm-provider-request-prelude provider)
   (let ((buf (current-buffer))
         (current-result))
@@ -423,7 +423,9 @@ Any strings will be concatenated, integers will be added, etc."
                           (llm-provider-utils-streaming-accumulate current-result s))
                     (when partial-callback
                       (llm-provider-utils-callback-in-buffer
-                       buf partial-callback current-result)))
+                       buf partial-callback (if multi-output
+                                                current-result
+                                              (plist-get current-result :text)))))
                   (lambda (err)
                     (llm-provider-utils-callback-in-buffer
                      buf error-callback 'error

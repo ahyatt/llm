@@ -328,7 +328,7 @@ else.  We really just want to see if it's in the right ballpark."
     (let ((prompt (llm-integration-test-tool-use-prompt)))
       (should (equal
                (llm-chat provider prompt)
-               (:tool-results llm-integration-test-fc-answer)))
+               '(:tool-results llm-integration-test-fc-answer)))
       ;; Test that we can send the function back to the provider without error.
       (llm-chat provider prompt t))))
 

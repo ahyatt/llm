@@ -46,13 +46,13 @@ either a vector response for the chat, or a signal symbol and
 message cons.  If nil, the response will be a simple vector."
   output-to-buffer chat-action-func embedding-action-func)
 
-(cl-defmethod llm-chat-async ((provider llm-fake) prompt response-callback error-callback)
+(cl-defmethod llm-chat-async ((provider llm-fake) prompt response-callback error-callback &optional multi-output)
   (condition-case err
       (funcall response-callback (llm-chat provider prompt))
     (t (funcall error-callback (car err) (cdr err))))
   nil)
 
-(cl-defmethod llm-chat ((provider llm-fake) prompt)
+(cl-defmethod llm-chat ((provider llm-fake) prompt &optional multi-output)
   (when (llm-fake-output-to-buffer provider)
     (with-current-buffer (get-buffer-create (llm-fake-output-to-buffer provider))
       (goto-char (point-max))
@@ -71,7 +71,7 @@ message cons.  If nil, the response will be a simple vector."
                   (list (make-llm-chat-prompt-interaction :role 'assistant :content result))))
     result))
 
-(cl-defmethod llm-chat-streaming ((provider llm-fake) prompt partial-callback response-callback _error-callback)
+(cl-defmethod llm-chat-streaming ((provider llm-fake) prompt partial-callback response-callback _error-callback &optional multi-output)
   (when (llm-fake-output-to-buffer provider)
     (with-current-buffer (get-buffer-create (llm-fake-output-to-buffer provider))
       (goto-char (point-max))
