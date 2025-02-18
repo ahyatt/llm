@@ -325,10 +325,14 @@ else.  We really just want to see if it's in the right ballpark."
 
 (llm-def-integration-test llm-tool-use-multi-result (provider)
   (when (member 'function-calls (llm-capabilities provider))
-    (let ((prompt (llm-integration-test-tool-use-prompt)))
+    (let* ((prompt (llm-integration-test-tool-use-prompt))
+           (result (llm-chat provider prompt t)))
       (should (equal
-               (llm-chat provider prompt)
-               '(:tool-results llm-integration-test-fc-answer)))
+               (plist-get result :tool-results)
+               llm-integration-test-fc-answer))
+      (should (plist-get result :tool-uses))
+      (if (plist-get result :text)
+          (should (> (length (plist-get result :text)) 0)))
       ;; Test that we can send the function back to the provider without error.
       (llm-chat provider prompt t))))
 

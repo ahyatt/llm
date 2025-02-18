@@ -758,6 +758,23 @@ PROVIDER is the struct that configures the user of the LLM."
                         :result (cdr c)))
            results-alist)))
 
+(defun llm-provider-utils-final-multi-output-result (tool-results)
+  "Return the final result from TOOL-RESULTS.
+
+This transforms the plist so that:
+1. We don't return an empty :text value.
+2. We transform the :tool-uses to an alist of tool name to use."
+  (cl-loop for (key value) on tool-results
+           by 'cddr
+           if (not (and (eq key :text) (equal value "")))
+           nconc (list key
+                       (if (eq key :tool-uses)
+                           (mapcar (lambda (tool-use)
+                                     `(:name ,(llm-provider-utils-tool-use-name tool-use)
+                                             :args ,(llm-provider-utils-tool-use-args tool-use)))
+                                   value)
+                         value))))
+
 (defun llm-provider-utils-execute-tool-uses (provider prompt tool-uses multi-output partial-result success-callback)
   "Execute TOOL-USES, a list of `llm-provider-utils-tool-use'.
 
@@ -805,8 +822,9 @@ have returned results."
                            provider prompt results)
                           (funcall success-callback
                                    (if multi-output
-                                       (append partial-result
-                                               `(:tool-results ,tool-use-and-results))
+                                       (llm-provider-utils-final-multi-output-result
+                                        (append partial-result
+                                                `(:tool-results ,tool-use-and-results)))
                                      tool-use-and-results))))))
        (if (llm-tool-async tool)
            (apply (llm-tool-function tool)
