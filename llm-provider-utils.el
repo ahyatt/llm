@@ -310,7 +310,7 @@ return a list of `llm-chat-prompt-tool-use' structs.")
                          provider data)
                         "Unknown error")))))))
 
-(defun llm-provider-utils-extract-all(provider response)
+(defun llm-provider-utils-extract-all (provider response)
   "Extract all from RESPONSE for the PROVIDER."
   (let ((text
          (llm-provider-chat-extract-result provider response))
@@ -435,8 +435,12 @@ Any strings will be concatenated, integers will be added, etc."
        ;; We don't need the data at the end of streaming, so we can ignore it.
        (llm-provider-utils-process-result
         provider prompt
-        current-result
-        multi-output
+        (llm-provider-utils-streaming-accumulate
+         current-result
+         (when-let ((tool-uses-raw (plist-get current-result
+                                              :tool-uses-raw)))
+           `(:tool-uses ,(llm-provider-collect-streaming-tool-uses
+                          provider tool-uses-raw))))
         (lambda (result)
           (llm-provider-utils-callback-in-buffer
            buf response-callback result))))
@@ -766,7 +770,8 @@ This transforms the plist so that:
 2. We transform the :tool-uses to an alist of tool name to use."
   (cl-loop for (key value) on tool-results
            by 'cddr
-           if (not (and (eq key :text) (equal value "")))
+           if (and (not (and (eq key :text) (equal value "")))
+                   (member key '(:text :tool-uses :tool-results)))
            nconc (list key
                        (if (eq key :tool-uses)
                            (mapcar (lambda (tool-use)

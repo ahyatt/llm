@@ -348,8 +348,10 @@ RESPONSE can be nil if the response is complete."
                          (unless (equal data "[DONE]")
                            (when-let ((response (llm-openai--get-partial-chat-response
                                                  (json-parse-string data :object-type 'alist))))
-                             (funcall receiver (list (if (stringp response) :text :tool-call)
-                                                     response)))))))))))
+                             (funcall receiver (if (stringp response)
+                                                   (list :text response)
+                                                 (list :tool-uses-raw
+                                                       response))))))))))))
 
 (cl-defmethod llm-provider-collect-streaming-tool-uses ((_ llm-openai) data)
   (llm-provider-utils-openai-collect-streaming-tool-uses data))
