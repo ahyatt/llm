@@ -1,6 +1,7 @@
 * Version 0.23.1
 - Add Gemini 2.0 pro experimental model, default to 2.0 flash
 - Add Open AI's o3 mini model
+- Fix Claude's capabilities to reflect that it can use tools
 * Version 0.23.0
 - Add GitHub's GitHub Models
 - Accept lists as nonstandard
