@@ -356,9 +356,8 @@ conversation so far.
 
 If MULTI-OUTPUT is non-nil the response is a plist with the possible
 keys: `text' (textual output), `reasoning' (reasoning that accompanies
-the output) `tool-uses' (an alist of tools and their arguments),
-`tool-results' (an alist of results of a calling tools), and
-`text-alternates', a list of alternate possibilities for the output."
+the output) `tool-uses' (a list of plists with tool `:name' and
+`:args'), and `tool-results' (an alist of results of a calling tools)"
   (ignore provider prompt multi-output)
   (signal 'not-implemented nil))
 
@@ -400,9 +399,8 @@ ERROR-CALLBACK receives the error response.
 
 If MULTI-OUTPUT is non-nil the response is a plist with the possible
 keys: `text' (textual output), `reasoning' (reasoning that accompanies
-the output) `tool-uses' (an alist of tools and their arguments),
-`tool-results' (an alist of results of a calling tools), and
-`text-alternates', a list of alternate possibilities for the output.
+the output) `tool-uses' (a list of plists with tool `:name' and
+`:args'), and `tool-results' (an alist of results of a calling tools)
 
 The prompt's interactions list will be updated to encode the
 conversation so far.
@@ -465,8 +463,8 @@ ERROR-CALLBACK receives the error response.
 
 If MULTI-OUTPUT is non-nil the response is a plist with the possible
 keys: `text' (textual output), `reasoning' (reasoning that accompanies
-the output) `tool-results' (an alist of results of a calling tools) and
-`text-alternates', a list of alternate possibilities for the output.
+the output) `tool-uses' (a list of plists with tool `:name' and
+`:args'), and `tool-results' (an alist of results of a calling tools)
 
 The prompt's interactions list will be updated to encode the
 conversation so far.

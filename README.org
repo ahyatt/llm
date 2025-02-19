@@ -139,9 +139,9 @@ Client applications should require the =llm= package, and code against it.  Most
 
 For all callbacks, the callback will be executed in the buffer the function was first called from.  If the buffer has been killed, it will be executed in a temporary buffer instead.
 ** Main functions
-- ~llm-chat provider prompt~:  With user-chosen ~provider~ , and a ~llm-chat-prompt~ structure (created by ~llm-make-chat-prompt~), send that prompt to the LLM and wait for the string output.
-- ~llm-chat-async provider prompt response-callback error-callback~: Same as ~llm-chat~, but executes in the background.  Takes a ~response-callback~ which will be called with the text response.  The ~error-callback~ will be called in case of error, with the error symbol and an error message.
-- ~llm-chat-streaming provider prompt partial-callback response-callback error-callback~:  Similar to ~llm-chat-async~, but request a streaming response.  As the response is built up, ~partial-callback~ is called with the all the text retrieved up to the current point.  Finally, ~reponse-callback~ is called with the complete text.
+- ~llm-chat provider prompt multi-output~:  With user-chosen ~provider~ , and a ~llm-chat-prompt~ structure (created by ~llm-make-chat-prompt~), send that prompt to the LLM and wait for the string output.
+- ~llm-chat-async provider prompt response-callback error-callback multi-output~: Same as ~llm-chat~, but executes in the background.  Takes a ~response-callback~ which will be called with the text response.  The ~error-callback~ will be called in case of error, with the error symbol and an error message.
+- ~llm-chat-streaming provider prompt partial-callback response-callback error-callback multi-output~:  Similar to ~llm-chat-async~, but request a streaming response.  As the response is built up, ~partial-callback~ is called with the all the text retrieved up to the current point.  Finally, ~reponse-callback~ is called with the complete text.
 - ~llm-embedding provider string~: With the user-chosen ~provider~, send a string and get an embedding, which is a large vector of floating point values.  The embedding represents the semantic meaning of the string, and the vector can be compared against other vectors, where smaller distances between the vectors represent greater semantic similarity.
 - ~llm-embedding-async provider string vector-callback error-callback~: Same as ~llm-embedding~ but this is processed asynchronously. ~vector-callback~ is called with the vector embedding, and, in case of error, ~error-callback~ is called with the same arguments as in ~llm-chat-async~.
 - ~llm-batch-embedding provider strings~: same as ~llm-embedding~, but takes in a list of strings, and returns a list of vectors whose order corresponds to the ordering of the strings.
@@ -156,6 +156,16 @@ For all callbacks, the callback will be executed in the buffer the function was 
   - ~llm-chat-prompt-to-text prompt~: From a prompt, return a string representation.  This is not usually suitable for passing to LLMs, but for debugging purposes.
   - ~llm-chat-streaming-to-point provider prompt buffer point finish-callback~: Same basic arguments as ~llm-chat-streaming~, but will stream to ~point~ in ~buffer~.
   - ~llm-chat-prompt-append-response prompt response role~: Append a new response (from the user, usually) to the prompt.  The ~role~ is optional, and defaults to ~'user~.
+*** Return and multi-output
+The default return value is text except for when tools are called, in which case it is a record of the return values of the tools called.
+
+Models can potentially return many types of information, though, so the ~multi-output~ option was added to the ~llm-chat~ calls so that the single return value can instead be a plist that represents the various possible values.  In the case of ~llm-chat~, this plist is returned, in ~llm-chat-async~, it is passed to the success function.  In ~llm-chat-streaming~, it is passed to the success function, and each partial update will be a plist, with no guarantee that the same keys will always be present.
+
+The possible plist keys are:
+   - ~:text~ , for the main textual output.
+   - ~:reasoning~, for reasoning output, when the model separates it.
+   - ~:tool-uses~, the tools that the llm identified to be called, as a list of plists, with ~:name~ and ~:args~ values.
+   - ~:tool-results~, the results of calling the tools.
 *** JSON schema
 By using the ~response-format~ argument to ~llm-make-chat-prompt~, you can ask the LLM to return items according to a specified JSON schema, based on the [[https://json-schema.org][JSON Schema Spec]].  Not everything is supported, but the most commonly used parts are.  To specify the JSON schema, we use a plist-based approach.  JSON objects are defined with ~(:type object :properties (:<var1> <schema1> :<var2> <schema2> ... :<varn> <scheman>) :required (<req var1> ... <req varn>))~.  Arrays are defined with ~(:type array :items <schema>)~.  Enums are defined with ~(:enum [<val1> <val2> <val3>])~.  You can also request integers, strings, and other types defined by the JSON Schema Spec, by just having ~(:type <type>)~.  Typically, LLMs often require the top-level schema object to be an object, and often that all properties on the top-level object must be required.
 
