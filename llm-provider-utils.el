@@ -441,6 +441,7 @@ Any strings will be concatenated, integers will be added, etc."
                                               :tool-uses-raw)))
            `(:tool-uses ,(llm-provider-collect-streaming-tool-uses
                           provider tool-uses-raw))))
+        multi-output
         (lambda (result)
           (llm-provider-utils-callback-in-buffer
            buf response-callback result))))
@@ -666,24 +667,23 @@ This returns a JSON object (a list that can be converted to JSON)."
 
 (defun llm-provider-utils-openai-collect-streaming-tool-uses (data)
   "Read Open AI compatible streaming output DATA to collect tool-uses."
-  (let* ((num-index (+ 1 (assoc-default 'index (aref (car (last data)) 0))))
+  (let* ((num-index (+ 1 (assoc-default 'index (aref data 0))))
          (cvec (make-vector num-index nil)))
     (dotimes (i num-index)
       (setf (aref cvec i) (make-llm-provider-utils-tool-use)))
-    (cl-loop for part in data do
-             (cl-loop for call in (append part nil) do
-                      (let* ((index (assoc-default 'index call))
-                             (id (assoc-default 'id call))
-                             (function (assoc-default 'function call))
-                             (name (assoc-default 'name function))
-                             (arguments (assoc-default 'arguments function)))
-                        (when id
-                          (setf (llm-provider-utils-tool-use-id (aref cvec index)) id))
-                        (when name
-                          (setf (llm-provider-utils-tool-use-name (aref cvec index)) name))
-                        (setf (llm-provider-utils-tool-use-args (aref cvec index))
-                              (concat (llm-provider-utils-tool-use-args (aref cvec index))
-                                      arguments)))))
+    (cl-loop for call in (append data nil) do
+             (let* ((index (assoc-default 'index call))
+                    (id (assoc-default 'id call))
+                    (function (assoc-default 'function call))
+                    (name (assoc-default 'name function))
+                    (arguments (assoc-default 'arguments function)))
+               (when id
+                 (setf (llm-provider-utils-tool-use-id (aref cvec index)) id))
+               (when name
+                 (setf (llm-provider-utils-tool-use-name (aref cvec index)) name))
+               (setf (llm-provider-utils-tool-use-args (aref cvec index))
+                     (concat (llm-provider-utils-tool-use-args (aref cvec index))
+                             arguments))))
     (cl-loop for call in (append cvec nil)
              do (setf (llm-provider-utils-tool-use-args call)
                       (json-parse-string (llm-provider-utils-tool-use-args call)
