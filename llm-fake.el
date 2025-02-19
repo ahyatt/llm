@@ -48,7 +48,7 @@ message cons.  If nil, the response will be a simple vector."
 
 (cl-defmethod llm-chat-async ((provider llm-fake) prompt response-callback error-callback &optional multi-output)
   (condition-case err
-      (funcall response-callback (llm-chat provider prompt))
+      (funcall response-callback (llm-chat provider prompt multi-output))
     (t (funcall error-callback (car err) (cdr err))))
   nil)
 
@@ -69,7 +69,9 @@ message cons.  If nil, the response will be a simple vector."
     (setf (llm-chat-prompt-interactions prompt)
           (append (llm-chat-prompt-interactions prompt)
                   (list (make-llm-chat-prompt-interaction :role 'assistant :content result))))
-    result))
+    (if multi-output
+        `(:text ,result)
+      result)))
 
 (cl-defmethod llm-chat-streaming ((provider llm-fake) prompt partial-callback response-callback _error-callback &optional multi-output)
   (when (llm-fake-output-to-buffer provider)
@@ -87,13 +89,13 @@ message cons.  If nil, the response will be a simple vector."
     (let ((accum ""))
       (mapc (lambda (word)
               (setq accum (concat accum word " "))
-              (funcall partial-callback accum)
+              (funcall partial-callback (if multi-output `(:text ,accum) accum))
               (sleep-for 0 100))
             (split-string text))
       (setf (llm-chat-prompt-interactions prompt)
             (append (llm-chat-prompt-interactions prompt)
                     (list (make-llm-chat-prompt-interaction :role 'assistant :content text))))
-      (funcall response-callback text))))
+      (funcall response-callback (if multi-output `(:text ,text) text)))))
 
 (cl-defmethod llm-embedding ((provider llm-fake) string)
   (when (llm-fake-output-to-buffer provider)
