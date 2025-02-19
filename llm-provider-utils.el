@@ -394,6 +394,7 @@ Any strings will be concatenated, integers will be added, etc."
               ('float (+ current new))
               ('vector (vconcat current new))
               ('cons (if (and (> (length current) 0)  ;; if plist
+                              (symbolp (car current))
                               (string-match-p "^:" (symbol-name (car current))))
                          (cl-loop for key in
                                   (seq-union (map-keys current)
