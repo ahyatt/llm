@@ -182,7 +182,7 @@
   "Claude")
 
 (cl-defmethod llm-capabilities ((_ llm-claude))
-  (list 'streaming 'function-calls 'image-input 'pdf-input))
+  (list 'streaming 'tool-uses 'image-input 'pdf-input))
 
 (cl-defmethod llm-provider-append-to-prompt ((_ llm-claude) prompt result
                                              &optional tool-use-results)
