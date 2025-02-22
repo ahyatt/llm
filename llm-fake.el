@@ -48,7 +48,9 @@ message cons.  If nil, the response will be a simple vector."
 
 (cl-defmethod llm-chat-async ((provider llm-fake) prompt response-callback error-callback &optional multi-output)
   (condition-case err
-      (funcall response-callback (llm-chat provider prompt multi-output))
+      ;; We use `apply' here in case `llm-chat is older and doesn't support
+      ;; the multi-output argument.
+      (funcall response-callback (apply #'llm-chat provider prompt multi-output))
     (t (funcall error-callback (car err) (cdr err))))
   nil)
 

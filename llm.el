@@ -410,13 +410,17 @@ be passed to `llm-cancel-request'."
   ;; By default, you can turn a streaming call into an async call, so we can
   ;; fall back to streaming if async is not populated.
   ;; However, first, we don't want to log twice, so let's delete the last log so that llm-chat-streaming will
-  (llm-chat-streaming provider prompt
-                      ;; Do nothing on partial callback
-                      nil
-                      (lambda (text)
-                        (funcall response-callback text))
-                      (lambda (err msg) (funcall error-callback err msg))
-                      multi-output))
+  ;;
+  ;; We use `apply' here in case `llm-chat-streaming' is older and doesn't
+  ;; support the multi-output argument.
+  (apply #'llm-chat-streaming
+         provider prompt
+         ;; Do nothing on partial callback
+         nil
+         (lambda (text)
+           (funcall response-callback text))
+         (lambda (err msg) (funcall error-callback err msg))
+         multi-output))
 
 (cl-defmethod llm-chat-async :around (provider prompt response-callback error-callback &optional multi-output)
   "Log the input to llm-chat-async."
