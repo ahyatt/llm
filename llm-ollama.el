@@ -106,7 +106,28 @@ PROVIDER is the llm-ollama provider."
 
 (cl-defmethod llm-provider-chat-extract-result ((_ llm-ollama) response)
   "Return the chat response from the server RESPONSE."
-  (assoc-default 'content (assoc-default 'message response)))
+  (let ((raw-result (assoc-default 'content (assoc-default 'message response))))
+    ;; The raw result may have reasoning content in, which is in <think> tags
+    ;; (for DeepSeek reasoning).  We want to strip that out.
+    (with-temp-buffer
+      (insert raw-result)
+      (goto-char 0)
+      (if (search-forward "\n</think>" nil t)
+          (string-trim (buffer-substring (point) (point-max)))
+        raw-result))))
+
+(cl-defmethod llm-provider-extract-reasoning ((_ llm-ollama) response)
+  (let ((raw-result (assoc-default 'content (assoc-default 'message response))))
+    ;; Reasoning content is in <think> tags (for DeepSeek reasoning).  We want to
+    ;; extract the content between these tags.
+    (with-temp-buffer
+      (insert raw-result)
+      (goto-char 0)
+      (when (search-forward "<think>\n" nil t)
+        (let* ((endtag "\n</think>")
+               (end (save-excursion
+                      (search-forward endtag))))
+          (buffer-substring (point) (- end (length endtag))))))))
 
 (defun llm-ollama--response-format (format)
   "Return the response format for FORMAT."
@@ -180,14 +201,24 @@ PROVIDER is the llm-ollama provider."
                                                       (llm-provider-utils-tool-use-args tool-use)))))
                     tool-uses))))
 
-(cl-defmethod llm-provider-streaming-media-handler ((_ llm-ollama) msg-receiver _ _)
+(cl-defmethod llm-provider-streaming-media-handler ((_ llm-ollama) receiver _)
   (cons 'application/x-ndjson
         (plz-media-type:application/x-ndjson
-         :handler (lambda (data)
-                    (when-let ((response (assoc-default
-                                          'content
-                                          (assoc-default 'message data))))
-                      (funcall msg-receiver response))))))
+         :handler (let ((in-reasoning))
+                    (lambda (data)
+                      (when-let ((response (assoc-default
+                                            'content
+                                            (assoc-default 'message data))))
+                        ;; The response from ollama should just have the tag and
+                        ;; nothing more.
+                        (cond
+                         ((string-match "<think>" response)
+                          (setq in-reasoning t))
+                         ((string-match "</think>" response)
+                          (setq in-reasoning nil))
+                         (t (funcall receiver (list (if in-reasoning
+                                                        :reasoning
+                                                      :text) response))))))))))
 
 (cl-defmethod llm-name ((provider llm-ollama))
   (or (llm-ollama-chat-model provider)

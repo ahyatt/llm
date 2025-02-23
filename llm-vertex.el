@@ -258,8 +258,7 @@ nothing to add, in which case it is nil."
   (llm-provider-utils-append-to-prompt prompt tool-uses nil 'assistant))
 
 (cl-defmethod llm-provider-streaming-media-handler ((provider llm-google)
-                                                    msg-receiver fc-receiver
-                                                    err-receiver)
+                                                    receiver err-receiver)
   (cons 'application/json
         (plz-media-type:application/json-array
          :handler
@@ -267,9 +266,9 @@ nothing to add, in which case it is nil."
            (when-let ((err-response (llm-provider-chat-extract-error provider element)))
              (funcall err-receiver err-response))
            (if-let ((response (llm-provider-chat-extract-result provider element)))
-               (funcall msg-receiver response)
+               (funcall receiver `(:text ,response))
              (when-let ((fc (llm-provider-extract-tool-uses provider element)))
-               (funcall fc-receiver fc)))))))
+               (funcall receiver `(:tool-call ,fc))))))))
 
 (cl-defmethod llm-provider-collect-streaming-tool-uses ((_ llm-google) data)
   (car data))

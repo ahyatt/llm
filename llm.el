@@ -342,7 +342,7 @@ need to override it."
   (ignore provider)
   nil)
 
-(cl-defgeneric llm-chat (provider prompt)
+(cl-defgeneric llm-chat (provider prompt &optional multi-output)
   "Return a response to PROMPT from PROVIDER.
 PROMPT is a `llm-chat-prompt'.
 
@@ -352,20 +352,25 @@ conses of the function named called (as a symbol), and the
 corresponding result from calling it.
 
 The prompt's interactions list will be updated to encode the
-conversation so far."
-  (ignore provider prompt)
+conversation so far.
+
+If MULTI-OUTPUT is non-nil the response is a plist with the possible
+keys: `text' (textual output), `reasoning' (reasoning that accompanies
+the output) `tool-uses' (a list of plists with tool `:name' and
+`:args'), and `tool-results' (an alist of results of a calling tools)"
+  (ignore provider prompt multi-output)
   (signal 'not-implemented nil))
 
-(cl-defmethod llm-chat ((_ (eql nil)) _)
+(cl-defmethod llm-chat ((_ (eql nil)) _ &optional _)
   "Catch trivial configuration mistake."
   (error "LLM provider was nil.  Please set the provider in the application you are using"))
 
-(cl-defmethod llm-chat :before (provider _)
+(cl-defmethod llm-chat :before (provider _ &optional _)
   "Issue a warning if the LLM is non-free."
   (when-let (info (llm-nonfree-message-info provider))
     (llm--warn-on-nonfree (llm-name provider) info)))
 
-(cl-defmethod llm-chat :around (provider prompt)
+(cl-defmethod llm-chat :around (provider prompt &optional _)
   "Log the input to llm-chat."
   (llm--log 'api-send :provider provider :prompt prompt)
   ;; We set the debug flag to nil around the next-method so that we don't log
@@ -378,7 +383,7 @@ conversation so far."
       (llm--log 'api-receive :provider provider :msg result))
     result))
 
-(cl-defgeneric llm-chat-async (provider prompt response-callback error-callback)
+(cl-defgeneric llm-chat-async (provider prompt response-callback error-callback &optional multi-output)
   "Call RESPONSE-CALLBACK with a response to PROMPT from PROVIDER.
 
 The response is a string response by the LLM when functions are
@@ -392,6 +397,11 @@ RESPONSE-CALLBACK receives the final text.
 
 ERROR-CALLBACK receives the error response.
 
+If MULTI-OUTPUT is non-nil the response is a plist with the possible
+keys: `text' (textual output), `reasoning' (reasoning that accompanies
+the output) `tool-uses' (a list of plists with tool `:name' and
+`:args'), and `tool-results' (an alist of results of a calling tools)
+
 The prompt's interactions list will be updated to encode the
 conversation so far.
 
@@ -400,14 +410,19 @@ be passed to `llm-cancel-request'."
   ;; By default, you can turn a streaming call into an async call, so we can
   ;; fall back to streaming if async is not populated.
   ;; However, first, we don't want to log twice, so let's delete the last log so that llm-chat-streaming will
-  (llm-chat-streaming provider prompt
-                      ;; Do nothing on partial callback
-                      nil
-                      (lambda (text)
-                        (funcall response-callback text))
-                      (lambda (err msg) (funcall error-callback err msg))))
+  ;;
+  ;; We use `apply' here in case `llm-chat-streaming' is older and doesn't
+  ;; support the multi-output argument.
+  (apply #'llm-chat-streaming
+         provider prompt
+         ;; Do nothing on partial callback
+         nil
+         (lambda (text)
+           (funcall response-callback text))
+         (lambda (err msg) (funcall error-callback err msg))
+         multi-output))
 
-(cl-defmethod llm-chat-async :around (provider prompt response-callback error-callback)
+(cl-defmethod llm-chat-async :around (provider prompt response-callback error-callback &optional multi-output)
   "Log the input to llm-chat-async."
   (llm--log 'api-send :provider provider :prompt prompt)
   (let* ((new-response-callback (lambda (response)
@@ -422,10 +437,11 @@ be passed to `llm-cancel-request'."
          (llm-log nil)
          (result (cl-call-next-method provider prompt
                                       new-response-callback
-                                      new-error-callback)))
+                                      new-error-callback
+                                      multi-output)))
     result))
 
-(cl-defgeneric llm-chat-streaming (provider prompt partial-callback response-callback error-callback)
+(cl-defgeneric llm-chat-streaming (provider prompt partial-callback response-callback error-callback &optional multi-output)
   "Stream a response to PROMPT from PROVIDER.
 PROMPT is a `llm-chat-prompt'.
 
@@ -449,24 +465,29 @@ final text.
 
 ERROR-CALLBACK receives the error response.
 
+If MULTI-OUTPUT is non-nil the response is a plist with the possible
+keys: `text' (textual output), `reasoning' (reasoning that accompanies
+the output) `tool-uses' (a list of plists with tool `:name' and
+`:args'), and `tool-results' (an alist of results of a calling tools)
+
 The prompt's interactions list will be updated to encode the
 conversation so far.
 
 This returns an object representing the async request, which can
 be passed to `llm-cancel-request'."
-  (ignore provider prompt partial-callback response-callback error-callback)
+  (ignore provider prompt partial-callback response-callback error-callback multi-output)
   (signal 'not-implemented nil))
 
-(cl-defmethod llm-chat-streaming ((_ (eql nil)) _ _ _ _)
+(cl-defmethod llm-chat-streaming ((_ (eql nil)) _ _ _ _ &optional _)
   "Catch trivial configuration mistake."
   (error "LLM provider was nil.  Please set the provider in the application you are using"))
 
-(cl-defmethod llm-chat-streaming :before (provider _ _ _ _)
+(cl-defmethod llm-chat-streaming :before (provider _ _ _ _ &optional _)
   "Issue a warning if the LLM is non-free."
   (when-let (info (llm-nonfree-message-info provider))
     (llm--warn-on-nonfree (llm-name provider) info)))
 
-(cl-defmethod llm-chat-streaming :around (provider prompt partial-callback response-callback error-callback)
+(cl-defmethod llm-chat-streaming :around (provider prompt partial-callback response-callback error-callback &optional multi-output)
   "Log the input to llm-chat-async."
   (llm--log 'api-send :provider provider :prompt prompt)
   ;; We need to wrap the callbacks before we set llm-log to nil.
@@ -486,7 +507,7 @@ be passed to `llm-cancel-request'."
          (llm-log nil)
          (result (cl-call-next-method provider prompt new-partial-callback
                                       new-response-callback
-                                      new-error-callback)))
+                                      new-error-callback multi-output)))
     result))
 
 (cl-defun llm-chat-streaming-to-point (provider prompt buffer point finish-callback
@@ -533,11 +554,11 @@ be passed to `llm-cancel-request'."
                                 (funcall finish-callback))
                               (lambda (_ msg) (error "Error calling the LLM: %s" msg))))))))
 
-(cl-defmethod llm-chat-async ((_ (eql nil)) _ _ _)
+(cl-defmethod llm-chat-async ((_ (eql nil)) _ _ _ &optional _)
   "Catch trivial configuration mistake."
   (error "LLM provider was nil.  Please set the provider in the application you are using"))
 
-(cl-defmethod llm-chat-async :before (provider _ _ _)
+(cl-defmethod llm-chat-async :before (provider _ _ _ &optional _)
   "Issue a warning if the LLM is non-free."
   (when-let (info (llm-nonfree-message-info provider))
     (llm--warn-on-nonfree (llm-name provider) info)))

@@ -138,5 +138,15 @@
     (should (equal "Previous interactions:\n\nUser: Hello\nAssistant: Hi! How can I assist you?\n\nThe current conversation follows:\n\nEarl Grey, hot."
                    (llm-chat-prompt-interaction-content (nth 0 (llm-chat-prompt-interactions prompt-for-second-request)))))))
 
+(ert-deftest llm-provider-utils-streaming-accumulate ()
+  (should (equal 3 (llm-provider-utils-streaming-accumulate 1 2)))
+  (should (equal "foobar" (llm-provider-utils-streaming-accumulate "foo" "bar")))
+  (should (equal [1 2 3] (llm-provider-utils-streaming-accumulate [1] [2 3])))
+  (should (equal '(1 2 3) (llm-provider-utils-streaming-accumulate '(1) '(2 3))))
+  (should (equal (llm-test-normalize '(:foo "aa" :bar "b" :baz "c"))
+                 (llm-test-normalize (llm-provider-utils-streaming-accumulate '(:foo "a" :baz "c") '(:foo "a" :bar "b")))))
+  (should (equal '(:foo 3) (llm-provider-utils-streaming-accumulate '(:foo 1) '(:foo 2))))
+  (should (equal '(:foo "foo bar baz") (llm-provider-utils-streaming-accumulate '(:foo "foo bar") '(:foo " baz")))))
+
 (provide 'llm-provider-utils-test)
 ;;; llm-provider-utils-test.el ends here
