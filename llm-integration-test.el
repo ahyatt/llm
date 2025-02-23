@@ -213,12 +213,14 @@ else.  We really just want to see if it's in the right ballpark."
                          (llm-make-chat-prompt llm-integration-test-chat-prompt)))
            llm-integration-test-chat-answer)))
 
-(llm-def-integration-test llm-chat-multi-response (provider)
+(llm-def-integration-test llm-chat-multi-output (provider)
   (should (equal
-           (string-trim (llm-chat
-                         provider
-                         (llm-make-chat-prompt llm-integration-test-chat-prompt) t))
-           `(:text ,llm-integration-test-chat-answer))))
+           (string-trim (plist-get
+                         (llm-chat
+                          provider
+                          (llm-make-chat-prompt llm-integration-test-chat-prompt)
+                          t) :text))
+           llm-integration-test-chat-answer)))
 
 (llm-def-integration-test llm-chat-async (provider)
   (let ((result nil)
@@ -238,7 +240,7 @@ else.  We really just want to see if it's in the right ballpark."
     (if err-result (error err-result))
     (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim result)))))
 
-(llm-def-integration-test llm-chat-async-multi-response (provider)
+(llm-def-integration-test llm-chat-async-multi-output (provider)
   (let ((result nil)
         (buf (current-buffer))
         (llm-warn-on-nonfree nil)
@@ -255,7 +257,8 @@ else.  We really just want to see if it's in the right ballpark."
     (while (not (or result err-result))
       (sleep-for 0.1))
     (if err-result (error err-result))
-    (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim (plist-get :text result))))))
+    (should (plist-get result :text))
+    (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim (plist-get result :text))))))
 
 (llm-def-integration-test llm-chat-streaming (provider)
   (when (member 'streaming (llm-capabilities provider))
@@ -285,7 +288,7 @@ else.  We really just want to see if it's in the right ballpark."
       (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim returned-result)))
       (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim streamed-result))))))
 
-(llm-def-integration-test llm-chat-streaming-multi-result (provider)
+(llm-def-integration-test llm-chat-streaming-multi-output (provider)
   (when (member 'streaming (llm-capabilities provider))
     (let ((streamed-result "")
           (returned-result nil)
@@ -298,7 +301,7 @@ else.  We really just want to see if it's in the right ballpark."
        (llm-make-chat-prompt llm-integration-test-chat-prompt)
        (lambda (partial-response)
          (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
-         (setq streamed-result (concat streamed-result partial-response)))
+         (setq streamed-result partial-response))
        (lambda (response)
          (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
          (setq returned-result response))
@@ -311,8 +314,8 @@ else.  We really just want to see if it's in the right ballpark."
                   (time-less-p (time-subtract (current-time) start-time) 60))
         (sleep-for 0.1))
       (if err-result (error err-result))
-      (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim (plist-get :text returned-result))))
-      (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim (plist-get :text streamed-result)))))))
+      (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim (plist-get returned-result :text))))
+      (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim (plist-get streamed-result :text)))))))
 
 (llm-def-integration-test llm-tool-use (provider)
   (when (member 'function-calls (llm-capabilities provider))
@@ -323,7 +326,7 @@ else.  We really just want to see if it's in the right ballpark."
       ;; Test that we can send the function back to the provider without error.
       (llm-chat provider prompt))))
 
-(llm-def-integration-test llm-tool-use-multi-result (provider)
+(llm-def-integration-test llm-tool-use-multi-output (provider)
   (when (member 'function-calls (llm-capabilities provider))
     (let* ((prompt (llm-integration-test-tool-use-prompt))
            (result (llm-chat provider prompt t)))
