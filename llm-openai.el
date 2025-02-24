@@ -338,7 +338,7 @@ RESPONSE can be nil if the response is complete."
                                  (assoc-default 'tool_calls delta)))))
       content-or-call)))
 
-(cl-defmethod llm-provider-streaming-media-handler ((_ llm-openai) msg-receiver fc-receiver _)
+(cl-defmethod llm-provider-streaming-media-handler ((_ llm-openai) receiver _)
   (cons 'text/event-stream
         (plz-event-source:text/event-stream
          :events `((message
@@ -348,7 +348,10 @@ RESPONSE can be nil if the response is complete."
                          (unless (equal data "[DONE]")
                            (when-let ((response (llm-openai--get-partial-chat-response
                                                  (json-parse-string data :object-type 'alist))))
-                             (funcall (if (stringp response) msg-receiver fc-receiver) response))))))))))
+                             (funcall receiver (if (stringp response)
+                                                   (list :text response)
+                                                 (list :tool-uses-raw
+                                                       response))))))))))))
 
 (cl-defmethod llm-provider-collect-streaming-tool-uses ((_ llm-openai) data)
   (llm-provider-utils-openai-collect-streaming-tool-uses data))

@@ -135,7 +135,7 @@
       (format "Unsupported non-text response: %s" content))))
 
 (cl-defmethod llm-provider-streaming-media-handler ((_ llm-claude)
-                                                    msg-receiver _ err-receiver)
+                                                    receiver err-receiver)
   (cons 'text/event-stream
         (plz-event-source:text/event-stream
          :events `((message_start . ignore)
@@ -153,7 +153,7 @@
                               (delta (assoc-default 'delta json))
                               (type (assoc-default 'type delta)))
                          (when (equal type "text_delta")
-                           (funcall msg-receiver (assoc-default 'text delta))))))))))
+                           (funcall receiver `(:text ,(assoc-default 'text delta)))))))))))
 
 (cl-defmethod llm-provider-collect-streaming-tool-uses ((_ llm-claude) data)
   (llm-provider-utils-openai-collect-streaming-tool-uses data))

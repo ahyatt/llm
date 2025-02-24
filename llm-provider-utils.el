@@ -186,19 +186,18 @@ TOOL-RESULTS is a list of function results, if any.")
   ;; By default, we just append to the prompt.
   (llm-provider-utils-append-to-prompt prompt result tool-results))
 
-(cl-defgeneric llm-provider-streaming-media-handler (provider msg-receiver fc-receiver err-receiver)
+(cl-defgeneric llm-provider-streaming-media-handler (provider receiver err-receiver)
   "Define how to handle streaming media for the PROVIDER.
 
 This should return a cons of the media type and an instance that
 handle objects of that type.
 
-The handlers defined can call MSG-RECEIVER when they receive part
-of a text message for the client (a chat response).  If they
-receive a function call, they should call FC-RECEIVER with the
-function call.  If they receive an error, they should call
-ERR-RECEIVER with the error message.")
+The handlers defined can call RECEIVER with a plist compatible with the
+output of the llm functions returned when `multi-output' is set.  If
+they receive an error, they should call ERR-RECEIVER with the error
+message.")
 
-(cl-defmethod llm-provider-streaming-media-handler ((_ llm-standard-chat-provider) _ _ _)
+(cl-defmethod llm-provider-streaming-media-handler ((_ llm-standard-chat-provider) _ _)
   "By default, the standard provider has no streaming media handler."
   nil)
 
@@ -212,6 +211,13 @@ list of `llm-provider-utils-tool-use'.")
 
 (cl-defmethod llm-provider-extract-tool-uses ((_ llm-standard-chat-provider) _)
   "By default, the standard provider has no function call extractor."
+  nil)
+
+(cl-defgeneric llm-provider-extract-reasoning (provider response)
+  "Return the reasoning from RESPONSE for the PROVIDER.")
+
+(cl-defmethod llm-provider-extract-reasoning ((_ llm-standard-chat-provider) _)
+  "By default, the standard provider has no reasoning extractor."
   nil)
 
 (cl-defgeneric llm-provider-populate-tool-uses (provider prompt tool-uses)
@@ -304,7 +310,19 @@ return a list of `llm-chat-prompt-tool-use' structs.")
                          provider data)
                         "Unknown error")))))))
 
-(cl-defmethod llm-chat ((provider llm-standard-chat-provider) prompt)
+(defun llm-provider-utils-extract-all (provider response)
+  "Extract all from RESPONSE for the PROVIDER."
+  (let ((text
+         (llm-provider-chat-extract-result provider response))
+        (tool-uses (llm-provider-extract-tool-uses
+                    provider response))
+        (reasoning (llm-provider-extract-reasoning
+                    provider response)))
+    (append (when text `(:text ,text))
+            (when tool-uses `(:tool-uses ,tool-uses))
+            (when reasoning `(:reasoning ,reasoning)))))
+
+(cl-defmethod llm-chat ((provider llm-standard-chat-provider) prompt &optional multi-output)
   (llm-provider-request-prelude provider)
   (let ((response (llm-request-plz-sync (llm-provider-chat-url provider)
                                         :headers (llm-provider-headers provider)
@@ -313,10 +331,9 @@ return a list of `llm-chat-prompt-tool-use' structs.")
     (if-let ((err-msg (llm-provider-chat-extract-error provider response)))
         (error err-msg)
       (llm-provider-utils-process-result provider prompt
-                                         (llm-provider-chat-extract-result
+                                         (llm-provider-utils-extract-all
                                           provider response)
-                                         (llm-provider-extract-tool-uses
-                                          provider response)
+                                         multi-output
                                          (lambda (result)
                                            (setq final-result result))))
     ;; In most cases, final-result will be available immediately.  However, when
@@ -327,7 +344,7 @@ return a list of `llm-chat-prompt-tool-use' structs.")
     final-result))
 
 (cl-defmethod llm-chat-async ((provider llm-standard-chat-provider) prompt success-callback
-                              error-callback)
+                              error-callback &optional multi-output)
   (llm-provider-request-prelude provider)
   (let ((buf (current-buffer)))
     (llm-request-plz-async
@@ -341,8 +358,8 @@ return a list of `llm-chat-prompt-tool-use' structs.")
                         err-msg)
                      (llm-provider-utils-process-result
                       provider prompt
-                      (llm-provider-chat-extract-result provider data)
-                      (llm-provider-extract-tool-uses provider data)
+                      (llm-provider-utils-extract-all provider data)
+                      multi-output
                       (lambda (result)
                         (llm-provider-utils-callback-in-buffer
                          buf success-callback result)))))
@@ -355,12 +372,47 @@ return a list of `llm-chat-prompt-tool-use' structs.")
                          provider data)
                         "Unknown error")))))))
 
+(defun llm-provider-utils-streaming-accumulate (current new)
+  "Add streaming NEW to CURRENT and return the result.
+
+This is designed to accumulate responses for streaming results.  It
+assumes that CURRENT and NEW are the same type of thing..
+
+This will work with text as well as the plists that are returned when
+`multi-output' is on.
+
+Any strings will be concatenated, integers will be added, etc."
+  (if current
+      (if new
+          (progn
+            (unless (eq (type-of current) (type-of new))
+              (error "Cannot accumulate different types of streaming results: %s and %s"
+                     current new))
+            (pcase (type-of current)
+              ('string (concat current new))
+              ('integer (+ current new))
+              ('float (+ current new))
+              ('vector (vconcat current new))
+              ('cons (if (and (> (length current) 0)  ;; if plist
+                              (symbolp (car current))
+                              (string-match-p "^:" (symbol-name (car current))))
+                         (cl-loop for key in
+                                  (seq-union (map-keys current)
+                                             (map-keys new))
+                                  append
+                                  (list key
+                                        (llm-provider-utils-streaming-accumulate
+                                         (plist-get current key)
+                                         (plist-get new key))))
+                       (append current new)))))
+        current)
+    new))
+
 (cl-defmethod llm-chat-streaming ((provider llm-standard-chat-provider) prompt partial-callback
-                                  response-callback error-callback)
+                                  response-callback error-callback &optional multi-output)
   (llm-provider-request-prelude provider)
   (let ((buf (current-buffer))
-        (current-text "")
-        (fc nil))
+        (current-result))
     (llm-request-plz-async
      (llm-provider-chat-streaming-url provider)
      :headers (llm-provider-headers provider)
@@ -368,13 +420,13 @@ return a list of `llm-chat-prompt-tool-use' structs.")
      :media-type (llm-provider-streaming-media-handler
                   provider
                   (lambda (s)
-                    (when (> (length s) 0)
-                      (setq current-text
-                            (concat current-text s))
-                      (when partial-callback
-                        (llm-provider-utils-callback-in-buffer
-                         buf partial-callback current-text))))
-                  (lambda (fc-new) (push fc-new fc))
+                    (setq current-result
+                          (llm-provider-utils-streaming-accumulate current-result s))
+                    (when partial-callback
+                      (llm-provider-utils-callback-in-buffer
+                       buf partial-callback (if multi-output
+                                                current-result
+                                              (plist-get current-result :text)))))
                   (lambda (err)
                     (llm-provider-utils-callback-in-buffer
                      buf error-callback 'error
@@ -384,10 +436,13 @@ return a list of `llm-chat-prompt-tool-use' structs.")
        ;; We don't need the data at the end of streaming, so we can ignore it.
        (llm-provider-utils-process-result
         provider prompt
-        current-text
-        (when fc
-          (llm-provider-collect-streaming-tool-uses
-           provider (nreverse fc)))
+        (llm-provider-utils-streaming-accumulate
+         current-result
+         (when-let ((tool-uses-raw (plist-get current-result
+                                              :tool-uses-raw)))
+           `(:tool-uses ,(llm-provider-collect-streaming-tool-uses
+                          provider tool-uses-raw))))
+        multi-output
         (lambda (result)
           (llm-provider-utils-callback-in-buffer
            buf response-callback result))))
@@ -613,24 +668,23 @@ This returns a JSON object (a list that can be converted to JSON)."
 
 (defun llm-provider-utils-openai-collect-streaming-tool-uses (data)
   "Read Open AI compatible streaming output DATA to collect tool-uses."
-  (let* ((num-index (+ 1 (assoc-default 'index (aref (car (last data)) 0))))
+  (let* ((num-index (+ 1 (assoc-default 'index (aref data 0))))
          (cvec (make-vector num-index nil)))
     (dotimes (i num-index)
       (setf (aref cvec i) (make-llm-provider-utils-tool-use)))
-    (cl-loop for part in data do
-             (cl-loop for call in (append part nil) do
-                      (let* ((index (assoc-default 'index call))
-                             (id (assoc-default 'id call))
-                             (function (assoc-default 'function call))
-                             (name (assoc-default 'name function))
-                             (arguments (assoc-default 'arguments function)))
-                        (when id
-                          (setf (llm-provider-utils-tool-use-id (aref cvec index)) id))
-                        (when name
-                          (setf (llm-provider-utils-tool-use-name (aref cvec index)) name))
-                        (setf (llm-provider-utils-tool-use-args (aref cvec index))
-                              (concat (llm-provider-utils-tool-use-args (aref cvec index))
-                                      arguments)))))
+    (cl-loop for call in (append data nil) do
+             (let* ((index (assoc-default 'index call))
+                    (id (assoc-default 'id call))
+                    (function (assoc-default 'function call))
+                    (name (assoc-default 'name function))
+                    (arguments (assoc-default 'arguments function)))
+               (when id
+                 (setf (llm-provider-utils-tool-use-id (aref cvec index)) id))
+               (when name
+                 (setf (llm-provider-utils-tool-use-name (aref cvec index)) name))
+               (setf (llm-provider-utils-tool-use-args (aref cvec index))
+                     (concat (llm-provider-utils-tool-use-args (aref cvec index))
+                             arguments))))
     (cl-loop for call in (append cvec nil)
              do (setf (llm-provider-utils-tool-use-args call)
                       (json-parse-string (llm-provider-utils-tool-use-args call)
@@ -661,7 +715,7 @@ ROLE will be `assistant' by default, but can be passed in for other roles."
                                   (format "%s" output))
                        :tool-results tool-results)))))
 
-(defun llm-provider-utils-process-result (provider prompt text tool-uses success-callback)
+(defun llm-provider-utils-process-result (provider prompt partial-result multi-output success-callback)
   "Process the RESPONSE from the provider for PROMPT.
 This execute function calls if there are any, does any result
 appending to the prompt, and returns an appropriate response for
@@ -671,22 +725,25 @@ PROVIDER is the struct that configures the use of the LLM.
 
 TOOL-USES is a list of tool uses in the result.
 
-TEXT is the text output from the provider, if any.  There should
-be either FUNCALLS or TEXT.
+PARTIAL-RESULT is the multipart result, without any tool results.
+
+MULTI-OUTPUT is true if multiple outputs are expected to be passed to
+SUCCESS-CALLBACK.
 
 SUCCESS-CALLBACK is the callback that will be run when all functions
 complete."
-  (if tool-uses
+  (when (plist-get partial-result :text)
+    (llm-provider-append-to-prompt provider prompt (plist-get partial-result :text)))
+  (if-let ((tool-uses (plist-get partial-result :tool-uses)))
       ;; If we have tool uses, execute them, and on the callback, we will
       ;; populate the results.  We don't execute the callback here because it
       ;; will be done inside `llm-provider-utils-execute-tool-uses'.
       (llm-provider-utils-execute-tool-uses
-       provider prompt tool-uses success-callback)
-    ;; We probably shouldn't be called if text is nil, but if we do,
-    ;; we shouldn't add something invalid to the prompt.
-    (when text
-      (llm-provider-append-to-prompt provider prompt text))
-    (funcall success-callback text)))
+       provider prompt tool-uses multi-output
+       partial-result success-callback)
+    (funcall success-callback
+             (if multi-output partial-result
+               (plist-get partial-result :text)))))
 
 (defun llm-provider-utils-populate-tool-uses (provider prompt results-alist)
   "Append the results in RESULTS-ALIST to the prompt.
@@ -706,7 +763,25 @@ PROVIDER is the struct that configures the user of the LLM."
                         :result (cdr c)))
            results-alist)))
 
-(defun llm-provider-utils-execute-tool-uses (provider prompt tool-uses success-callback)
+(defun llm-provider-utils-final-multi-output-result (tool-results)
+  "Return the final result from TOOL-RESULTS.
+
+This transforms the plist so that:
+1. We don't return an empty :text value.
+2. We transform the :tool-uses to an alist of tool name to use."
+  (cl-loop for (key value) on tool-results
+           by 'cddr
+           if (and (not (and (eq key :text) (equal value "")))
+                   (member key '(:text :tool-uses :tool-results)))
+           nconc (list key
+                       (if (eq key :tool-uses)
+                           (mapcar (lambda (tool-use)
+                                     `(:name ,(llm-provider-utils-tool-use-name tool-use)
+                                             :args ,(llm-provider-utils-tool-use-args tool-use)))
+                                   value)
+                         value))))
+
+(defun llm-provider-utils-execute-tool-uses (provider prompt tool-uses multi-output partial-result success-callback)
   "Execute TOOL-USES, a list of `llm-provider-utils-tool-use'.
 
 A response suitable for returning to the client will be returned.
@@ -716,6 +791,12 @@ PROVIDER is the provider that supplied the response.
 PROMPT was the prompt given to the provider, which will get
 updated with the response from the LLM, and if there is a
 function call, the result.
+
+MULTI-OUTPUT is true if multiple outputs are expected to be passed to
+SUCCESS-CALLBACK.
+
+PARTIAL-RESULT is the result to return to the user, without the tool
+call results.
 
 SUCCESS-CALLBACK is the callback that will be run when all functions
 have returned results."
@@ -745,7 +826,12 @@ have returned results."
                         (when (= (length results) (length tool-uses))
                           (llm-provider-utils-populate-tool-uses
                            provider prompt results)
-                          (funcall success-callback tool-use-and-results)))))
+                          (funcall success-callback
+                                   (if multi-output
+                                       (llm-provider-utils-final-multi-output-result
+                                        (append partial-result
+                                                `(:tool-results ,tool-use-and-results)))
+                                     tool-use-and-results))))))
        (if (llm-tool-async tool)
            (apply (llm-tool-function tool)
                   (append (list end-func) call-args))
