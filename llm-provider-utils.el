@@ -458,24 +458,25 @@ Any strings will be concatenated, integers will be added, etc."
 (defun llm-provider-utils-get-system-prompt (prompt &optional example-prelude)
   "From PROMPT, turn the context and examples into a string.
 EXAMPLE-PRELUDE is a string to prepend to the examples."
-  (concat
-   (llm-chat-prompt-context prompt)
-   (when (llm-chat-prompt-context prompt) "\n")
-   (when (llm-chat-prompt-examples prompt) (or example-prelude
-                                               (concat
-                                                (if (= (length (llm-chat-prompt-examples prompt)) 1)
-                                                    "Here is an example"
-                                                  (format "Here are %d examples"
-                                                          (length (llm-chat-prompt-examples prompt))))
-                                                " of how to respond:\n")))
-   (when (llm-chat-prompt-examples prompt) "\n")
-   (mapconcat (lambda (example)
-                (format "User: %s\nAssistant: %s"
-                        (car example)
-                        (cdr example)))
-              (llm-chat-prompt-examples prompt) "\n")))
+  (string-trim
+   (concat
+    (llm-chat-prompt-context prompt)
+    (when (llm-chat-prompt-context prompt) "\n")
+    (when (llm-chat-prompt-examples prompt) (or example-prelude
+                                                (concat
+                                                 (if (= (length (llm-chat-prompt-examples prompt)) 1)
+                                                     "Here is an example"
+                                                   (format "Here are %d examples"
+                                                           (length (llm-chat-prompt-examples prompt))))
+                                                 " of how to respond:\n")))
+    (when (llm-chat-prompt-examples prompt) "\n")
+    (mapconcat (lambda (example)
+                 (format "User: %s\nAssistant: %s"
+                         (car example)
+                         (cdr example)))
+               (llm-chat-prompt-examples prompt) "\n"))))
 
-(defun llm-provider-utils-combine-to-system-prompt (prompt &optional example-prelude)
+(defun llm-provider-utils-combine-to-system-prompt (prompt &optional example-prelude combine-cached-prompt)
   "Add context and examples to a system prompt in PROMPT.
 
 This should be used for providers that have a notion of a system prompt.
@@ -483,12 +484,20 @@ If there is a system prompt, and no assistant response, add to it.
 If there is no system prompt, create one.
 If there is an assistance response, do nothing.
 
-EXAMPLE-PRELUDE is the text to introduce any examples with."
+EXAMPLE-PRELUDE is the text to introduce any examples with.
+
+COMBINED-CACHED-PROMPT, if non-nil, will prefix the system prompt with
+the cached prompt."
   (let ((system-prompt (seq-find
                         (lambda (interaction)
                           (eq (llm-chat-prompt-interaction-role interaction) 'system))
                         (llm-chat-prompt-interactions prompt)))
-        (system-content (llm-provider-utils-get-system-prompt prompt example-prelude)))
+        (system-content
+         (if combine-cached-prompt
+             (string-trim
+              (concat (or (llm-chat-prompt-cached-context prompt) "") "\n"
+                      (llm-provider-utils-get-system-prompt prompt example-prelude)))
+           (llm-provider-utils-get-system-prompt prompt example-prelude))))
     (when (and system-content (> (length system-content) 0))
       (if system-prompt
           (setf (llm-chat-prompt-interaction-content system-prompt)

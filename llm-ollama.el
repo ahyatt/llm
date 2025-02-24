@@ -136,7 +136,7 @@ PROVIDER is the llm-ollama provider."
     (llm-provider-utils-convert-to-serializable format)))
 
 (cl-defmethod llm-provider-chat-request ((provider llm-ollama) prompt streaming)
-  (llm-provider-utils-combine-to-system-prompt prompt llm-ollama-example-prelude)
+  (llm-provider-utils-combine-to-system-prompt prompt llm-ollama-example-prelude t)
   (let (request-plist messages options)
     (setq messages
           (vconcat (mapcar (lambda (interaction)

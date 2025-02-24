@@ -1,5 +1,6 @@
 * Version 0.24.0
 - Add =multi-output= as an option, allowing all llm results to return, call, or stream multiple kinds of data via a plist.  This allows separating out reasoning, as well as optionally returning text as well as tool uses at the same time.
+- Add context caching via the ~cached-context~ argument to ~llm-make-chat-prompt~, supported by Claude, Open AI, and Gemini.
 * Version 0.23.1
 - Add Gemini 2.0 pro experimental model, default to 2.0 flash
 - Add Open AI's o3 mini model

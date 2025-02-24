@@ -71,7 +71,8 @@ See %s for the details on the restrictions on use." name tos)))
   "This stores all the information needed for a structured chat prompt.
 
 Use of this directly is deprecated, instead use `llm-make-chat-prompt'."
-  context examples interactions tools temperature max-tokens response-format non-standard-params)
+  context examples interactions tools temperature max-tokens response-format
+  non-standard-params cached-context internal-hash)
 
 (cl-defstruct llm-chat-prompt-interaction
   "This defines a single interaction given as part of a chat prompt.
@@ -232,7 +233,7 @@ instead."
 
 (cl-defun llm-make-chat-prompt (content &key context examples tools
                                         temperature max-tokens response-format
-                                        non-standard-params)
+                                        non-standard-params cached-context)
   "Create a `llm-chat-prompt' with CONTENT sent to the LLM provider.
 
 This is the most correct and easy way to create an
@@ -260,6 +261,11 @@ CONTEXT is a string given to the LLM as context for the entire
 interaction, such as instructions to the LLM on how to reply,
 persona, information on the user, or anything else that applies
 to the chat as a whole.  This is optional.
+
+CACHED-CONTEXT is a string that will be cached if the model supports
+it (see the `caching').  If the model does not support it, it will be
+just added to the beginning of the system prompt or however else the
+context and examples are expressed.
 
 EXAMPLES is a list of conses, where the car is an example
 inputs, and cdr is the corresponding example outputs.  This is optional.
@@ -322,7 +328,9 @@ vectors (if a list).  This is optional."
    :temperature temperature
    :max-tokens max-tokens
    :response-format response-format
-   :non-standard-params non-standard-params))
+   :non-standard-params non-standard-params
+   :cached-context cached-context
+   :internal-hash (make-hash-table :test 'equal)))
 
 (defun llm-chat-prompt-append-response (prompt response &optional role)
   "Append a new RESPONSE to PROMPT, to continue a conversation.

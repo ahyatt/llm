@@ -82,7 +82,13 @@
            :interactions (list
                           (make-llm-chat-prompt-interaction :role 'system :content "Existing system prompt.")
                           (copy-llm-chat-prompt-interaction interaction1))
-           :examples (list example1 example2))))
+           :examples (list example1 example2)))
+         (prompt-with-cached-context
+          (llm-make-chat-prompt "Hello world" :context "context" :cached-context "cached"))
+         (prompt-with-cached-context-cache-ignored
+          (llm-make-chat-prompt "Hello world" :context "context" :cached-context "cached"))
+         (prompt-with-only-cached-context
+          (llm-make-chat-prompt "Hello world" :cached-context "cached")))
     (llm-provider-utils-combine-to-system-prompt prompt-for-first-request)
     (should (= 2 (length (llm-chat-prompt-interactions prompt-for-first-request))))
     (should (equal "Example context\nHere are 2 examples of how to respond:\n\nUser: Request 1\nAssistant: Response 1\nUser: Request 2\nAssistant: Response 2"
@@ -96,7 +102,22 @@
     (llm-provider-utils-combine-to-system-prompt prompt-with-existing-system-prompt)
     (should (= 2 (length (llm-chat-prompt-interactions prompt-with-existing-system-prompt))))
     (should (equal "Existing system prompt.\nExample context\nHere are 2 examples of how to respond:\n\nUser: Request 1\nAssistant: Response 1\nUser: Request 2\nAssistant: Response 2"
-                   (llm-chat-prompt-interaction-content (nth 0 (llm-chat-prompt-interactions prompt-with-existing-system-prompt)))))))
+                   (llm-chat-prompt-interaction-content (nth 0 (llm-chat-prompt-interactions prompt-with-existing-system-prompt)))))
+
+    (llm-provider-utils-combine-to-system-prompt prompt-with-cached-context nil t)
+    (should (= 2 (length (llm-chat-prompt-interactions prompt-with-cached-context))))
+    (should (equal "cached\ncontext"
+                   (llm-chat-prompt-interaction-content (nth 0 (llm-chat-prompt-interactions prompt-with-cached-context)))))
+
+    (llm-provider-utils-combine-to-system-prompt prompt-with-cached-context-cache-ignored)
+    (should (= 2 (length (llm-chat-prompt-interactions prompt-with-cached-context-cache-ignored))))
+    (should (equal "context"
+                   (llm-chat-prompt-interaction-content (nth 0 (llm-chat-prompt-interactions prompt-with-cached-context-cache-ignored)))))
+
+    (llm-provider-utils-combine-to-system-prompt prompt-with-only-cached-context nil t)
+    (should (= 2 (length (llm-chat-prompt-interactions prompt-with-only-cached-context))))
+    (should (equal "cached"
+                   (llm-chat-prompt-interaction-content (nth 0 (llm-chat-prompt-interactions prompt-with-only-cached-context)))))))
 
 (ert-deftest llm-provider-utils-combine-to-user-prompt ()
   (let* ((interaction1 (make-llm-chat-prompt-interaction :role 'user :content "Hello"))

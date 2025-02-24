@@ -155,6 +155,23 @@
                            :messages [(:role "user" :content "Hello world")]
                            :system "context\nHere are 2 examples of how to respond:\n\nUser: input1\nAssistant: output1\nUser: input2\nAssistant: output2"
                            :stream :false))
+    (:name "Request with cache"
+           :prompt (lambda () (llm-make-chat-prompt "Hello world"
+                                                    :context "context"
+                                                    :cached-context "cached"))
+           :openai (:model "model"
+                           :messages [(:role "system" :content "cached\ncontext")
+                                      (:role "user" :content "Hello world")])
+           :claude (:model "model"
+                           :max_tokens 4096
+                           :messages [(:role "user" :content "Hello world")]
+                           :system [(:type text :text "cached" :cache_control (:type ephemeral))
+                                    (:type text :text "context")]
+                           :stream :false)
+           :ollama (:model "model"
+                           :messages [(:role "system" :content "cached\ncontext")
+                                      (:role "user" :content "Hello world")]
+                           :stream :false))
     (:name "Request with conversation"
            :prompt (lambda () (llm-make-chat-prompt '("Hello world" "Hello human" "I am user!")))
            :openai (:model "model"

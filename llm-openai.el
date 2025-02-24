@@ -283,7 +283,7 @@ FCS is a list of `llm-provider-utils-tool-use' structs."
   "From PROMPT, create the chat request data to send.
 PROVIDER is the Open AI provider.
 STREAMING if non-nil, turn on response streaming."
-  (llm-provider-utils-combine-to-system-prompt prompt llm-openai-example-prelude)
+  (llm-provider-utils-combine-to-system-prompt prompt llm-openai-example-prelude t)
   (let ((non-standard-params (llm-chat-prompt-non-standard-params prompt))
         request-plist)
 

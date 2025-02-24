@@ -79,7 +79,13 @@
                                                (t
                                                 (llm-chat-prompt-interaction-content interaction)))))
                              (llm-chat-prompt-interactions prompt)))))
-        (system (llm-provider-utils-get-system-prompt prompt)))
+        (system
+         (if (llm-chat-prompt-cached-context prompt)
+             (vector
+              `(:type text :text ,(llm-chat-prompt-cached-context prompt)
+                      :cache_control (:type ephemeral))
+              `(:type text :text ,(llm-provider-utils-get-system-prompt prompt)))
+           (llm-provider-utils-get-system-prompt prompt))))
     (when (llm-chat-prompt-tools prompt)
       (plist-put request :tools
                  (vconcat (mapcar (lambda (f) (llm-claude--tool-call f))
