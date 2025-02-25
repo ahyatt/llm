@@ -1,8 +1,8 @@
 * Version 0.24.0
 - Add =multi-output= as an option, allowing all llm results to return, call, or stream multiple kinds of data via a plist.  This allows separating out reasoning, as well as optionally returning text as well as tool uses at the same time.
-* Version 0.23.1
 - Add Gemini 2.0 pro experimental model, default to 2.0 flash
 - Add Open AI's o3 mini model
+- Add Claude 3.7 sonnet
 - Fix Claude's capabilities to reflect that it can use tools
 * Version 0.23.0
 - Add GitHub's GitHub Models
