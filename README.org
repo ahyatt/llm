@@ -93,7 +93,12 @@ In addition to the provider, which you may want multiple of (for example, to cha
 - ~:host~: The host that ollama is run on.  This is optional and will default to localhost.
 - ~:port~: The port that ollama is run on.  This is optional and will default to the default ollama port.
 - ~:chat-model~: The model name to use for chat.  This is not optional for chat use, since there is no default.
-- ~:embedding-model~: The model name to use for embeddings.  Only [[https://ollama.com/search?q=&c=embedding][some models]] can be used for embeddings.  This is not optional for embedding use, since there is no default.
+- ~:embedding-model~: The model name to use for embeddings.  Only [[https://ollama.com/search?q=&c=embedding][some models]] can be used for embeddings.  This is not optional for embedding use, since there is no default. 
+** Deepseek
+[[https://deepseek.com][Deepseek]] is a company offers both reasoning and chat high-quality models.  This provider connects to their server.  It is also possible to run their model locally as a free model via Ollama.  To use the service, you can set it up with the following parameters:
+
+=:key=: The API Key you get from DeepSeek [[https://platform.deepseek.com/api_keys][API key page]].  This is required.
+=:chat-model=: One of the models from their [[https://api-docs.deepseek.com/quick_start/pricing][model list.]]
 ** GPT4All
 [[https://gpt4all.io/index.html][GPT4All]] is a way to run large language models locally.  To use it with =llm= package, you must click "Enable API Server" in the settings.  It does not offer embeddings or streaming functionality, though, so Ollama might be a better fit for users who are not already set up with local models.  You can set it up with the following parameters:
 - ~:host~: The host that GPT4All is run on.  This is optional and will default to localhost.
