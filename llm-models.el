@@ -210,6 +210,16 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 128000
     :regex "deepseek-r1")
    (make-llm-model
+    :name "deepseek-reasoner" :symbol 'deepseek-reasoner
+    :capabilities '(generation reasoning)
+    :context-length 65536
+    :regex "deepseek-reasoner")
+   (make-llm-model
+    :name "deepseek-chat" :symbol 'deepseek-chat
+    :capabilities '(generation)
+    :context-length 65536
+    :regex "deepseek-chat")
+   (make-llm-model
     :name "Mistral" :symbol 'mistral
     :capabilities '(generation tool-use free-software)  ;; Apache license
     :context-length 8192
