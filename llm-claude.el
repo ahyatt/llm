@@ -139,24 +139,80 @@
   (cons 'text/event-stream
         (plz-event-source:text/event-stream
          :events `((message_start . ignore)
-                   (content_block_start . ignore)
                    (ping . ignore)
                    (message_stop . ignore)
                    (content_block_stop . ignore)
+                   (message_delta . ignore)
                    (error . ,(lambda (event)
                                (funcall err-receiver (plz-event-source-event-data event))))
+                   (content_block_start
+                    .
+                    ,(lambda (event)
+                       (let* ((data (plz-event-source-event-data event))
+                              (json (json-parse-string data :object-type 'alist))
+                              (block (assoc-default 'content_block json))
+                              (type (assoc-default 'type block))
+                              (index (assoc-default 'index json)))
+                         (when (equal type "tool_use")
+                           (let ((id (assoc-default 'id block))
+                                 (name (assoc-default 'name block)))
+                             (funcall receiver `(:tool-uses-raw
+                                                 ,(vector
+                                                   (list
+                                                    'id id
+                                                    'name name
+                                                    'index index
+                                                    'input "")))))))))
                    (content_block_delta
                     .
                     ,(lambda (event)
                        (let* ((data (plz-event-source-event-data event))
                               (json (json-parse-string data :object-type 'alist))
                               (delta (assoc-default 'delta json))
-                              (type (assoc-default 'type delta)))
-                         (when (equal type "text_delta")
-                           (funcall receiver `(:text ,(assoc-default 'text delta)))))))))))
+                              (type (assoc-default 'type delta))
+                              (index (assoc-default 'index json)))
+                         (cond
+                          ((equal type "text_delta")
+                           (funcall receiver `(:text ,(assoc-default 'text delta))))
+                          ((equal type "input_json_delta")
+                           (funcall receiver `(:tool-uses-raw
+                                               ,(vector
+                                                 (list
+                                                  'input (assoc-default 'partial_json delta)
+                                                  'index index)))))))))))))
 
 (cl-defmethod llm-provider-collect-streaming-tool-uses ((_ llm-claude) data)
-  (llm-provider-utils-openai-collect-streaming-tool-uses data))
+  "Transform Claude streaming tool-uses DATA responses into tool use structs.
+DATA is a vector of lists produced by `llm-provider-streaming-media-handler'."
+  (let ((tools (make-hash-table :test 'equal))
+        (index-to-id (make-hash-table :test 'eql))
+        result)
+    (cl-loop for entry across data do
+             (if (plist-get entry 'id)
+                 ;; new tool use
+                 (let ((id (plist-get entry 'id))
+                       (name (plist-get entry 'name))
+                       (index (plist-get entry 'index)))
+                   (puthash id (make-llm-provider-utils-tool-use
+                                :id id :name name :args "")
+                            tools)
+                   (puthash index id index-to-id))
+               ;; tool input update
+               (let* ((index (plist-get entry 'index))
+                      (input (plist-get entry 'input))
+                      (id (gethash index index-to-id))
+                      (tool (gethash id tools)))
+                 (setf (llm-provider-utils-tool-use-args tool)
+                       (concat (llm-provider-utils-tool-use-args tool) input)))))
+    (maphash (lambda (_ tool)
+               (condition-case nil
+                   (setf (llm-provider-utils-tool-use-args tool)
+                         (json-parse-string (llm-provider-utils-tool-use-args tool)
+                                            :object-type 'alist))
+                 (error nil))
+               (push tool result))
+             tools)
+    (nreverse result)))
 
 (cl-defmethod llm-provider-headers ((provider llm-claude))
   `(("x-api-key" . ,(if (functionp (llm-claude-key provider))
