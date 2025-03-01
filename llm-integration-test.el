@@ -31,6 +31,7 @@
 ;; - GEMINI_KEY: A Gemini API key.
 ;; - VERTEX_PROJECT: A Google Cloud Vertex project.
 ;; - OLLAMA_CHAT_MODELS: A list of Ollama models to test.
+;; - DEEPSEEK_KEY: A DeepSeek API key.
 ;; - AZURE_URL: The URL of the Azure API.
 ;; - AZURE_KEY: The key for the Azure API.
 ;; - AZURE_CHAT_MODEL: The name of the chat model to test.
@@ -137,6 +138,10 @@ else.  We really just want to see if it's in the right ballpark."
     (when (getenv "GITHUB_TOKEN")
       (require 'llm-github)
       (push (make-llm-github :key (getenv "GITHUB_TOKEN")) providers))
+    (when (getenv "DEEPSEEK_KEY")
+      (require 'llm-deepseek)
+      (push (make-llm-deepseek :key (getenv "DEEPSEEK_KEY")) providers)
+      (push (make-llm-deepseek :key (getenv "DEEPSEEK_KEY") :chat-model "deepseek-reasoner") providers))
     (when (getenv "OLLAMA_CHAT_MODELS")
       (require 'llm-ollama)
       ;; This variable is a list of models to test.
