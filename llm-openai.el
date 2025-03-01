@@ -369,7 +369,7 @@ RESPONSE can be nil if the response is complete."
   (llm-provider-utils-model-token-limit (llm-openai-chat-model provider)))
 
 (cl-defmethod llm-capabilities ((provider llm-openai))
-  (append '(streaming embeddings function-calls json-response)
+  (append '(streaming embeddings tool-use streaming-tool-use json-response)
           (when-let ((model (llm-models-match (llm-openai-chat-model provider))))
             (seq-intersection (llm-model-capabilities model)
                               '(image-input)))))

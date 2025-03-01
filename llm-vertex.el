@@ -302,7 +302,7 @@ If STREAMING is non-nil, use the URL for the streaming API."
    (when-let ((model (llm-models-match (llm-vertex-chat-model provider)))
               (capabilities (llm-model-capabilities model)))
      (append
-      (when (member 'tool-use capabilities) '(function-calls))
+      (when (member 'tool-use capabilities) '(tool-uses streaming-tool-uses))
       (seq-intersection capabilities '(image-input audio-input video-input))))))
 
 (provide 'llm-vertex)
