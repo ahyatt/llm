@@ -303,8 +303,8 @@
     (should-have-token-limit "unknown" 4096)))
 
 (ert-deftest llm-test-capabilities-openai-compatible ()
-  (should-not (member 'function-calls (llm-capabilities (make-llm-openai-compatible :chat-model "llama-3"))))
-  (should (member 'function-calls (llm-capabilities (make-llm-openai-compatible :chat-model "llama-3.1"))))
+  (should-not (member 'tool-use (llm-capabilities (make-llm-openai-compatible :chat-model "llama-3"))))
+  (should (member 'tool-use (llm-capabilities (make-llm-openai-compatible :chat-model "llama-3.1"))))
   (should-not (member 'embeddings (llm-capabilities (make-llm-openai-compatible :chat-model "llama-3")))))
 
 (ert-deftest llm-test-chat-token-limit-gemini ()
