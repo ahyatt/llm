@@ -378,9 +378,8 @@ RESPONSE can be nil if the response is complete."
   (append '(streaming)
           (when (llm-openai-embedding-model provider)
             '(embeddings embeddings-batch))
-          (let ((model (llm-models-match (llm-openai-chat-model provider))))
-            (when (and model (member 'tool-use (llm-model-capabilities model)))
-              '(function-calls)))))
+          (when-let* ((model (llm-models-match (llm-openai-chat-model provider))))
+            (llm-model-capabilities model))))
 
 (provide 'llm-openai)
 

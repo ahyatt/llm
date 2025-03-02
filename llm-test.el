@@ -339,7 +339,7 @@
   (should (= 8192 (llm-chat-token-limit
                    (make-llm-gpt4all :chat-model "Mistral")))))
 
-(ert-deftest llm-test-ollama-function-calling-capabilities ()
+(ert-deftest llm-test-ollama-tool-use-capabilities ()
   ;; tests subject to change as models may get function calling
   (cl-flet ((has-fc (model)
               (member 'tool-use (llm-capabilities (make-llm-ollama :chat-model model)))))
