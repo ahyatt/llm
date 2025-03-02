@@ -30,6 +30,7 @@
 (require 'llm-provider-utils)
 (require 'llm-models)
 (require 'json)
+(require 'plz)
 (require 'plz-event-source)
 
 (defgroup llm-openai nil
@@ -369,18 +370,28 @@ RESPONSE can be nil if the response is complete."
   (llm-provider-utils-model-token-limit (llm-openai-chat-model provider)))
 
 (cl-defmethod llm-capabilities ((provider llm-openai))
-  (append '(streaming embeddings function-calls json-response)
+  (append '(streaming embeddings function-calls json-response model-list)
           (when-let ((model (llm-models-match (llm-openai-chat-model provider))))
             (seq-intersection (llm-model-capabilities model)
                               '(image-input)))))
 
 (cl-defmethod llm-capabilities ((provider llm-openai-compatible))
-  (append '(streaming)
+  (append '(streaming model-list)
           (when (llm-openai-embedding-model provider)
             '(embeddings embeddings-batch))
           (let ((model (llm-models-match (llm-openai-chat-model provider))))
             (when (and model (member 'tool-use (llm-model-capabilities model)))
               '(function-calls)))))
+
+(cl-defmethod llm-models ((provider llm-openai))
+  (mapcar (lambda (model)
+            (plist-get model :id))
+          (append
+           (plist-get (plz 'get (llm-openai--url provider "models")
+                        :as (lambda () (json-parse-buffer :object-type 'plist))
+                        :headers (llm-openai--headers provider))
+                      :data)
+           nil)))
 
 (provide 'llm-openai)
 
