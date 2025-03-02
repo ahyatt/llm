@@ -240,7 +240,7 @@ PROVIDER is the llm-ollama provider."
                       (chat-model (llm-models-match model))
                       (capabilities (llm-model-capabilities chat-model)))
             (append
-             (when (member 'tool-use capabilities) '(function-calls))
+             (when (member 'tool-use capabilities) '(tool-use))
              (seq-intersection capabilities '(image-input))))))
 
 (provide 'llm-ollama)

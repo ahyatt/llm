@@ -303,8 +303,8 @@
     (should-have-token-limit "unknown" 4096)))
 
 (ert-deftest llm-test-capabilities-openai-compatible ()
-  (should-not (member 'function-calls (llm-capabilities (make-llm-openai-compatible :chat-model "llama-3"))))
-  (should (member 'function-calls (llm-capabilities (make-llm-openai-compatible :chat-model "llama-3.1"))))
+  (should-not (member 'tool-use (llm-capabilities (make-llm-openai-compatible :chat-model "llama-3"))))
+  (should (member 'tool-use (llm-capabilities (make-llm-openai-compatible :chat-model "llama-3.1"))))
   (should-not (member 'embeddings (llm-capabilities (make-llm-openai-compatible :chat-model "llama-3")))))
 
 (ert-deftest llm-test-chat-token-limit-gemini ()
@@ -315,8 +315,8 @@
                    (make-llm-vertex :chat-model "unknown")))))
 
 (ert-deftest llm-test-capabilities-gemini ()
-  (should-not (member 'function-calls (llm-capabilities (make-llm-gemini :chat-model "llama-3"))))
-  (should (member 'function-calls (llm-capabilities (make-llm-gemini :chat-model "gemini-1.5-flash")))))
+  (should-not (member 'tool-use (llm-capabilities (make-llm-gemini :chat-model "llama-3"))))
+  (should (member 'tool-use (llm-capabilities (make-llm-gemini :chat-model "gemini-1.5-flash")))))
 
 (ert-deftest llm-test-chat-token-limit-vertex ()
   (should (= 2097152 (llm-chat-token-limit (make-llm-vertex))))
@@ -339,10 +339,10 @@
   (should (= 8192 (llm-chat-token-limit
                    (make-llm-gpt4all :chat-model "Mistral")))))
 
-(ert-deftest llm-test-ollama-function-calling-capabilities ()
+(ert-deftest llm-test-ollama-tool-use-capabilities ()
   ;; tests subject to change as models may get function calling
   (cl-flet ((has-fc (model)
-              (member 'function-calls (llm-capabilities (make-llm-ollama :chat-model model)))))
+              (member 'tool-use (llm-capabilities (make-llm-ollama :chat-model model)))))
     (should (has-fc "llama3.1"))
     (should (has-fc "llama3.1:8b-instruct-q8_0"))
     (should (has-fc "mistral"))

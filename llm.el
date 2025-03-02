@@ -580,7 +580,9 @@ won't have any partial responses, so basically just operates like
 
 `embeddings-batch': the LLM can return many vector embeddings at the same time.
 
-`tool-uses': the LLM can call functions.i
+`tool-use': the LLM can call functions.
+
+`streaming-tool-use': The LLM can call functions when streaming.
 
 `image-input': the LLM can accept images as input.
 
