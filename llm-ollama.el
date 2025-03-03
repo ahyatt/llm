@@ -184,7 +184,7 @@ PROVIDER is the llm-ollama provider."
       (when-let* ((keep-alive (plist-get more-options-plist :keep_alive)))
         (setq request-plist (plist-put request-plist :keep_alive keep-alive)))
       (setq options (append options
-                            (map-filter (lambda (key val) (not (equal key :keep_alive)))
+                            (map-filter (lambda (key _) (not (equal key :keep_alive)))
                                         more-options-plist))))
     (when options
       (setq request-plist (plist-put request-plist :options options)))
