@@ -180,7 +180,12 @@ PROVIDER is the llm-ollama provider."
       (setq options (plist-put options :temperature (llm-chat-prompt-temperature prompt))))
     (when (llm-chat-prompt-max-tokens prompt)
       (setq options (plist-put options :num_predict (llm-chat-prompt-max-tokens prompt))))
-    (setq options (append options (llm-provider-utils-non-standard-params-plist prompt)))
+    (when-let* ((more-options-plist (llm-provider-utils-non-standard-params-plist prompt)))
+      (when-let* ((keep-alive (plist-get more-options-plist :keep_alive)))
+        (setq request-plist (plist-put request-plist :keep_alive keep-alive)))
+      (setq options (append options
+                            (map-filter (lambda (key val) (not (equal key :keep_alive)))
+                                        more-options-plist))))
     (when options
       (setq request-plist (plist-put request-plist :options options)))
     request-plist))
