@@ -8,6 +8,7 @@
 - Add Open AI's o3 mini model
 - Add Claude 3.7 sonnet
 - Fix Claude's capabilities to reflect that it can use tools
+- Added ability to set =keep_alive= option for Ollama correctly.
 * Version 0.23.0
 - Add GitHub's GitHub Models
 - Accept lists as nonstandard
