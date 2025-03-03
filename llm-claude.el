@@ -28,6 +28,7 @@
 (require 'llm)
 (require 'llm-provider-utils)
 (require 'plz-event-source)
+(require 'plz)
 (require 'rx)
 
 ;; Models defined at https://docs.anthropic.com/claude/docs/models-overview
@@ -226,9 +227,13 @@ DATA is a vector of lists produced by `llm-provider-streaming-media-handler'."
     (format "Error %s: '%s'" (assoc-default 'type err)
             (assoc-default 'message err))))
 
+(defun llm-claude--url (method)
+  "Return a Claude API URL for METHOD."
+  (format "https://api.anthropic.com/v1/%s" method))
+
 (cl-defmethod llm-provider-chat-url ((_ llm-claude))
   "Return the URL for the Claude API."
-  "https://api.anthropic.com/v1/messages")
+  (llm-claude--url "messages"))
 
 (cl-defmethod llm-chat-token-limit ((provider llm-claude))
   (llm-provider-utils-model-token-limit (llm-claude-chat-model provider)))
@@ -249,6 +254,15 @@ DATA is a vector of lists produced by `llm-provider-streaming-media-handler'."
                                                                           'user
                                                                         'assistant)))
 
+(cl-defmethod llm-models ((provider llm-claude))
+  (mapcar (lambda (model)
+            (plist-get model :id))
+          (append
+           (plist-get (plz 'get (llm-claude--url "models")
+                        :as (lambda () (json-parse-buffer :object-type 'plist))
+                        :headers (llm-provider-headers provider))
+                      :data)
+           nil)))
 
 (provide 'llm-claude)
 

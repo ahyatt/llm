@@ -70,7 +70,7 @@ RESPONSE can be nil if the response is complete."
                              (funcall receiver response))))))))))
 
 (cl-defmethod llm-capabilities ((provider llm-deepseek))
-  (append '(streaming)
+  (append '(streaming model-list)
           (when-let* ((model (llm-models-match (llm-deepseek-chat-model provider))))
             (llm-model-capabilities model))))
 

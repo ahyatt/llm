@@ -422,4 +422,11 @@ else.  We really just want to see if it's in the right ballpark."
     (should (integerp result))
     (should (> result 0))))
 
+(llm-def-integration-test llm-models (provider)
+  (when (member 'model-list (llm-capabilities provider))
+    (let ((models (llm-models provider)))
+      (should models)
+      (should (listp models))
+      (should (> (length models) 0)))))
+
 (provide 'llm-integration-test)

@@ -491,11 +491,7 @@ be passed to `llm-cancel-request'."
   "Log the input to llm-chat-async."
   (llm--log 'api-send :provider provider :prompt prompt)
   ;; We need to wrap the callbacks before we set llm-log to nil.
-  (let* ((new-partial-callback (lambda (response)
-                                 (when partial-callback
-                                   (let ((llm-log nil))
-                                     (funcall partial-callback response)))))
-         (new-response-callback (lambda (response)
+  (let* ((new-response-callback (lambda (response)
                                   (llm--log 'api-receive :provider provider :msg response)
                                   (let ((llm-log nil))
                                     (funcall response-callback response))))
@@ -505,7 +501,7 @@ be passed to `llm-cancel-request'."
                                (let ((llm-log nil))
                                  (funcall error-callback type err))))
          (llm-log nil)
-         (result (cl-call-next-method provider prompt new-partial-callback
+         (result (cl-call-next-method provider prompt partial-callback
                                       new-response-callback
                                       new-error-callback multi-output)))
     result))
@@ -593,7 +589,9 @@ JSON format.
 
 `video-input': the LLM can accept video as input.
 
-`audio-input': the LLM can accept audio as input."
+`audio-input': the LLM can accept audio as input.
+
+`model-list': the provider can return a list of models."
   (ignore provider)
   nil)
 
@@ -704,6 +702,15 @@ methods."
 
 (cl-defmethod llm-cancel-request ((proc process))
   (delete-process proc))
+
+(cl-defgeneric llm-models (provider)
+  "Return a list of model names for PROVIDER.
+This is not asynchronous, but should be fast.
+
+Not every model provides this, you can check the ones that implement
+`model-list' in `llm-capabilities' before calling."
+  (ignore provider)
+  (signal 'not-implemented nil))
 
 (cl-defgeneric llm-name (_)
   "Return the name of the model in PROVIDER.

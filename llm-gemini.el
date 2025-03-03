@@ -58,11 +58,14 @@ You can get this at https://makersuite.google.com/app/apikey."
 (cl-defmethod llm-provider-embedding-extract-result ((_ llm-gemini) response)
   (assoc-default 'values (assoc-default 'embedding response)))
 
+(defconst llm-gemini--base-url "https://generativelanguage.googleapis.com/v1beta/models/")
+
 ;; from https://ai.google.dev/tutorials/rest_quickstart
 (defun llm-gemini--chat-url (provider streaming-p)
   "Return the URL for the chat request, using PROVIDER.
 If STREAMING-P is non-nil, use the streaming endpoint."
-  (format "https://generativelanguage.googleapis.com/v1beta/models/%s:%s?key=%s"
+  (format "%s%s:%s?key=%s"
+          llm-gemini--base-url
           (llm-gemini-chat-model provider)
           (if streaming-p "streamGenerateContent" "generateContent")
           (if (functionp (llm-gemini-key provider))
@@ -90,12 +93,24 @@ If STREAMING-P is non-nil, use the streaming endpoint."
 
 (cl-defmethod llm-capabilities ((provider llm-gemini))
   (append
-   (list 'streaming 'embeddings)
+   '(streaming embeddings model-list)
    (when-let ((model (llm-models-match (llm-gemini-chat-model provider)))
               (capabilities (llm-model-capabilities model)))
      (append
       (when (member 'tool-use capabilities) '(tool-use streaming-tool-use))
       (seq-intersection capabilities '(image-input audio-input video-input))))))
+
+(cl-defmethod llm-models ((provider llm-gemini))
+  (mapcar (lambda (model)
+            (plist-get model :name))
+          (append
+           (plist-get (plz 'get (format "%s?key=%s" llm-gemini--base-url
+                                        (if (functionp (llm-gemini-key provider))
+                                            (funcall (llm-gemini-key provider))
+                                          (llm-gemini-key provider)))
+                        :as (lambda () (json-parse-buffer :object-type 'plist)))
+                      :models)
+           nil)))
 
 (provide 'llm-gemini)
 

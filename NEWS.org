@@ -1,7 +1,8 @@
 * Version 0.24.0
 - Add =multi-output= as an option, allowing all llm results to return, call, or stream multiple kinds of data via a plist.  This allows separating out reasoning, as well as optionally returning text as well as tool uses at the same time.
+- Added ~llm-models~ to get a list of models from a provider.
 - Fix misnamed ~llm-capabilities~ output to refer to =tool-use= and =streaming-tool-use= (which is new).
-- Fixed Clude streaming tool use (via Paul Nelson)
+- Fixed Claude streaming tool use (via Paul Nelson)
 - Added Deepseek service
 - Add Gemini 2.0 pro experimental model, default to 2.0 flash
 - Add Open AI's o3 mini model
