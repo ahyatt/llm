@@ -82,13 +82,14 @@
                              (llm-chat-prompt-interactions prompt)))))
         (system (llm-provider-utils-get-system-prompt prompt)))
     (when (llm-chat-prompt-tools prompt)
-      (plist-put request :tools
-                 (vconcat (mapcar (lambda (f) (llm-claude--tool-call f))
-                                  (llm-chat-prompt-tools prompt)))))
+      (setq request (plist-put request :tools
+                               (vconcat
+                                (mapcar (lambda (f) (llm-claude--tool-call f))
+                                        (llm-chat-prompt-tools prompt))))))
     (when (> (length system) 0)
-      (plist-put request :system system))
+      (setq request (plist-put request :system system)))
     (when (llm-chat-prompt-temperature prompt)
-      (plist-put request :temperature (llm-chat-prompt-temperature prompt)))
+      (setq request (plist-put request :temperature (llm-chat-prompt-temperature prompt))))
     (append request (llm-provider-utils-non-standard-params-plist prompt))))
 
 (defun llm-claude--multipart-content (content)
