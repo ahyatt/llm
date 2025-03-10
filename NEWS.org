@@ -1,3 +1,5 @@
+* Version 0.24.2
+- Fix Deepseek name
 * Version 0.24.1
 - Fix issue with Ollama incorrect requests when passing non-standard params.
 * Version 0.24.0

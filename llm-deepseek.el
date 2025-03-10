@@ -69,6 +69,10 @@ RESPONSE can be nil if the response is complete."
                                                   (json-parse-string data :object-type 'alist))))
                              (funcall receiver response))))))))))
 
+(cl-defmethod llm-name ((provider llm-deepseek))
+  "Return the name of the provider."
+  "DeepSeek")
+
 (cl-defmethod llm-capabilities ((provider llm-deepseek))
   (append '(streaming model-list)
           (when-let* ((model (llm-models-match (llm-deepseek-chat-model provider))))
