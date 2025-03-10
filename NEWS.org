@@ -1,3 +1,5 @@
+* Version 0.24.1
+- Fix issue with Ollama incorrect requests when passing non-standard params.
 * Version 0.24.0
 - Add =multi-output= as an option, allowing all llm results to return, call, or stream multiple kinds of data via a plist.  This allows separating out reasoning, as well as optionally returning text as well as tool uses at the same time.
 - Added ~llm-models~ to get a list of models from a provider.
