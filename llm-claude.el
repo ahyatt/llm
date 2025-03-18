@@ -208,9 +208,11 @@ DATA is a vector of lists produced by `llm-provider-streaming-media-handler'."
                        (concat (llm-provider-utils-tool-use-args tool) input)))))
     (maphash (lambda (_ tool)
                (condition-case nil
-                   (setf (llm-provider-utils-tool-use-args tool)
-                         (json-parse-string (llm-provider-utils-tool-use-args tool)
-                                            :object-type 'alist))
+                   (let ((args (llm-provider-utils-tool-use-args tool)))
+                     (setf (llm-provider-utils-tool-use-args tool)
+                           (if (string-empty-p args)
+                               nil
+                             (json-parse-string args :object-type 'alist))))
                  (error nil))
                (push tool result))
              tools)
