@@ -105,6 +105,9 @@ PROVIDER is the llm-ollama provider."
 (cl-defmethod llm-provider-batch-embeddings-extract-result ((_ llm-ollama) response)
   (append (assoc-default 'embeddings response) nil))
 
+(defconst llm-ollama-reasoning-tags '("think" "reasoning")
+  "Possibilities for reasoning tags in Ollama responses.")
+
 (cl-defmethod llm-provider-chat-extract-result ((_ llm-ollama) response)
   "Return the chat response from the server RESPONSE."
   (let ((raw-result (assoc-default 'content (assoc-default 'message response))))
@@ -113,7 +116,9 @@ PROVIDER is the llm-ollama provider."
     (with-temp-buffer
       (insert raw-result)
       (goto-char 0)
-      (if (search-forward "\n</think>" nil t)
+      (if (seq-find (lambda (tag)
+                      (search-forward (format "</%s>" tag) nil t))
+                    llm-ollama-reasoning-tags)
           (string-trim (buffer-substring (point) (point-max)))
         raw-result))))
 
@@ -124,11 +129,19 @@ PROVIDER is the llm-ollama provider."
     (with-temp-buffer
       (insert raw-result)
       (goto-char 0)
-      (when (search-forward "<think>\n" nil t)
-        (let* ((endtag "\n</think>")
-               (end (save-excursion
-                      (search-forward endtag))))
-          (buffer-substring (point) (- end (length endtag))))))))
+      (when (re-search-forward
+             (rx (seq (literal "<")
+                      (group (eval `(or ,@llm-ollama-reasoning-tags)))
+                      (literal ">")))
+             nil t)
+        (when-let* ((end (save-excursion
+                           (re-search-forward
+                            (rx (seq
+                                 (literal "</")
+                                 (group (literal (match-string 1)))
+                                 (literal ">"))) nil t))))
+          ;; +3 to account for the length of the two brackets and slash
+          (buffer-substring (point) (- end (+ 3 (length (match-string 1))))))))))
 
 (defun llm-ollama--response-format (format)
   "Return the response format for FORMAT."
@@ -219,9 +232,15 @@ PROVIDER is the llm-ollama provider."
                         ;; The response from ollama should just have the tag and
                         ;; nothing more.
                         (cond
-                         ((string-match "<think>" response)
+                         ((string-match (rx
+                                         (seq "<"
+                                              (eval `(or ,@llm-ollama-reasoning-tags))
+                                              ">")) response)
                           (setq in-reasoning t))
-                         ((string-match "</think>" response)
+                         ((string-match (rx
+                                         (seq "</"
+                                              (eval `(or ,@llm-ollama-reasoning-tags))
+                                              ">")) response)
                           (setq in-reasoning nil))
                          (t (funcall receiver (list (if in-reasoning
                                                         :reasoning
