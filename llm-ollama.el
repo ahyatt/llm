@@ -105,8 +105,11 @@ PROVIDER is the llm-ollama provider."
 (cl-defmethod llm-provider-batch-embeddings-extract-result ((_ llm-ollama) response)
   (append (assoc-default 'embeddings response) nil))
 
-(defconst llm-ollama-reasoning-tags '("think" "reasoning")
-  "Possibilities for reasoning tags in Ollama responses.")
+(eval-and-compile
+  (defconst llm-ollama-reasoning-tags '("think" "reasoning")
+    "A list of possibilities for reasoning tags in Ollama responses.
+
+These are just the text inside the tag, not the tag itself."))
 
 (cl-defmethod llm-provider-chat-extract-result ((_ llm-ollama) response)
   "Return the chat response from the server RESPONSE."
