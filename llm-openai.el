@@ -169,9 +169,7 @@ PROVIDER is the Open AI provider struct."
 
 (defun llm-openai--build-model (provider)
   "Get the model field for the request for PROVIDER."
-  (list :model (or (llm-openai-chat-model provider)
-                   (when (llm-openai-compatible-p provider)
-                     llm-openai-compatible-default-model))))
+  (list :model (llm-openai-chat-model provider)))
 
 (defun llm-openai--build-streaming (streaming)
   "Add streaming field if STREAMING is non-nil."
