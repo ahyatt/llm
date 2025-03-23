@@ -377,7 +377,8 @@ RESPONSE can be nil if the response is complete."
 
 (cl-defmethod llm-capabilities ((provider llm-openai-compatible))
   (append '(streaming model-list)
-          (when (llm-openai-embedding-model provider)
+          (when (and (llm-openai-embedding-model provider)
+                     (not (equal "unset" (llm-openai-embedding-model provider))))
             '(embeddings embeddings-batch))
           (when-let* ((model (llm-models-match (llm-openai-chat-model provider))))
             (llm-model-capabilities model))))
