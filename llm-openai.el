@@ -55,8 +55,8 @@ will use a reasonable default."
   key (chat-model "gpt-4o") (embedding-model "text-embedding-3-small"))
 
 (cl-defstruct (llm-openai-compatible (:include llm-openai
-                                               (chat-model nil)
-                                               (embedding-model nil)))
+                                               (chat-model "unset")
+                                               (embedding-model "unset")))
   "A structure for other APIs that use the Open AI's API.
 
 URL is the URL to use for the API, up to the command.  So, for
@@ -169,7 +169,9 @@ PROVIDER is the Open AI provider struct."
 
 (defun llm-openai--build-model (provider)
   "Get the model field for the request for PROVIDER."
-  (list :model (llm-openai-chat-model provider)))
+  (list :model (or (llm-openai-chat-model provider)
+                   (when (llm-openai-compatible-p provider)
+                     llm-openai-compatible-default-model))))
 
 (defun llm-openai--build-streaming (streaming)
   "Add streaming field if STREAMING is non-nil."
