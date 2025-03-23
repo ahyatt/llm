@@ -48,7 +48,9 @@ You can set up with ~make-llm-openai~, with the following parameters:
 - ~:embedding-model~: A model name from [[https://platform.openai.com/docs/guides/embeddings/embedding-models][list of Open AI's embedding model names.]]  This is optional, and will default to a reasonable model.
 ** Open AI Compatible
 There are many Open AI compatible APIs and proxies of Open AI.  You can set up one with ~make-llm-openai-compatible~, with the following parameter:
-- ~:url~, the URL of leading up to the command ("embeddings" or "chat/completions").  So, for example, "https://api.openai.com/v1/" is the URL to use Open AI (although if you wanted to do that, just use ~make-llm-openai~ instead.
+1) ~:url~, the URL of leading up to the command ("embeddings" or "chat/completions").  So, for example, "https://api.openai.com/v1/" is the URL to use Open AI (although if you wanted to do that, just use ~make-llm-openai~ instead).
+2) ~:chat-model~:  The chat model that is supported by the provider.  Some providers don't need a model to be set, but still require it in the API, so we default to "unset".
+3) ~:embedding-model~: An embedding model name that is supported by the provider.  This is also defaulted to "unset".
 ** Azure's Open AI
 Microsoft Azure has an Open AI integration, although it doesn't support everything Open AI does, such as tool use.  You can set it up with ~make-llm-azure~, with the following parameter:
 - ~:url~, the endpoint URL, such as "https://docs-test-001.openai.azure.com/".

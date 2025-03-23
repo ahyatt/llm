@@ -55,8 +55,8 @@ will use a reasonable default."
   key (chat-model "gpt-4o") (embedding-model "text-embedding-3-small"))
 
 (cl-defstruct (llm-openai-compatible (:include llm-openai
-                                               (chat-model nil)
-                                               (embedding-model nil)))
+                                               (chat-model "unset")
+                                               (embedding-model "unset")))
   "A structure for other APIs that use the Open AI's API.
 
 URL is the URL to use for the API, up to the command.  So, for
@@ -377,7 +377,8 @@ RESPONSE can be nil if the response is complete."
 
 (cl-defmethod llm-capabilities ((provider llm-openai-compatible))
   (append '(streaming model-list)
-          (when (llm-openai-embedding-model provider)
+          (when (and (llm-openai-embedding-model provider)
+                     (not (equal "unset" (llm-openai-embedding-model provider))))
             '(embeddings embeddings-batch))
           (when-let* ((model (llm-models-match (llm-openai-chat-model provider))))
             (llm-model-capabilities model))))
