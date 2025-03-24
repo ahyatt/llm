@@ -378,32 +378,6 @@ STREAMING if non-nil, turn on response streaming."
 (cl-defmethod llm-provider-populate-tool-uses ((_ llm-openai) prompt tool-uses)
   (llm-provider-utils-append-to-prompt prompt tool-uses nil 'assistant))
 
-(defun llm-openai--get-partial-chat-response (response)
-  "Return the text in the partial chat response from RESPONSE.
-RESPONSE can be nil if the response is complete."
-  (when response
-    (let* ((choices (assoc-default 'choices response))
-           (delta (when (> (length choices) 0)
-                    (assoc-default 'delta (aref choices 0))))
-           (content-or-call (or (llm-provider-utils-json-val
-                                 (assoc-default 'content delta))
-                                (llm-provider-utils-json-val
-                                 (assoc-default 'tool_calls delta)))))
-      content-or-call)))
-
-(defun llm-openai--get-partial-reasoning-response (response)
-  "Return the reasoning in the partial chat response from RESPONSE.
-RESPONSE can be nil if the response is complete.  This only works for
-Open AI compatible providers that include reasoning in the delta, such
-as oMLX."
-  (when response
-    (let* ((choices (assoc-default 'choices response))
-           (delta (when (> (length choices) 0)
-                    (assoc-default 'delta (aref choices 0)))))
-      (llm-provider-utils-json-val
-       (or (assoc-default 'reasoning delta)
-           (assoc-default 'reasoning_content delta))))))
-
 (cl-defmethod llm-provider-streaming-media-handler ((_ llm-openai) receiver _)
   (cons 'text/event-stream
         (plz-event-source:text/event-stream
@@ -413,19 +387,19 @@ as oMLX."
                        (let ((data (plz-event-source-event-data event)))
                          (unless (equal data "[DONE]")
                            (let ((response-alist (json-parse-string data :object-type 'alist)))
-                             (let ((text-response (llm-openai--get-partial-chat-response
-                                                   response-alist))
-                                   (reasoning-response (llm-openai--get-partial-reasoning-response
-                                                        response-alist)))
-                               (when (or text-response reasoning-response)
-                                 (funcall receiver (append
-                                                    (when text-response
-                                                      (if (stringp text-response)
-                                                          (list :text text-response)
-                                                        (list :tool-uses-raw
-                                                              text-response)))
-                                                    (when reasoning-response
-                                                      (list :reasoning reasoning-response))))))
+                             (when-let* ((choices (assoc-default 'choices response-alist))
+																				 (delta (and (> (length choices) 0)
+																										 (assoc-default 'delta (aref choices 0)))))
+															 (let ((text (llm-provider-utils-json-val (assoc-default 'content delta)))
+																		 (tool-calls (llm-provider-utils-json-val (assoc-default 'tool_calls delta)))
+																		 (reasoning (llm-provider-utils-json-val
+																								 (or (assoc-default 'reasoning delta)
+																										 (assoc-default 'reasoning_content delta)))))
+																 (when-let ((output (append
+																										 (and (not (string-empty-p reasoning)) `(:text ,text))
+																										 (and tool-calls `(:tool-uses-raw ,tool-calls))
+																										 (and (not (string-empty-p reasoning)) `(:reasoning ,reasoning)))))
+																	 (funcall receiver output))))
                              (when-let ((usage (assoc-default 'usage response-alist)))
                                (when (not (eq usage :null))
                                  (funcall receiver
