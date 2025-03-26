@@ -578,7 +578,13 @@ If MODEL cannot be found, warn and return DEFAULT, which by default is 4096."
 The expectation is that any symbol values will be converted to strings
 for plist and any nested plists."
   (mapcan (lambda (elem-pair)
-            (cond ((symbolp (nth 1 elem-pair))
+            (cond ((member (nth 1 elem-pair) '(:json-false :false))
+                   (list (car elem-pair) :false))
+                  ((eq (nth 1 elem-pair) t)
+                   (list (car elem-pair) t))
+                  ((not (nth 1 elem-pair))
+                   (list (car elem-pair) :null))
+                  ((symbolp (nth 1 elem-pair))
                    (list (car elem-pair)
                          (symbol-name (nth 1 elem-pair))))
                   ((consp (nth 1 elem-pair))
