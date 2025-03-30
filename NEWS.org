@@ -1,9 +1,9 @@
 * Version 0.24.2
 - Fix issue with some Open AI compatible providers needing models to be passed by giving a non-nil default.
-* Version 0.24.1
 - Add Gemini 2.5 Pro
-- Fix issue with Ollama incorrect requests when passing non-standard params.
 - Fix issue with JSON return specs which pass booleans
+* Version 0.24.1
+- Fix issue with Ollama incorrect requests when passing non-standard params.
 * Version 0.24.0
 - Add =multi-output= as an option, allowing all llm results to return, call, or stream multiple kinds of data via a plist.  This allows separating out reasoning, as well as optionally returning text as well as tool uses at the same time.
 - Added ~llm-models~ to get a list of models from a provider.
