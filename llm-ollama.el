@@ -1,4 +1,4 @@
-;;; llm-ollama.el --- llm module for integrating with Ollama. -*- lexical-binding: t; package-lint-main-file: "llm.el"; -*-
+;;; llm-ollama.el --- llm module for integrating with Ollama. -*- lexical-binding: t; package-lint-main-file: "llm.el"; byte-compile-docstring-max-column: 200-*-
 
 ;; Copyright (c) 2023-2025  Free Software Foundation, Inc.
 
@@ -62,6 +62,13 @@ CHAT-MODEL is the model to use for chat queries.  It is required.
 
 EMBEDDING-MODEL is the model to use for embeddings.  It is required."
   (scheme "http") (host "localhost") (port 11434) chat-model embedding-model)
+
+(cl-defstruct (llm-ollama-authed (:include llm-ollama))
+  "Similar to llm-ollama, but also with a key."
+  key)
+
+(cl-defmethod llm-provider-headers ((provider llm-ollama-authed))
+  `(("Authorization" . ,(format "Bearer %s" (encode-coding-string (llm-ollama-authed-key provider) 'utf-8)))))
 
 ;; Ollama's models may or may not be free, we have no way of knowing.  There's no
 ;; way to tell, and no ToS to point out here.
