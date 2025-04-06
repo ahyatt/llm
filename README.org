@@ -101,7 +101,12 @@ In addition to the provider, which you may want multiple of (for example, to cha
 - ~:host~: The host that ollama is run on.  This is optional and will default to localhost.
 - ~:port~: The port that ollama is run on.  This is optional and will default to the default ollama port.
 - ~:chat-model~: The model name to use for chat.  This is not optional for chat use, since there is no default.
-- ~:embedding-model~: The model name to use for embeddings.  Only [[https://ollama.com/search?q=&c=embedding][some models]] can be used for embeddings.  This is not optional for embedding use, since there is no default. 
+- ~:embedding-model~: The model name to use for embeddings.  Only [[https://ollama.com/search?q=&c=embedding][some models]] can be used for embeddings.  This is not optional for embedding use, since there is no default.
+** Ollama (authed)
+This is a variant of the Ollama provider, which is set up with the same parameters plus:
+- ~:key~: The authentication key of the provider.
+
+The key is used to send a standard =Authentication= header.
 ** Deepseek
 [[https://deepseek.com][Deepseek]] is a company offers both reasoning and chat high-quality models.  This provider connects to their server.  It is also possible to run their model locally as a free model via Ollama.  To use the service, you can set it up with the following parameters:
 

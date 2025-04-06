@@ -63,6 +63,13 @@ CHAT-MODEL is the model to use for chat queries.  It is required.
 EMBEDDING-MODEL is the model to use for embeddings.  It is required."
   (scheme "http") (host "localhost") (port 11434) chat-model embedding-model)
 
+(cl-defstruct (llm-ollama-authed (:include llm-ollama))
+  "Similar to llm-ollama, but also with a key"
+  key)
+
+(cl-defmethod llm-provider-headers ((provider llm-openai-authed))
+  `(("Authorization" . ,(format "Bearer %s" (encode-coding-string key 'utf-8)))))
+
 ;; Ollama's models may or may not be free, we have no way of knowing.  There's no
 ;; way to tell, and no ToS to point out here.
 (cl-defmethod llm-nonfree-message-info ((provider llm-ollama))
