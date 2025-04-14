@@ -300,7 +300,7 @@ return a list of `llm-chat-prompt-tool-use' structs.")
                         err-msg)
                      (llm-provider-utils-callback-in-buffer
                       buf vector-callback
-                      (llm-provider-embedding-extract-result provider data))))
+                      (llm-provider-batch-embeddings-extract-result provider data))))
      :on-error (lambda (_ data)
                  (llm-provider-utils-callback-in-buffer
                   buf error-callback 'error

@@ -1,5 +1,6 @@
 * Version 0.24.3
 - Set Gemini 2.5 Pro to be the default Gemini model
+- Fix =llm-batch-embeddings-async= so it returns all embeddings
 * Version 0.24.2
 - Fix issue with some Open AI compatible providers needing models to be passed by giving a non-nil default.
 - Add Gemini 2.5 Pro
