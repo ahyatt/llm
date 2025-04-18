@@ -81,6 +81,26 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 30000
     :regex "o3-mini")
    (make-llm-model
+    :name "o4 Mini" :symbol 'o4-mini
+    :capabilities '(generation tool-use image-input json-response)
+    :context-length 30000
+    :regex "o4-mini")
+   (make-llm-model
+    :name "o3" :symbol 'o3
+    :capabilities '(generation tool-use image-input json-response)
+    :context-length 30000
+    :regex "o3\\'")
+   (make-llm-model
+    :name "GPT-4.1" :symbol 'gpt-4.1
+    :capabilities '(generation tool-use image-input json-response)
+    :context-length 30000
+    :regex "gpt-4\\.1$")
+   (make-llm-model
+    :name "GPT-4.1 Nano" :symbol 'gpt-4.1-nano
+    :capabilities '(generation tool-use image-input json-response)
+    :context-length 30000
+    :regex "gpt-4\\.1-nano")
+   (make-llm-model
     :name "GPT-4 Turbo" :symbol 'gpt-4-turbo
     :capabilities '(generation tool-use image-input)
     :context-length 30000
@@ -144,9 +164,15 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :regex "gemini-2\\.0-flash-thinking")
    (make-llm-model
     :name "Gemini 2.5 Pro" :symbol 'gemini-2.5-pro
-    :capabilities '(generation tool-use image-input audio-input video-input)
+    :capabilities '(generation tool-use image-input audio-input video-input json-response)
     :context-length 1048576
     :regex "gemini-2\\.5-pro")
+   (make-llm-model
+    :name "Gemini 2.5 Flash" :symbol 'gemini-2.5-flash
+    :capabilities '(generation tool-use image-input audio-input video-input json-response
+                               pdf-input caching)
+    :context-length 1048576
+    :regex "gemini-2\\.5-flash")
    (make-llm-model
     :name "Gemini 2.0 Pro" :symbol 'gemini-2.0-pro
     :capabilities '(generation tool-use image-input audio-input video-input)
