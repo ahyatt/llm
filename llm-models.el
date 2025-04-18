@@ -81,6 +81,21 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 30000
     :regex "o3-mini")
    (make-llm-model
+    :name "o4 Mini" :symbol 'o4-mini
+    :capabilities '(generation tool-use image-input json-response)
+    :context-length 30000
+    :regex "o4-mini")
+   (make-llm-model
+    :name "GPT-4.1" :symbol 'gpt-4.1
+    :capabilities '(generation tool-use image-input json-response)
+    :context-length 30000
+    :regex "gpt-4\\.1$\\'")
+   (make-llm-model
+    :name "GPT-4.1 Nano" :symbol 'gpt-4.1-nano
+    :capabilities '(generation tool-use image-input json-response)
+    :context-length 30000
+    :regex "gpt-4\\.1-nano")
+   (make-llm-model
     :name "GPT-4 Turbo" :symbol 'gpt-4-turbo
     :capabilities '(generation tool-use image-input)
     :context-length 30000

@@ -370,10 +370,11 @@ RESPONSE can be nil if the response is complete."
   (llm-provider-utils-model-token-limit (llm-openai-chat-model provider)))
 
 (cl-defmethod llm-capabilities ((provider llm-openai))
-  (append '(streaming embeddings tool-use streaming-tool-use json-response model-list)
-          (when-let ((model (llm-models-match (llm-openai-chat-model provider))))
-            (seq-intersection (llm-model-capabilities model)
-                              '(image-input)))))
+  (seq-uniq
+   (append '(streaming embeddings tool-use streaming-tool-use json-response model-list)
+           (when-let ((model (llm-models-match (llm-openai-chat-model provider))))
+             (seq-intersection (llm-model-capabilities model)
+                               '(image-input))))))
 
 (cl-defmethod llm-capabilities ((provider llm-openai-compatible))
   (append '(streaming model-list)
