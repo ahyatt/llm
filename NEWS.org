@@ -1,3 +1,5 @@
+* Version 0.26.0
+- Call tools with =nil= when called with false JSON values
 * Version 0.25.0
 - Add =llm-ollama-authed= provider, which is like Ollama but takes a key.
 - Set Gemini 2.5 Pro to be the default Gemini model

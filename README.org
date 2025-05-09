@@ -271,6 +271,8 @@ The various chat APIs will execute the functions defined in =tools= slot with th
 
 After the tool is called, the client could use the result, but if you want to proceed with the conversation, or get a textual response that accompany the function you should just send the prompt back with no modifications.  This is because the LLM gives the tool use to perform, and then expects to get back the results of that tool use.  The results were already executed at the end of the call which returned the tools used, which also stores the result of that execution in the prompt.  This is why it should be sent back without further modifications.
 
+Tools will be called with vectors for array results, =nil= for false boolean results, and plists for objects.
+
 Be aware that there is no gaurantee that the tool will be called correctly.  While the LLMs mostly get this right, they are trained on Javascript functions, so imitating Javascript names is recommended. So, "write_email" is a better name for a function than "write-email".
 
 Examples can be found in =llm-tester=. There is also a function call to generate function calls from existing elisp functions in =utilities/elisp-to-tool.el=.
