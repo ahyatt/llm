@@ -25,6 +25,7 @@
 (require 'llm-request-plz)
 (require 'llm-models)
 (require 'seq)
+(require 'compat)
 
 (cl-defstruct llm-standard-provider
   "A struct indicating that this is a standard provider.
