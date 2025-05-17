@@ -1,3 +1,6 @@
+* Version 0.25.1
+- Add Qwen 3 and Gemma 3 to model list.
+- Fix broken model error message
 * Version 0.25.0
 - Add =llm-ollama-authed= provider, which is like Ollama but takes a key.
 - Set Gemini 2.5 Pro to be the default Gemini model

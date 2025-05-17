@@ -236,6 +236,11 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 8192
     :regex "gemma-?2")
    (make-llm-model
+    :name "Gemma 3" :symbol 'gemma-3
+    :capabilities '(generation free-software)  ;; Apache license
+    :context-length 128000
+    :regex "gemma-?3")
+   (make-llm-model
     :name "deepseek-r1" :symbol 'deepseek-r1
     :capabilities '(generation free-software)  ;; MIT license
     :context-length 128000
@@ -289,7 +294,12 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :name "Qwen 2.5" :symbol 'qwen-2.5
     :capabilities '(generation tool-use)  ;; Apache license for some variations only
     :context-length 128000
-    :regex "qwen-2\\.5")
+    :regex "qwen-?2\\.5")
+   (make-llm-model
+    :name "Qwen 3" :symbol 'qwen-3
+    :capabilities '(generation tool-use)  ;; Apache license for some variations only
+    :context-length 32000
+    :regex "qwen-?3")
    (make-llm-model
     :name "Nemotron Mini" :symbol 'nemotron-mini
     :capabilities '(generation tool-use)
