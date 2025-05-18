@@ -25,6 +25,7 @@
 (require 'llm-request-plz)
 (require 'llm-models)
 (require 'seq)
+(require 'compat)
 
 (cl-defstruct llm-standard-provider
   "A struct indicating that this is a standard provider.
@@ -787,6 +788,24 @@ This transforms the plist so that:
                                    value)
                          value))))
 
+(defun llm-provider-utils--normalize-args (args)
+  "Normalize ARGS to a form that can be passed to the user.
+
+This will convert all :json-false and :false values to nil."
+  (cond
+   ((vectorp args) (vconcat (mapcar #'llm-provider-utils--normalize-args args)))
+   ((listp args) (mapcar #'llm-provider-utils--normalize-args args))
+   ((plistp args) (let (new-plist)
+                    (map-do
+                     (lambda (key value)
+                       (setq new-plist
+                             (plist-put new-plist
+                                        key
+                                        (llm-provider-utils--normalize-args value))))
+                     args)))
+   ((member args '(:json-false :false)) nil)
+   (t args)))
+
 (defun llm-provider-utils-execute-tool-uses (provider prompt tool-uses multi-output partial-result success-callback)
   "Execute TOOL-USES, a list of `llm-provider-utils-tool-use'.
 
@@ -841,7 +860,8 @@ have returned results."
        (if (llm-tool-async tool)
            (apply (llm-tool-function tool)
                   (append (list end-func) call-args))
-         (funcall end-func (apply (llm-tool-function tool) call-args)))))))
+         (funcall end-func (apply (llm-tool-function tool)
+                                  (llm-provider-utils--normalize-args call-args))))))))
 
 
 ;; This is a useful method for getting out of the request buffer when it's time

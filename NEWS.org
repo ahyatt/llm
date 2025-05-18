@@ -1,4 +1,5 @@
-* Version 0.25.1
+* Version 0.26.0
+- Call tools with =nil= when called with false JSON values
 - Add Qwen 3 and Gemma 3 to model list.
 - Fix broken model error message
 * Version 0.25.0
