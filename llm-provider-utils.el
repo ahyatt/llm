@@ -424,10 +424,11 @@ Any strings will be concatenated, integers will be added, etc."
                     (setq current-result
                           (llm-provider-utils-streaming-accumulate current-result s))
                     (when partial-callback
-                      (llm-provider-utils-callback-in-buffer
-                       buf partial-callback (if multi-output
-                                                current-result
-                                              (plist-get current-result :text)))))
+                      (when-let* ((callback-val (if multi-output
+                                                    current-result
+                                                  (plist-get current-result :text))))
+                        (llm-provider-utils-callback-in-buffer
+                         buf partial-callback callback-val))))
                   (lambda (err)
                     (llm-provider-utils-callback-in-buffer
                      buf error-callback 'error
