@@ -551,7 +551,7 @@ conversation history will follow."
   "Return the token limit for MODEL.
 If MODEL cannot be found, warn and return DEFAULT, which by default is 4096."
   (let ((matched-model (llm-models-match model)))
-    (if model
+    (if matched-model
         (llm-model-context-length matched-model)
       (warn "No model predefined for model %s, using restrictive defaults" model)
       (or default 4096))))
