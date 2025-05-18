@@ -3,6 +3,7 @@
 - Fix bug in ollama batch embedding generation.
 - Add Qwen 3 and Gemma 3 to model list.
 - Fix broken model error message
+- Fix reasoning model and streaming incompatibility
 * Version 0.25.0
 - Add =llm-ollama-authed= provider, which is like Ollama but takes a key.
 - Set Gemini 2.5 Pro to be the default Gemini model
