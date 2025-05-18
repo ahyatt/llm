@@ -291,6 +291,11 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 128000
     :regex "qwen-2\\.5")
    (make-llm-model
+    :name "Qwen 3" :symbol 'qwen3
+    :capabilities '(generation tool-use)  ;; Apache license for some variations only
+    :context-length 128000
+    :regex "qwen3")
+   (make-llm-model
     :name "Nemotron Mini" :symbol 'nemotron-mini
     :capabilities '(generation tool-use)
     :context-length 4096
