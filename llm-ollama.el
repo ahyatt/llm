@@ -103,7 +103,7 @@ PROVIDER is the llm-ollama provider."
            :model ,(llm-ollama-embedding-model provider)))
 
 (cl-defmethod llm-provider-batch-embeddings-request ((provider llm-ollama) strings)
-  (llm-provider-embedding-request provider strings))
+  (llm-provider-embedding-request provider (apply #'vector strings)))
 
 (cl-defmethod llm-provider-embedding-extract-result ((_ llm-ollama) response)
   "Return the embedding from the server RESPONSE."
