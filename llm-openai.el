@@ -72,7 +72,9 @@ https://api.example.com/v1/chat, then URL should be
 (cl-defmethod llm-provider-embedding-request ((provider llm-openai) string-or-list)
   "Return the request to the server for the embedding of STRING-OR-LIST.
 PROVIDER is the Open AI provider struct."
-  `(:input ,string-or-list
+  `(:input ,(if (listp string-or-list)
+                (apply #'vector string-or-list)
+              string-or-list)
            :model ,(llm-openai-embedding-model provider)))
 
 (cl-defmethod llm-provider-batch-embeddings-request ((provider llm-openai) batch)
