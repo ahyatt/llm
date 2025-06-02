@@ -148,5 +148,17 @@
   (should (equal '(:foo 3) (llm-provider-utils-streaming-accumulate '(:foo 1) '(:foo 2))))
   (should (equal '(:foo "foo bar baz") (llm-provider-utils-streaming-accumulate '(:foo "foo bar") '(:foo " baz")))))
 
+(ert-deftest llm-provider-utils--normalize-args ()
+  (should-not (llm-provider-utils--normalize-args :false))
+  (should-not (llm-provider-utils--normalize-args :json-false))
+  (should (equal '(1 2 nil)
+                 (llm-provider-utils--normalize-args '(1 2 :json-false))))
+  (should (equal [1 2 nil]
+                 (llm-provider-utils--normalize-args [1 2 :json-false])))
+  (should (equal '(1 2 [t nil t])
+                 (llm-provider-utils--normalize-args '(1 2 [t :false t]))))
+  (should (equal '(:a 1 :b nil)
+                 (llm-provider-utils--normalize-args '(:a 1 :b :json-false)))))
+
 (provide 'llm-provider-utils-test)
 ;;; llm-provider-utils-test.el ends here

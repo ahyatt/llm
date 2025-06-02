@@ -81,6 +81,26 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 30000
     :regex "o3-mini")
    (make-llm-model
+    :name "o4 Mini" :symbol 'o4-mini
+    :capabilities '(generation tool-use image-input json-response)
+    :context-length 30000
+    :regex "o4-mini")
+   (make-llm-model
+    :name "o3" :symbol 'o3
+    :capabilities '(generation tool-use image-input json-response)
+    :context-length 30000
+    :regex "o3\\'")
+   (make-llm-model
+    :name "GPT-4.1" :symbol 'gpt-4.1
+    :capabilities '(generation tool-use image-input json-response)
+    :context-length 30000
+    :regex "gpt-4\\.1$")
+   (make-llm-model
+    :name "GPT-4.1 Nano" :symbol 'gpt-4.1-nano
+    :capabilities '(generation tool-use image-input json-response)
+    :context-length 30000
+    :regex "gpt-4\\.1-nano")
+   (make-llm-model
     :name "GPT-4 Turbo" :symbol 'gpt-4-turbo
     :capabilities '(generation tool-use image-input)
     :context-length 30000
@@ -106,6 +126,16 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 8192
     :regex "text-embedding-ada-002")
    ;; https://docs.anthropic.com/en/docs/about-claude/models
+   (make-llm-model
+    :name "Claude 4 Opus" :symbol 'claude-4-opus
+    :capabilities '(generation tool-use image-input pdf-input caching)
+    :context-length 200000
+    :regex "claude-opus-4-0")
+   (make-llm-model
+    :name "Claude 4 Sonnet" :symbol 'claude-4-sonnet
+    :capabilities '(generation tool-use image-input pdf-input caching)
+    :context-length 200000
+    :regex "claude-sonnet-4-0")
    (make-llm-model
     :name "Claude 3.7 Sonnet" :symbol 'claude-3.7-sonnet
     :capabilities '(generation tool-use image-input pdf-input caching)
@@ -142,6 +172,17 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :capabilities '(generation)
     :context-length 32768
     :regex "gemini-2\\.0-flash-thinking")
+   (make-llm-model
+    :name "Gemini 2.5 Pro" :symbol 'gemini-2.5-pro
+    :capabilities '(generation tool-use image-input audio-input video-input json-response)
+    :context-length 1048576
+    :regex "gemini-2\\.5-pro")
+   (make-llm-model
+    :name "Gemini 2.5 Flash" :symbol 'gemini-2.5-flash
+    :capabilities '(generation tool-use image-input audio-input video-input json-response
+                               pdf-input caching)
+    :context-length 1048576
+    :regex "gemini-2\\.5-flash")
    (make-llm-model
     :name "Gemini 2.0 Pro" :symbol 'gemini-2.0-pro
     :capabilities '(generation tool-use image-input audio-input video-input)
@@ -205,6 +246,11 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 8192
     :regex "gemma-?2")
    (make-llm-model
+    :name "Gemma 3" :symbol 'gemma-3
+    :capabilities '(generation free-software)  ;; Apache license
+    :context-length 128000
+    :regex "gemma-?3")
+   (make-llm-model
     :name "deepseek-r1" :symbol 'deepseek-r1
     :capabilities '(generation free-software)  ;; MIT license
     :context-length 128000
@@ -258,7 +304,12 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :name "Qwen 2.5" :symbol 'qwen-2.5
     :capabilities '(generation tool-use)  ;; Apache license for some variations only
     :context-length 128000
-    :regex "qwen-2\\.5")
+    :regex "qwen-?2\\.5")
+   (make-llm-model
+    :name "Qwen 3" :symbol 'qwen-3
+    :capabilities '(generation tool-use)  ;; Apache license for some variations only
+    :context-length 32000
+    :regex "qwen-?3")
    (make-llm-model
     :name "Nemotron Mini" :symbol 'nemotron-mini
     :capabilities '(generation tool-use)
