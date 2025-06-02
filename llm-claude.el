@@ -86,9 +86,23 @@
                  (vconcat (mapcar (lambda (f) (llm-claude--tool-call f))
                                   (llm-chat-prompt-tools prompt)))))
     (when (> (length system) 0)
-      (plist-put request :system system))
+      (setq request (plist-put request :system system)))
     (when (llm-chat-prompt-temperature prompt)
-      (plist-put request :temperature (llm-chat-prompt-temperature prompt)))
+      (setq request (plist-put request :temperature (llm-chat-prompt-temperature prompt))))
+    (when (llm-chat-prompt-reasoning prompt)
+      (setq request (plist-put request :thinking
+                               (let (thinking-plist)
+                                 (setq thinking-plist (plist-put thinking-plist
+                                                                 :type
+                                                                 (if (eq (llm-chat-prompt-reasoning prompt) 'none)
+                                                                     "disabled" "enabled")))
+                                 (if (not (eq (llm-chat-prompt-reasoning prompt)) 'none)
+                                     (plist-put thinking-plist :budget_tokens
+                                                (pcase (llm-chat-prompt-reasoning prompt)
+                                                  ('light 3000)
+                                                  ('medium 10000)
+                                                  ('maximum 32000))))
+                                 thinking-plist))))
     (append request (llm-provider-utils-non-standard-params-plist prompt))))
 
 (defun llm-claude--multipart-content (content)
@@ -175,6 +189,8 @@
                          (cond
                           ((equal type "text_delta")
                            (funcall receiver `(:text ,(assoc-default 'text delta))))
+                          ((equal type "thinking_delta")
+                           (funcall receiver `(:reasoning ,(assoc-default 'text delta))))
                           ((equal type "input_json_delta")
                            (funcall receiver `(:tool-uses-raw
                                                ,(vector
@@ -243,7 +259,7 @@ DATA is a vector of lists produced by `llm-provider-streaming-media-handler'."
   "Claude")
 
 (cl-defmethod llm-capabilities ((_ llm-claude))
-  (list 'streaming 'tool-use 'streaming-tool-use 'image-input 'pdf-input))
+  (list 'streaming 'tool-use 'streaming-tool-use 'image-input 'pdf-input 'reasoning))
 
 (cl-defmethod llm-provider-append-to-prompt ((_ llm-claude) prompt result
                                              &optional tool-use-results)
