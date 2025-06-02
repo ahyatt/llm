@@ -241,12 +241,17 @@ These are just the text inside the tag, not the tag itself."))
                           ;; The response from ollama should just have the tag and
                           ;; nothing more.
                           (cond
-                           ((string-match "<think>" response)
+                           ((string-match (rx
+                                           (seq "<"
+                                                (eval `(or ,@llm-ollama-reasoning-tags))
+                                                ">")) response)
                             (setq in-reasoning t))
-                           ((string-match "</think>" response)
+                           ((string-match (rx
+                                           (seq "</"
+                                                (eval `(or ,@llm-ollama-reasoning-tags))
+                                                ">")) response)
                             (setq in-reasoning nil))
                            (t
-                            (message "setting text response")
                             (setq response
                                   (plist-put response (if in-reasoning :reasoning :text) response)))))
                         (when tool-call
