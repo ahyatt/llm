@@ -1,6 +1,8 @@
 * Version 0.26.1
 - Add Claude 4 models
 - Fix error using Open AI for batch embeddings
+- Add streaming tool calls for Ollama
+- Fix Ollama tool-use booleans
 * Version 0.26.0
 - Call tools with =nil= when called with false JSON values.
 - Fix bug in ollama batch embedding generation.

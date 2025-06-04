@@ -225,7 +225,8 @@ These are just the text inside the tag, not the tag itself."))
    (vconcat (mapcar (lambda (tool-use)
                       `(:function (:name ,(llm-provider-utils-tool-use-name tool-use)
                                          :arguments ,(json-serialize
-                                                      (llm-provider-utils-tool-use-args tool-use)))))
+                                                      (llm-provider-utils-tool-use-args tool-use)
+                                                      :false-object :json-false))))
                     tool-uses))))
 
 (cl-defmethod llm-provider-streaming-media-handler ((_ llm-ollama) receiver _)
@@ -244,16 +245,16 @@ These are just the text inside the tag, not the tag itself."))
                            ((string-match (rx
                                            (seq "<"
                                                 (eval `(or ,@llm-ollama-reasoning-tags))
-                                                ">")) response)
+                                                ">")) text)
                             (setq in-reasoning t))
                            ((string-match (rx
                                            (seq "</"
                                                 (eval `(or ,@llm-ollama-reasoning-tags))
-                                                ">")) response)
+                                                ">")) text)
                             (setq in-reasoning nil))
                            (t
                             (setq response
-                                  (plist-put response (if in-reasoning :reasoning :text) response)))))
+                                  (plist-put response (if in-reasoning :reasoning :text) text)))))
                         (when tool-call
                           (setq response
                                 (plist-put response :tool-uses-raw
