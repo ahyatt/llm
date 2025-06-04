@@ -186,9 +186,6 @@ These are just the text inside the tag, not the tag itself."))
                            (llm-chat-prompt-interactions prompt))))
     (setq request-plist (plist-put request-plist :messages messages))
     (setq request-plist (plist-put request-plist :model (llm-ollama-chat-model provider)))
-    (when (and streaming (llm-chat-prompt-tools prompt))
-      (signal 'not-implemented
-              "Ollama does not support streaming with function calls"))
     (when (llm-chat-prompt-tools prompt)
       (setq request-plist (plist-put
                            request-plist :tools
@@ -228,7 +225,8 @@ These are just the text inside the tag, not the tag itself."))
    (vconcat (mapcar (lambda (tool-use)
                       `(:function (:name ,(llm-provider-utils-tool-use-name tool-use)
                                          :arguments ,(json-serialize
-                                                      (llm-provider-utils-tool-use-args tool-use)))))
+                                                      (llm-provider-utils-tool-use-args tool-use)
+                                                      :false-object :json-false))))
                     tool-uses))))
 
 (cl-defmethod llm-provider-streaming-media-handler ((_ llm-ollama) receiver _)
@@ -236,25 +234,39 @@ These are just the text inside the tag, not the tag itself."))
         (plz-media-type:application/x-ndjson
          :handler (let ((in-reasoning))
                     (lambda (data)
-                      (when-let ((response (assoc-default
-                                            'content
-                                            (assoc-default 'message data))))
-                        ;; The response from ollama should just have the tag and
-                        ;; nothing more.
-                        (cond
-                         ((string-match (rx
-                                         (seq "<"
-                                              (eval `(or ,@llm-ollama-reasoning-tags))
-                                              ">")) response)
-                          (setq in-reasoning t))
-                         ((string-match (rx
-                                         (seq "</"
-                                              (eval `(or ,@llm-ollama-reasoning-tags))
-                                              ">")) response)
-                          (setq in-reasoning nil))
-                         (t (funcall receiver (list (if in-reasoning
-                                                        :reasoning
-                                                      :text) response))))))))))
+                      (let* ((message (assoc-default 'message data))
+                             (text (assoc-default 'content message))
+                             (tool-call (assoc-default 'tool_calls message))
+                             (response nil))
+                        (when (and text (> (length text) 0))
+                          ;; The response from ollama should just have the tag and
+                          ;; nothing more.
+                          (cond
+                           ((string-match (rx
+                                           (seq "<"
+                                                (eval `(or ,@llm-ollama-reasoning-tags))
+                                                ">")) text)
+                            (setq in-reasoning t))
+                           ((string-match (rx
+                                           (seq "</"
+                                                (eval `(or ,@llm-ollama-reasoning-tags))
+                                                ">")) text)
+                            (setq in-reasoning nil))
+                           (t
+                            (setq response
+                                  (plist-put response (if in-reasoning :reasoning :text) text)))))
+                        (when tool-call
+                          (setq response
+                                (plist-put response :tool-uses-raw
+                                           (aref tool-call 0))))
+                        (funcall receiver response)))))))
+
+(cl-defmethod llm-provider-collect-streaming-tool-uses ((_ llm-ollama) data)
+  (mapcar (lambda (fc) (let ((f-alist (cdr fc)))
+                         (make-llm-provider-utils-tool-use
+                          :name (assoc-default 'name f-alist)
+                          :args (assoc-default 'arguments f-alist))))
+          data))
 
 (cl-defmethod llm-name ((provider llm-ollama))
   (or (llm-ollama-chat-model provider)
@@ -265,7 +277,7 @@ These are just the text inside the tag, not the tag itself."))
                                         2048))
 
 (cl-defmethod llm-capabilities ((provider llm-ollama))
-  (append '(streaming json-response model-list)
+  (append '(streaming streaming-tool-use json-response model-list)
           (when (and (llm-ollama-embedding-model provider)
                      (let ((embedding-model (llm-models-match
                                              (llm-ollama-embedding-model provider))))
