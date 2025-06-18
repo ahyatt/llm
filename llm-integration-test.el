@@ -331,6 +331,21 @@ else.  We really just want to see if it's in the right ballpark."
       ;; Test that we can send the function back to the provider without error.
       (llm-chat provider prompt))))
 
+(llm-def-integration-test llm-boolean-tool-use (provider)
+  (when (member 'tool-use (llm-capabilities provider))
+    (llm-chat provider (llm-make-chat-prompt
+                        "Is Lyon the capital of France?"
+                        :tools
+                        (list (llm-make-tool
+                               :function (lambda (result)
+                                           (should-not result))
+                               :name "verifier"
+                               :description "Test the LLM's decision on the veracity of the statement."
+                               :args '((:name "llm-decision"
+                                              :description "The decision on the statement by the LLM."
+                                              :type boolean))
+                               :async nil))))))
+
 (llm-def-integration-test llm-tool-use-multi-output (provider)
   (when (member 'tool-use (llm-capabilities provider))
     (let* ((prompt (llm-integration-test-tool-use-prompt))

@@ -1,4 +1,4 @@
-;;; llm-ollama.el --- llm module for integrating with Ollama. -*- lexical-binding: t; package-lint-main-file: "llm.el"; -*-
+;;; llm-ollama.el --- llm module for integrating with Ollama. -*- lexical-binding: t; package-lint-main-file: "llm.el"; byte-compile-docstring-max-column: 200-*-
 
 ;; Copyright (c) 2023-2025  Free Software Foundation, Inc.
 
@@ -63,6 +63,13 @@ CHAT-MODEL is the model to use for chat queries.  It is required.
 EMBEDDING-MODEL is the model to use for embeddings.  It is required."
   (scheme "http") (host "localhost") (port 11434) chat-model embedding-model)
 
+(cl-defstruct (llm-ollama-authed (:include llm-ollama))
+  "Similar to llm-ollama, but also with a key."
+  key)
+
+(cl-defmethod llm-provider-headers ((provider llm-ollama-authed))
+  `(("Authorization" . ,(format "Bearer %s" (encode-coding-string (llm-ollama-authed-key provider) 'utf-8)))))
+
 ;; Ollama's models may or may not be free, we have no way of knowing.  There's no
 ;; way to tell, and no ToS to point out here.
 (cl-defmethod llm-nonfree-message-info ((provider llm-ollama))
@@ -96,7 +103,7 @@ PROVIDER is the llm-ollama provider."
            :model ,(llm-ollama-embedding-model provider)))
 
 (cl-defmethod llm-provider-batch-embeddings-request ((provider llm-ollama) strings)
-  (llm-provider-embedding-request provider strings))
+  (llm-provider-embedding-request provider (apply #'vector strings)))
 
 (cl-defmethod llm-provider-embedding-extract-result ((_ llm-ollama) response)
   "Return the embedding from the server RESPONSE."
@@ -104,6 +111,12 @@ PROVIDER is the llm-ollama provider."
 
 (cl-defmethod llm-provider-batch-embeddings-extract-result ((_ llm-ollama) response)
   (append (assoc-default 'embeddings response) nil))
+
+(eval-and-compile
+  (defconst llm-ollama-reasoning-tags '("think" "reasoning")
+    "A list of possibilities for reasoning tags in Ollama responses.
+
+These are just the text inside the tag, not the tag itself."))
 
 (cl-defmethod llm-provider-chat-extract-result ((_ llm-ollama) response)
   "Return the chat response from the server RESPONSE."
@@ -113,7 +126,9 @@ PROVIDER is the llm-ollama provider."
     (with-temp-buffer
       (insert raw-result)
       (goto-char 0)
-      (if (search-forward "\n</think>" nil t)
+      (if (seq-find (lambda (tag)
+                      (search-forward (format "</%s>" tag) nil t))
+                    llm-ollama-reasoning-tags)
           (string-trim (buffer-substring (point) (point-max)))
         raw-result))))
 
@@ -124,11 +139,19 @@ PROVIDER is the llm-ollama provider."
     (with-temp-buffer
       (insert raw-result)
       (goto-char 0)
-      (when (search-forward "<think>\n" nil t)
-        (let* ((endtag "\n</think>")
-               (end (save-excursion
-                      (search-forward endtag))))
-          (buffer-substring (point) (- end (length endtag))))))))
+      (when (re-search-forward
+             (rx (seq (literal "<")
+                      (group (eval `(or ,@llm-ollama-reasoning-tags)))
+                      (literal ">")))
+             nil t)
+        (when-let* ((end (save-excursion
+                           (re-search-forward
+                            (rx (seq
+                                 (literal "</")
+                                 (group (literal (match-string 1)))
+                                 (literal ">"))) nil t))))
+          ;; +3 to account for the length of the two brackets and slash
+          (buffer-substring (point) (- end (+ 3 (length (match-string 1))))))))))
 
 (defun llm-ollama--response-format (format)
   "Return the response format for FORMAT."
@@ -163,9 +186,6 @@ PROVIDER is the llm-ollama provider."
                            (llm-chat-prompt-interactions prompt))))
     (setq request-plist (plist-put request-plist :messages messages))
     (setq request-plist (plist-put request-plist :model (llm-ollama-chat-model provider)))
-    (when (and streaming (llm-chat-prompt-tools prompt))
-      (signal 'not-implemented
-              "Ollama does not support streaming with function calls"))
     (when (llm-chat-prompt-tools prompt)
       (setq request-plist (plist-put
                            request-plist :tools
@@ -189,8 +209,9 @@ PROVIDER is the llm-ollama provider."
       (when-let* ((keep-alive (plist-get more-options-plist :keep_alive)))
         (setq request-plist (plist-put request-plist :keep_alive keep-alive)))
       (setq options (append options
-                            (map-filter (lambda (key _) (not (equal key :keep_alive)))
-                                        more-options-plist))))
+                            (map-into (map-filter (lambda (key _) (not (equal key :keep_alive)))
+                                                  more-options-plist)
+                                      'plist))))
     (when options
       (setq request-plist (plist-put request-plist :options options)))
     request-plist))
@@ -209,7 +230,8 @@ PROVIDER is the llm-ollama provider."
    (vconcat (mapcar (lambda (tool-use)
                       `(:function (:name ,(llm-provider-utils-tool-use-name tool-use)
                                          :arguments ,(json-serialize
-                                                      (llm-provider-utils-tool-use-args tool-use)))))
+                                                      (llm-provider-utils-tool-use-args tool-use)
+                                                      :false-object :json-false))))
                     tool-uses))))
 
 (cl-defmethod llm-provider-streaming-media-handler ((_ llm-ollama) receiver _)
@@ -217,19 +239,39 @@ PROVIDER is the llm-ollama provider."
         (plz-media-type:application/x-ndjson
          :handler (let ((in-reasoning))
                     (lambda (data)
-                      (when-let ((response (assoc-default
-                                            'content
-                                            (assoc-default 'message data))))
-                        ;; The response from ollama should just have the tag and
-                        ;; nothing more.
-                        (cond
-                         ((string-match "<think>" response)
-                          (setq in-reasoning t))
-                         ((string-match "</think>" response)
-                          (setq in-reasoning nil))
-                         (t (funcall receiver (list (if in-reasoning
-                                                        :reasoning
-                                                      :text) response))))))))))
+                      (let* ((message (assoc-default 'message data))
+                             (text (assoc-default 'content message))
+                             (tool-call (assoc-default 'tool_calls message))
+                             (response nil))
+                        (when (and text (> (length text) 0))
+                          ;; The response from ollama should just have the tag and
+                          ;; nothing more.
+                          (cond
+                           ((string-match (rx
+                                           (seq "<"
+                                                (eval `(or ,@llm-ollama-reasoning-tags))
+                                                ">")) text)
+                            (setq in-reasoning t))
+                           ((string-match (rx
+                                           (seq "</"
+                                                (eval `(or ,@llm-ollama-reasoning-tags))
+                                                ">")) text)
+                            (setq in-reasoning nil))
+                           (t
+                            (setq response
+                                  (plist-put response (if in-reasoning :reasoning :text) text)))))
+                        (when tool-call
+                          (setq response
+                                (plist-put response :tool-uses-raw
+                                           (aref tool-call 0))))
+                        (funcall receiver response)))))))
+
+(cl-defmethod llm-provider-collect-streaming-tool-uses ((_ llm-ollama) data)
+  (mapcar (lambda (fc) (let ((f-alist (cdr fc)))
+                         (make-llm-provider-utils-tool-use
+                          :name (assoc-default 'name f-alist)
+                          :args (assoc-default 'arguments f-alist))))
+          data))
 
 (cl-defmethod llm-name ((provider llm-ollama))
   (or (llm-ollama-chat-model provider)
@@ -240,7 +282,7 @@ PROVIDER is the llm-ollama provider."
                                         2048))
 
 (cl-defmethod llm-capabilities ((provider llm-ollama))
-  (append '(streaming json-response model-list)
+  (append '(streaming streaming-tool-use json-response model-list)
           (when (and (llm-ollama-embedding-model provider)
                      (let ((embedding-model (llm-models-match
                                              (llm-ollama-embedding-model provider))))

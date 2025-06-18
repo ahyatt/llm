@@ -34,7 +34,7 @@
 ;; Models defined at https://docs.anthropic.com/claude/docs/models-overview
 (cl-defstruct (llm-claude (:include llm-standard-chat-provider))
   (key nil :read-only t)
-  (chat-model "claude-3-7-sonnet-20250219" :read-only t))
+  (chat-model "claude-sonnet-4-0" :read-only t))
 
 (cl-defmethod llm-nonfree-message-info ((_ llm-claude))
   "Return Claude's nonfree ToS."
@@ -82,9 +82,10 @@
                              (llm-chat-prompt-interactions prompt)))))
         (system (llm-provider-utils-get-system-prompt prompt)))
     (when (llm-chat-prompt-tools prompt)
-      (plist-put request :tools
-                 (vconcat (mapcar (lambda (f) (llm-claude--tool-call f))
-                                  (llm-chat-prompt-tools prompt)))))
+      (setq request (plist-put request :tools
+                               (vconcat
+                                (mapcar (lambda (f) (llm-claude--tool-call f))
+                                        (llm-chat-prompt-tools prompt))))))
     (when (> (length system) 0)
       (setq request (plist-put request :system system)))
     (when (llm-chat-prompt-temperature prompt)
@@ -223,9 +224,11 @@ DATA is a vector of lists produced by `llm-provider-streaming-media-handler'."
                        (concat (llm-provider-utils-tool-use-args tool) input)))))
     (maphash (lambda (_ tool)
                (condition-case nil
-                   (setf (llm-provider-utils-tool-use-args tool)
-                         (json-parse-string (llm-provider-utils-tool-use-args tool)
-                                            :object-type 'alist))
+                   (let ((args (llm-provider-utils-tool-use-args tool)))
+                     (setf (llm-provider-utils-tool-use-args tool)
+                           (if (string-empty-p args)
+                               nil
+                             (json-parse-string args :object-type 'alist))))
                  (error nil))
                (push tool result))
              tools)

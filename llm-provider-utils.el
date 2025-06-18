@@ -25,6 +25,7 @@
 (require 'llm-request-plz)
 (require 'llm-models)
 (require 'seq)
+(require 'compat)
 
 (cl-defstruct llm-standard-provider
   "A struct indicating that this is a standard provider.
@@ -300,7 +301,7 @@ return a list of `llm-chat-prompt-tool-use' structs.")
                         err-msg)
                      (llm-provider-utils-callback-in-buffer
                       buf vector-callback
-                      (llm-provider-embedding-extract-result provider data))))
+                      (llm-provider-batch-embeddings-extract-result provider data))))
      :on-error (lambda (_ data)
                  (llm-provider-utils-callback-in-buffer
                   buf error-callback 'error
@@ -423,10 +424,11 @@ Any strings will be concatenated, integers will be added, etc."
                     (setq current-result
                           (llm-provider-utils-streaming-accumulate current-result s))
                     (when partial-callback
-                      (llm-provider-utils-callback-in-buffer
-                       buf partial-callback (if multi-output
-                                                current-result
-                                              (plist-get current-result :text)))))
+                      (when-let* ((callback-val (if multi-output
+                                                    current-result
+                                                  (plist-get current-result :text))))
+                        (llm-provider-utils-callback-in-buffer
+                         buf partial-callback callback-val))))
                   (lambda (err)
                     (llm-provider-utils-callback-in-buffer
                      buf error-callback 'error
@@ -549,9 +551,9 @@ conversation history will follow."
 (defun llm-provider-utils-model-token-limit (model &optional default)
   "Return the token limit for MODEL.
 If MODEL cannot be found, warn and return DEFAULT, which by default is 4096."
-  (let ((model (llm-models-match model)))
-    (if model
-        (llm-model-context-length model)
+  (let ((matched-model (llm-models-match model)))
+    (if matched-model
+        (llm-model-context-length matched-model)
       (warn "No model predefined for model %s, using restrictive defaults" model)
       (or default 4096))))
 
@@ -578,7 +580,13 @@ If MODEL cannot be found, warn and return DEFAULT, which by default is 4096."
 The expectation is that any symbol values will be converted to strings
 for plist and any nested plists."
   (mapcan (lambda (elem-pair)
-            (cond ((symbolp (nth 1 elem-pair))
+            (cond ((member (nth 1 elem-pair) '(:json-false :false))
+                   (list (car elem-pair) :false))
+                  ((eq (nth 1 elem-pair) t)
+                   (list (car elem-pair) t))
+                  ((not (nth 1 elem-pair))
+                   (list (car elem-pair) :null))
+                  ((symbolp (nth 1 elem-pair))
                    (list (car elem-pair)
                          (symbol-name (nth 1 elem-pair))))
                   ((consp (nth 1 elem-pair))
@@ -781,6 +789,24 @@ This transforms the plist so that:
                                    value)
                          value))))
 
+(defun llm-provider-utils--normalize-args (args)
+  "Normalize ARGS to a form that can be passed to the user.
+
+This will convert all :json-false and :false values to nil."
+  (cond
+   ((vectorp args) (vconcat (mapcar #'llm-provider-utils--normalize-args args)))
+   ((listp args) (mapcar #'llm-provider-utils--normalize-args args))
+   ((plistp args) (let (new-plist)
+                    (map-do
+                     (lambda (key value)
+                       (setq new-plist
+                             (plist-put new-plist
+                                        key
+                                        (llm-provider-utils--normalize-args value))))
+                     args)))
+   ((member args '(:json-false :false)) nil)
+   (t args)))
+
 (defun llm-provider-utils-execute-tool-uses (provider prompt tool-uses multi-output partial-result success-callback)
   "Execute TOOL-USES, a list of `llm-provider-utils-tool-use'.
 
@@ -835,7 +861,8 @@ have returned results."
        (if (llm-tool-async tool)
            (apply (llm-tool-function tool)
                   (append (list end-func) call-args))
-         (funcall end-func (apply (llm-tool-function tool) call-args)))))))
+         (funcall end-func (apply (llm-tool-function tool)
+                                  (llm-provider-utils--normalize-args call-args))))))))
 
 
 ;; This is a useful method for getting out of the request buffer when it's time

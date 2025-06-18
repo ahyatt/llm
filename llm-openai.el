@@ -55,8 +55,8 @@ will use a reasonable default."
   key (chat-model "gpt-4o") (embedding-model "text-embedding-3-small"))
 
 (cl-defstruct (llm-openai-compatible (:include llm-openai
-                                               (chat-model nil)
-                                               (embedding-model nil)))
+                                               (chat-model "unset")
+                                               (embedding-model "unset")))
   "A structure for other APIs that use the Open AI's API.
 
 URL is the URL to use for the API, up to the command.  So, for
@@ -72,7 +72,9 @@ https://api.example.com/v1/chat, then URL should be
 (cl-defmethod llm-provider-embedding-request ((provider llm-openai) string-or-list)
   "Return the request to the server for the embedding of STRING-OR-LIST.
 PROVIDER is the Open AI provider struct."
-  `(:input ,string-or-list
+  `(:input ,(if (listp string-or-list)
+                (apply #'vector string-or-list)
+              string-or-list)
            :model ,(llm-openai-embedding-model provider)))
 
 (cl-defmethod llm-provider-batch-embeddings-request ((provider llm-openai) batch)
@@ -370,14 +372,16 @@ RESPONSE can be nil if the response is complete."
   (llm-provider-utils-model-token-limit (llm-openai-chat-model provider)))
 
 (cl-defmethod llm-capabilities ((provider llm-openai))
-  (append '(streaming embeddings tool-use streaming-tool-use json-response model-list)
-          (when-let ((model (llm-models-match (llm-openai-chat-model provider))))
-            (seq-intersection (llm-model-capabilities model)
-                              '(image-input)))))
+  (seq-uniq
+   (append '(streaming embeddings tool-use streaming-tool-use json-response model-list)
+           (when-let ((model (llm-models-match (llm-openai-chat-model provider))))
+             (seq-intersection (llm-model-capabilities model)
+                               '(image-input))))))
 
 (cl-defmethod llm-capabilities ((provider llm-openai-compatible))
   (append '(streaming model-list)
-          (when (llm-openai-embedding-model provider)
+          (when (and (llm-openai-embedding-model provider)
+                     (not (equal "unset" (llm-openai-embedding-model provider))))
             '(embeddings embeddings-batch))
           (when-let* ((model (llm-models-match (llm-openai-chat-model provider))))
             (llm-model-capabilities model))))

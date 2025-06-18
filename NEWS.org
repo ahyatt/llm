@@ -1,5 +1,28 @@
-* Version 0.25.0
+* Version 0.27.0
 - Add =thinking= option to control the amount of thinking that happens for reasoning models.
+* Version 0.26.1
+- Add Claude 4 models
+- Fix error using Open AI for batch embeddings
+- Add streaming tool calls for Ollama
+- Fix Ollama tool-use booleans
+* Version 0.26.0
+- Call tools with =nil= when called with false JSON values.
+- Fix bug in ollama batch embedding generation.
+- Add Qwen 3 and Gemma 3 to model list.
+- Fix broken model error message
+- Fix reasoning model and streaming incompatibility
+* Version 0.25.0
+- Add =llm-ollama-authed= provider, which is like Ollama but takes a key.
+- Set Gemini 2.5 Pro to be the default Gemini model
+- Fix =llm-batch-embeddings-async= so it returns all embeddings
+- Add Open AI 4.1, o3, Gemini 2.5 Flash
+* Version 0.24.2
+- Fix issue with some Open AI compatible providers needing models to be passed by giving a non-nil default.
+- Add Gemini 2.5 Pro
+- Fix issue with JSON return specs which pass booleans
+* Version 0.24.1
+- Fix issue with Ollama incorrect requests when passing non-standard params.
+>>>>>>> main
 * Version 0.24.0
 - Add =multi-output= as an option, allowing all llm results to return, call, or stream multiple kinds of data via a plist.  This allows separating out reasoning, as well as optionally returning text as well as tool uses at the same time.
 - Added ~llm-models~ to get a list of models from a provider.
