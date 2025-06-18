@@ -97,7 +97,7 @@
                                                                  :type
                                                                  (if (eq (llm-chat-prompt-reasoning prompt) 'none)
                                                                      "disabled" "enabled")))
-                                 (if (not (eq (llm-chat-prompt-reasoning prompt)) 'none)
+                                 (if (not (eq (llm-chat-prompt-reasoning prompt) 'none))
                                      (plist-put thinking-plist :budget_tokens
                                                 (pcase (llm-chat-prompt-reasoning prompt)
                                                   ('light 3000)
