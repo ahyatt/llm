@@ -110,11 +110,11 @@
                            :messages [(:role "user" :content "Hello world")]
                            :stream :false)
            :claude (:model "model"
-                           :max_tokens 4096
+                           :max_tokens 8192
                            :messages [(:role "user" :content "Hello world")]
                            :stream :false)
            :claude-stream (:model "model"
-                                  :max_tokens 4096
+                                  :max_tokens 8192
                                   :messages [(:role "user" :content "Hello world")]
                                   :stream t))
     (:name "Request with temperature"
@@ -130,7 +130,7 @@
                            :options (:temperature 0.5)
                            :stream :false)
            :claude (:model "model"
-                           :max_tokens 4096
+                           :max_tokens 8192
                            :messages [(:role "user" :content "Hello world")]
                            :temperature 0.5
                            :stream :false))
@@ -151,7 +151,7 @@
                                       (:role "user" :content "Hello world")]
                            :stream :false)
            :claude (:model "model"
-                           :max_tokens 4096
+                           :max_tokens 8192
                            :messages [(:role "user" :content "Hello world")]
                            :system "context\nHere are 2 examples of how to respond:\n\nUser: input1\nAssistant: output1\nUser: input2\nAssistant: output2"
                            :stream :false))
@@ -170,7 +170,7 @@
                                       (:role "user" :content "I am user!")]
                            :stream :false)
            :claude (:model "model"
-                           :max_tokens 4096
+                           :max_tokens 8192
                            :messages [(:role "user" :content "Hello world")
                                       (:role "assistant" :content "Hello human")
                                       (:role "user" :content "I am user!")]
@@ -197,7 +197,7 @@
                                              :images ["aW1hZ2UgZGF0YQ=="])]
                            :stream :false)
            :claude (:model "model"
-                           :max_tokens 4096
+                           :max_tokens 8192
                            :messages [(:role "user"
                                              :content
                                              [(:type "text" :text "What is this?")
@@ -250,7 +250,7 @@
                                                  :required ["arg1"])))]
                            :stream :false)
            :claude (:model "model"
-                           :max_tokens 4096
+                           :max_tokens 8192
                            :messages [(:role "user" :content "Hello world")]
                            :tools
                            [(:name "func"
