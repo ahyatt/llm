@@ -56,7 +56,16 @@
           `(:model ,(llm-claude-chat-model provider)
                    :stream ,(if stream t :false)
                    ;; Claude requires max_tokens
-                   :max_tokens ,(or (llm-chat-prompt-max-tokens prompt) 4096)
+                   :max_tokens ,(or (llm-chat-prompt-max-tokens prompt)
+                                    (cond ((string-match "opus-4-0" (llm-claude-chat-model provider))
+                                           32000)
+                                          ((or (string-match "sonnet-4-0" (llm-claude-chat-model provider))
+                                               (string-match "sonnet-3-7" (llm-claude-chat-model provider)))
+                                           64000)
+                                          ((string-match "opus" (llm-claude-chat-model provider))
+                                           4096)
+                                          (t
+                                           8192)))
                    :messages
                    ,(vconcat
                      (mapcar (lambda (interaction)
@@ -148,7 +157,10 @@
   (let ((content (aref (assoc-default 'content response) 0)))
     (if (equal (assoc-default 'type content) "text")
         (assoc-default 'text content)
-      (format "Unsupported non-text response: %s" content))))
+      nil)))
+
+(cl-defmethod llm-provider-extract-reasoning ((_ llm-claude) response)
+  (assoc-default 'thinking response))
 
 (cl-defmethod llm-provider-streaming-media-handler ((_ llm-claude)
                                                     receiver err-receiver)

@@ -1,5 +1,6 @@
 * Version 0.27.0
 - Add =thinking= option to control the amount of thinking that happens for reasoning models.
+- Fix incorrectly low default Claude max tokens
 * Version 0.26.1
 - Add Claude 4 models
 - Fix error using Open AI for batch embeddings
