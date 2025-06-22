@@ -71,7 +71,8 @@ See %s for the details on the restrictions on use." name tos)))
   "This stores all the information needed for a structured chat prompt.
 
 Use of this directly is deprecated, instead use `llm-make-chat-prompt'."
-  context examples interactions tools temperature max-tokens response-format non-standard-params)
+  context examples interactions tools temperature max-tokens response-format
+  reasoning non-standard-params)
 
 (cl-defstruct llm-chat-prompt-interaction
   "This defines a single interaction given as part of a chat prompt.
@@ -232,7 +233,7 @@ instead."
 
 (cl-defun llm-make-chat-prompt (content &key context examples tools
                                         temperature max-tokens response-format
-                                        non-standard-params)
+                                        reasoning non-standard-params)
   "Create a `llm-chat-prompt' with CONTENT sent to the LLM provider.
 
 This is the most correct and easy way to create an
@@ -300,6 +301,17 @@ usually turned into part of the interaction, and if so, they will
 be put in the first interaction of the prompt (before anything in
 PREVIOUS-INTERACTIONS).
 
+REASONING controls the reasoning (also called thinking) the model does.
+This generally enables a separate step of thinking about the answer
+which is different from the answer, and will be returned either not at
+all (if MULTIPART is false) or with the `:reasoning' key if MULTIPART is
+true. This can be nil (whatever the default for the provider is),
+`none', `light', `medium', and `maximum'. The settings will have
+different exact effects per providers, but for providers that allow
+control over the thinking tokens, `light' will result in a small number
+of tokens used for thinking, `medium' would use half the maximum, and
+`maximum' would use the maximum tokens.
+
 NON-STANDARD-PARAMS is an alist of other options that the provider may
 or may not know how to handle.  These are expected to be provider
 specific.  Don't use this if you want the prompt to be used amongst
@@ -322,6 +334,7 @@ vectors (if a list).  This is optional."
    :temperature temperature
    :max-tokens max-tokens
    :response-format response-format
+   :reasoning reasoning
    :non-standard-params non-standard-params))
 
 (defun llm-chat-prompt-append-response (prompt response &optional role)

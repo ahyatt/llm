@@ -382,6 +382,22 @@ else.  We really just want to see if it's in the right ballpark."
       ;; Test that we can send the function back to the provider without error.
       (llm-chat provider prompt))))
 
+(llm-def-integration-test llm-reasoning (provider)
+  (when (member 'reasoning (llm-capabilities provider))
+    (let ((prompt (llm-make-chat-prompt "Will interest rates fall in the next year?" :reasoning 'medium)))
+      (should (plist-get (llm-chat provider prompt t) :reasoning)))))
+
+(llm-def-integration-test llm-reasoning-streaming (provider)
+  (when (member 'streaming-reasoning (llm-capabilities provider))
+    (let ((prompt (llm-make-chat-prompt "Will interest rates fall in the next year?" :reasoning 'medium))
+          (result nil))
+      (llm-chat-streaming provider prompt #'ignore
+                          (lambda (response) (setq result response))
+                          (lambda (_ err) (error err)) t)
+      (while (null result)
+        (sleep-for 0.1))
+      (should (plist-get result :reasoning)))))
+
 (llm-def-integration-test llm-image-chat (provider)
   ;; On github, the emacs we use doesn't have image support, so we can't use
   ;; image objects.

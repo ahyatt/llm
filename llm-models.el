@@ -252,7 +252,7 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :regex "gemma-?3")
    (make-llm-model
     :name "deepseek-r1" :symbol 'deepseek-r1
-    :capabilities '(generation free-software)  ;; MIT license
+    :capabilities '(generation reasoning free-software)  ;; MIT license
     :context-length 128000
     :regex "deepseek-r1")
    (make-llm-model

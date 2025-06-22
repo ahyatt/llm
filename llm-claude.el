@@ -56,7 +56,16 @@
           `(:model ,(llm-claude-chat-model provider)
                    :stream ,(if stream t :false)
                    ;; Claude requires max_tokens
-                   :max_tokens ,(or (llm-chat-prompt-max-tokens prompt) 4096)
+                   :max_tokens ,(or (llm-chat-prompt-max-tokens prompt)
+                                    (cond ((string-match "opus-4-0" (llm-claude-chat-model provider))
+                                           32000)
+                                          ((or (string-match "sonnet-4-0" (llm-claude-chat-model provider))
+                                               (string-match "sonnet-3-7" (llm-claude-chat-model provider)))
+                                           64000)
+                                          ((string-match "opus" (llm-claude-chat-model provider))
+                                           4096)
+                                          (t
+                                           8192)))
                    :messages
                    ,(vconcat
                      (mapcar (lambda (interaction)
@@ -90,6 +99,20 @@
       (setq request (plist-put request :system system)))
     (when (llm-chat-prompt-temperature prompt)
       (setq request (plist-put request :temperature (llm-chat-prompt-temperature prompt))))
+    (when (llm-chat-prompt-reasoning prompt)
+      (setq request (plist-put request :thinking
+                               (let (thinking-plist)
+                                 (setq thinking-plist (plist-put thinking-plist
+                                                                 :type
+                                                                 (if (eq (llm-chat-prompt-reasoning prompt) 'none)
+                                                                     "disabled" "enabled")))
+                                 (if (not (eq (llm-chat-prompt-reasoning prompt) 'none))
+                                     (plist-put thinking-plist :budget_tokens
+                                                (pcase (llm-chat-prompt-reasoning prompt)
+                                                  ('light 3000)
+                                                  ('medium 10000)
+                                                  ('maximum 32000))))
+                                 thinking-plist))))
     (append request (llm-provider-utils-non-standard-params-plist prompt))))
 
 (defun llm-claude--multipart-content (content)
@@ -132,9 +155,11 @@
 
 (cl-defmethod llm-provider-chat-extract-result ((_ llm-claude) response)
   (let ((content (aref (assoc-default 'content response) 0)))
-    (if (equal (assoc-default 'type content) "text")
-        (assoc-default 'text content)
-      (format "Unsupported non-text response: %s" content))))
+    (assoc-default 'text content)))
+
+(cl-defmethod llm-provider-extract-reasoning ((_ llm-claude) response)
+  (let ((content (aref (assoc-default 'content response) 0)))
+    (assoc-default 'thinking content)))
 
 (cl-defmethod llm-provider-streaming-media-handler ((_ llm-claude)
                                                     receiver err-receiver)
@@ -176,6 +201,8 @@
                          (cond
                           ((equal type "text_delta")
                            (funcall receiver `(:text ,(assoc-default 'text delta))))
+                          ((equal type "thinking_delta")
+                           (funcall receiver `(:reasoning ,(assoc-default 'text delta))))
                           ((equal type "input_json_delta")
                            (funcall receiver `(:tool-uses-raw
                                                ,(vector
@@ -246,7 +273,7 @@ DATA is a vector of lists produced by `llm-provider-streaming-media-handler'."
   "Claude")
 
 (cl-defmethod llm-capabilities ((_ llm-claude))
-  (list 'streaming 'tool-use 'streaming-tool-use 'image-input 'pdf-input))
+  (list 'streaming 'tool-use 'streaming-tool-use 'image-input 'pdf-input 'reasoning))
 
 (cl-defmethod llm-provider-append-to-prompt ((_ llm-claude) prompt result
                                              &optional tool-use-results)

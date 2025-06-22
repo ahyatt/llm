@@ -196,6 +196,11 @@ These are just the text inside the tag, not the tag itself."))
                                      (llm-ollama--response-format
                                       (llm-chat-prompt-response-format prompt)))))
     (setq request-plist (plist-put request-plist :stream (if streaming t :false)))
+    (when (llm-chat-prompt-reasoning prompt)
+      (setq request-plist (plist-put request-plist :think
+                                     (if (eq 'none (llm-chat-prompt-reasoning prompt))
+                                         :false
+                                       't))))
     (when (llm-chat-prompt-temperature prompt)
       (setq options (plist-put options :temperature (llm-chat-prompt-temperature prompt))))
     (when (llm-chat-prompt-max-tokens prompt)
