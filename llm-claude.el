@@ -155,12 +155,11 @@
 
 (cl-defmethod llm-provider-chat-extract-result ((_ llm-claude) response)
   (let ((content (aref (assoc-default 'content response) 0)))
-    (if (equal (assoc-default 'type content) "text")
-        (assoc-default 'text content)
-      nil)))
+    (assoc-default 'text content)))
 
 (cl-defmethod llm-provider-extract-reasoning ((_ llm-claude) response)
-  (assoc-default 'thinking response))
+  (let ((content (aref (assoc-default 'content response) 0)))
+    (assoc-default 'thinking content)))
 
 (cl-defmethod llm-provider-streaming-media-handler ((_ llm-claude)
                                                     receiver err-receiver)
