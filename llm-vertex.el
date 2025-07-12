@@ -271,7 +271,7 @@ which is necessary to properly set some paremeters."
         (if (and (eq model 'gemini-2.5-pro) (eq budget 'none))
             (display-warning 'llm :warning "Cannot turn off reasoning in Gemini 2.5 Pro, ignoring reasoning setting")
           (setq params-plist (plist-put params-plist :thinkingConfig
-					`(:thinkingBudget 
+					                    `(:thinkingBudget
                                           ,(pcase budget
                                              ('none 0)
                                              ('light 1024)
