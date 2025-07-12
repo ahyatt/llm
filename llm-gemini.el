@@ -78,10 +78,11 @@ If STREAMING-P is non-nil, use the streaming endpoint."
 (cl-defmethod llm-provider-chat-streaming-url ((provider llm-gemini))
   (llm-gemini--chat-url provider t))
 
-(cl-defmethod llm-provider-chat-request ((_ llm-gemini) _ _)
-  ;; Temporary, can be removed in the next version.  Without this the old
-  ;; definition will cause problems when users upgrade.
-  (cl-call-next-method))
+(cl-defmethod llm-provider-chat-request ((provider llm-gemini) prompt _)
+  (llm-provider--chat-request prompt (let ((model (llm-models-match (llm-gemini-chat-model provider))))
+                                       (if model
+                                           (llm-model-symbol model)
+                                         'unknown))))
 
 (cl-defmethod llm-name ((_ llm-gemini))
   "Return the name of PROVIDER."
