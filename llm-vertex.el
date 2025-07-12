@@ -59,7 +59,7 @@ and there is no default.  The maximum value possible here is 2049."
   :type 'integer
   :group 'llm-vertex)
 
-(defcustom llm-vertex-default-chat-model "gemini-1.5-pro"
+(defcustom llm-vertex-default-chat-model "gemini-2.5-pro"
   "The default model to ask for.
 This should almost certainly be a chat model, other models are
 for more specialized uses."
@@ -207,7 +207,8 @@ the key must be regenerated every hour."
                               (llm-multipart-parts (llm-chat-prompt-interaction-content interaction)))))
             (t `[(:text ,(llm-chat-prompt-interaction-content interaction))]))))
 
-(cl-defmethod llm-provider-chat-request ((_ llm-google) prompt _)
+(defun llm-provider--chat-request (prompt model)
+  "Create the request for the chat PROMPT and MODEL symbol."
   (llm-provider-utils-combine-to-system-prompt prompt llm-vertex-example-prelude)
   (append
    (when (eq 'system (llm-chat-prompt-interaction-role (car (llm-chat-prompt-interactions prompt))))
@@ -231,12 +232,25 @@ the key must be regenerated every hour."
                               :parameters ,(llm-provider-utils-openai-arguments
                                             (llm-tool-args tool))))
                     (llm-chat-prompt-tools prompt))))]))
-   (llm-vertex--chat-parameters prompt)))
+   (llm-vertex--chat-parameters prompt model)))
 
-(defun llm-vertex--chat-parameters (prompt)
+;; TODO: remove after September 2025, this is only here so people can upgrade to
+;; a new version of their llm library without the old llm-google specializer
+;; sticking around.
+(cl-defmethod llm-provider-chat-request ((_ llm-google) _ _)
+  (cl-call-next-method))
+
+(cl-defmethod llm-provider-chat-request ((provider llm-vertex) prompt _)
+  (llm-provider--chat-request prompt (let ((model (llm-models-match (llm-vertex-chat-model provider))))
+                                       (if model
+                                           (llm-model-symbol model)
+                                         'unknown))))
+
+(defun llm-vertex--chat-parameters (prompt model)
   "From PROMPT, create the parameters section.
-Return value is a cons for adding to an alist, unless there is
-nothing to add, in which case it is nil."
+Return value is a cons for adding to an alist, unless there is nothing
+to add, in which case it is nil.  MODEL is the symbol of the model used,
+which is necessary to properly set some paremeters."
   (let ((params-plist (llm-provider-utils-non-standard-params-plist prompt)))
     (when (llm-chat-prompt-temperature prompt)
       (setq params-plist (plist-put params-plist :temperature
@@ -251,6 +265,18 @@ nothing to add, in which case it is nil."
         (setq params-plist (plist-put params-plist :response_schema
                                       (llm-provider-utils-convert-to-serializable
                                        (llm-chat-prompt-response-format prompt))))))
+    (when-let ((budget (llm-chat-prompt-reasoning prompt))
+               (max-budget (if (eq model 'gemini-2.5-pro) 32768 24576)))
+      (when (member 'reasoning (llm-model-capabilities (llm-models-by-symbol model)))
+        (if (and (eq model 'gemini-2.5-pro) (eq budget 'none))
+            (display-warning 'llm :warning "Cannot turn off reasoning in Gemini 2.5 Pro, ignoring reasoning setting")
+          (setq params-plist (plist-put params-plist :thinkingConfig
+					`(:thinkingBudget 
+                                          ,(pcase budget
+                                             ('none 0)
+                                             ('light 1024)
+                                             ('medium (/ max-budget 2))
+                                             ('maximum max-budget))))))))
     (when params-plist
       `(:generationConfig ,params-plist))))
 
