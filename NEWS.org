@@ -1,6 +1,6 @@
 * Version 0.27.1
 - Add thinking control to Gemini / Vertex.
-- Change default Vertex model to Gemini 2.5 Pro.
+- Change default Vertex, Gemini model to Gemini 2.5 Pro.
 - Add Gemini 2.5 Flash model
 * Version 0.27.0
 - Add =thinking= option to control the amount of thinking that happens for reasoning models.
