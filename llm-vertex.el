@@ -294,7 +294,7 @@ which is necessary to properly set some paremeters."
            (if-let ((response (llm-provider-chat-extract-result provider element)))
                (funcall receiver `(:text ,response))
              (when-let ((fc (llm-provider-extract-tool-uses provider element)))
-               (funcall receiver `(:tool-call ,fc))))))))
+               (funcall receiver `(:tool-uses ,fc))))))))
 
 (cl-defmethod llm-provider-collect-streaming-tool-uses ((_ llm-google) data)
   (car data))
