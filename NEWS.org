@@ -3,6 +3,7 @@
 - Change default Vertex, Gemini model to Gemini 2.5 Pro.
 - Add Gemini 2.5 Flash model
 - Fix Vertex / Gemini streaming tool calls
+- Add Open AI GPT-5 models
 * Version 0.27.0
 - Add =thinking= option to control the amount of thinking that happens for reasoning models.
 - Fix incorrectly low default Claude max tokens
