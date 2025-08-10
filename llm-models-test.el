@@ -27,7 +27,7 @@
   ;; It shouldn't be the case that things match because they are first.  So we
   ;; will test various model names against the models and reverse the order of
   ;; the models to ensure that the first match is the unique match.
-  (let ((models-names-to-test '("gpt-3.5-turbo-instructo" "gpt-4" "gpt-4o"
+  (let ((models-names-to-test '("gpt-4" "gpt-4o" "gpt-5" "gpt-5-chat"
                                 "gemini-1.5-flash" "llama-3" "llama-3.1"
                                 "llama3" "llama3.1" "gemini-2.0-flash-thinking")))
     (dolist (model-name models-names-to-test)
