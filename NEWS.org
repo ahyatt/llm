@@ -1,3 +1,5 @@
+* Version 0.27.2
+- Add JSON response capabilities to Gemini, which had a non-standard API.
 * Version 0.27.1
 - Add thinking control to Gemini / Vertex.
 - Change default Vertex, Gemini model to Gemini 2.5 Pro.
