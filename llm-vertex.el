@@ -240,6 +240,28 @@ the key must be regenerated every hour."
 (cl-defmethod llm-provider-chat-request ((_ llm-google) _ _)
   (cl-call-next-method))
 
+(defun llm-vertex-transform-response-format (format)
+  "Transform FORMAT plist into the appropriate Vertex response schema."
+  (let (result)
+    (map-do (lambda (k v)
+              (when (member k '(:type :format :description :nullable :enum :maxItems
+                                      :minItems :properties :required :propertyOrdering :items))
+                (setq result (plist-put result k
+                                        (cond
+                                         ((eq k :properties)
+                                          (let (inner-plist)
+                                            (map-do (lambda (prop prep-def)
+                                                      (setq inner-plist (plist-put inner-plist
+                                                                                   prop
+                                                                                   (llm-vertex-transform-response-format prep-def))))
+                                                      v)
+                                            inner-plist))
+                                         ((eq k :items)
+                                          (llm-vertex-transform-response-format v))
+                                         (t v))))))
+              format)
+    result))
+
 (cl-defmethod llm-provider-chat-request ((provider llm-vertex) prompt _)
   (llm-provider--chat-request prompt (let ((model (llm-models-match (llm-vertex-chat-model provider))))
                                        (if model
@@ -263,8 +285,8 @@ which is necessary to properly set some paremeters."
                                     "application/json"))
       (unless (eq 'json format)
         (setq params-plist (plist-put params-plist :response_schema
-                                      (llm-provider-utils-convert-to-serializable
-                                       (llm-chat-prompt-response-format prompt))))))
+                                      (llm-vertex-transform-response-format
+                                       (llm-provider-utils-convert-to-serializable format))))))
     (when-let ((budget (llm-chat-prompt-reasoning prompt))
                (max-budget (if (eq model 'gemini-2.5-pro) 32768 24576)))
       (when (member 'reasoning (llm-model-capabilities (llm-models-by-symbol model)))
