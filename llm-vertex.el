@@ -153,7 +153,23 @@ the key must be regenerated every hour."
                              (assoc-default 'content
                                             (aref (assoc-default 'candidates response) 0)))))
                  (when parts
-                   (assoc-default 'text (aref parts (- (length parts) 1)))))))))
+                   (assoc-default 'text (seq-find (lambda (part)
+                                                    (not (assoc-default 'thought part)))
+                                                  parts))))))))
+
+(cl-defmethod llm-provider-extract-reasoning ((provider llm-google) response)
+  (if (vectorp response)
+      (llm-provider-extract-reasoning provider (aref response 0))
+    ;; In some error cases, the response does not have any candidates.
+    (when (assoc-default 'candidates response)
+      (when-let* ((parts (assoc-default
+                          'parts (assoc-default
+                                  'content
+                                  (aref (assoc-default 'candidates response) 0))))
+                  (thought-part (seq-find (lambda (part)
+                                            (assoc-default 'thought part))
+                                          parts)))
+        (assoc-default 'text thought-part)))))
 
 (cl-defmethod llm-provider-extract-tool-uses ((provider llm-google) response)
   (if (vectorp response)
@@ -254,12 +270,12 @@ the key must be regenerated every hour."
                                                       (setq inner-plist (plist-put inner-plist
                                                                                    prop
                                                                                    (llm-vertex-transform-response-format prep-def))))
-                                                      v)
+                                                    v)
                                             inner-plist))
                                          ((eq k :items)
                                           (llm-vertex-transform-response-format v))
                                          (t v))))))
-              format)
+            format)
     result))
 
 (cl-defmethod llm-provider-chat-request ((provider llm-vertex) prompt _)
@@ -293,12 +309,13 @@ which is necessary to properly set some paremeters."
         (if (and (eq model 'gemini-2.5-pro) (eq budget 'none))
             (display-warning 'llm :warning "Cannot turn off reasoning in Gemini 2.5 Pro, ignoring reasoning setting")
           (setq params-plist (plist-put params-plist :thinkingConfig
-					                    `(:thinkingBudget
-                                          ,(pcase budget
-                                             ('none 0)
-                                             ('light 1024)
-                                             ('medium (/ max-budget 2))
-                                             ('maximum max-budget))))))))
+					                    `(:includeThoughts t
+                                                           :thinkingBudget
+                                                           ,(pcase budget
+                                                              ('none 0)
+                                                              ('light 1024)
+                                                              ('medium (/ max-budget 2))
+                                                              ('maximum max-budget))))))))
     (when params-plist
       `(:generationConfig ,params-plist))))
 
