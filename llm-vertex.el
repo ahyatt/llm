@@ -303,8 +303,9 @@ which is necessary to properly set some paremeters."
         (setq params-plist (plist-put params-plist :response_schema
                                       (llm-vertex-transform-response-format
                                        (llm-provider-utils-convert-to-serializable format))))))
-    (let (thinking-plist)
-      (when (member 'reasoning (llm-model-capabilities (llm-models-by-symbol model)))
+    (let* (thinking-plist
+           (model-data (llm-models-by-symbol model)))
+      (when (and model-data (member 'reasoning (llm-model-capabilities model-data)))
         (setq thinking-plist '(:includeThoughts t))
         (when-let ((budget (llm-chat-prompt-reasoning prompt))
                    (max-budget (if (eq model 'gemini-2.5-pro) 32768 24576)))
