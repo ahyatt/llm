@@ -303,19 +303,22 @@ which is necessary to properly set some paremeters."
         (setq params-plist (plist-put params-plist :response_schema
                                       (llm-vertex-transform-response-format
                                        (llm-provider-utils-convert-to-serializable format))))))
-    (when-let ((budget (llm-chat-prompt-reasoning prompt))
-               (max-budget (if (eq model 'gemini-2.5-pro) 32768 24576)))
+    (let (thinking-plist)
       (when (member 'reasoning (llm-model-capabilities (llm-models-by-symbol model)))
-        (if (and (eq model 'gemini-2.5-pro) (eq budget 'none))
-            (display-warning 'llm :warning "Cannot turn off reasoning in Gemini 2.5 Pro, ignoring reasoning setting")
-          (setq params-plist (plist-put params-plist :thinkingConfig
-					                    `(:includeThoughts t
-                                                           :thinkingBudget
-                                                           ,(pcase budget
-                                                              ('none 0)
-                                                              ('light 1024)
-                                                              ('medium (/ max-budget 2))
-                                                              ('maximum max-budget))))))))
+        (setq thinking-plist '(:includeThoughts t))
+        (when-let ((budget (llm-chat-prompt-reasoning prompt))
+                   (max-budget (if (eq model 'gemini-2.5-pro) 32768 24576)))
+          (if (and (eq model 'gemini-2.5-pro) (eq budget 'none))
+              (display-warning 'llm :warning "Cannot turn off reasoning in Gemini 2.5 Pro, ignoring reasoning setting")
+            (setq thinking-plist (plist-put thinking-plist
+                                            :thinkingBudget
+                                            (pcase budget
+                                              ('none 0)
+                                              ('light 1024)
+                                              ('medium (/ max-budget 2))
+                                              ('maximum max-budget)))))))
+      (when thinking-plist
+        (setq params-plist (plist-put params-plist :thinkingConfig thinking-plist))))
     (when params-plist
       `(:generationConfig ,params-plist))))
 
