@@ -1,3 +1,5 @@
+* Version 0.27.3
+- Add reasoning output for Gemini.
 * Version 0.27.2
 - Add JSON response capabilities to Gemini, which had a non-standard API.
 - Add Claude 4.1 to supported models
