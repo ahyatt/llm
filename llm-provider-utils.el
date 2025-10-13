@@ -141,6 +141,12 @@ Return nil for the standard timeout.")
   "By default, the standard provider has the standard timeout."
   nil)
 
+(defun llm-alist-p (v)
+  "Return non-nil if V is an alist."
+  (and (listp v)
+       (or (null v)
+           (cl-every #'consp v))))
+
 (cl-defmethod llm-provider-chat-request :before ((provider llm-standard-chat-provider) prompt _)
   "Set PROVIDER default parameters where they do not existe in the PROMPT."
   (setf (llm-chat-prompt-temperature prompt)
@@ -151,9 +157,10 @@ Return nil for the standard timeout.")
             (llm-standard-chat-provider-default-chat-max-tokens provider))
         (llm-chat-prompt-non-standard-params prompt)
         ;; We need to merge the parameters individually.
-        ;; Lists as values should be turned into vectors.
+        ;; Lists (but not alists) as values should be turned into vectors.
         (mapcar (lambda (c)
-                  (if (listp (cdr c))
+                  (if (and (listp (cdr c))
+                           (not (llm-alist-p (cdr c))))
                       (cons (car c) (vconcat (cdr c)))
                     c))
                 (seq-union (llm-chat-prompt-non-standard-params prompt)
