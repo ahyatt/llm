@@ -279,7 +279,9 @@ FCS is a list of `llm-provider-utils-tool-use' structs."
           (val (cdr param)))
       (setq request-plist
             (plist-put request-plist
-                       (if (keywordp key) key (intern (concat ":" (symbol-name key))))
+                       (if (keywordp key) key (intern (concat ":" (if (symbolp key)
+                                                                      (symbol-name key)
+                                                                    key))))
                        val)))))
 
 (cl-defmethod llm-provider-chat-request ((provider llm-openai) prompt streaming)
