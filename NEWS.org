@@ -1,6 +1,6 @@
 * Version 0.27.3
 - Add reasoning output for Gemini.
-- Add Claude 4.5 to support models, fix model matching for other Claude models.
+- Add Claude 4.5 Sonnet and Haiku to support models, fix model matching for other Claude models.
 - Fix Open AI issue in using =non-stardard-params=.
 - Fix incorrect vectorzation of alists in =non-standard-params=.
 * Version 0.27.2
