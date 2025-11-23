@@ -90,6 +90,11 @@ the key must be regenerated every hour."
   (chat-model llm-vertex-default-chat-model)
   key-gentime)
 
+(cl-defstruct (llm-gemini-tool-use (:include llm-provider-utils-tool-use))
+  "A struct representing tool use from Gemini models, which needs more
+information than standard tool use."
+  thought-signature)
+
 ;; API reference: https://cloud.google.com/vertex-ai/docs/generative-ai/multimodal/send-chat-prompts-gemini#gemini-chat-samples-drest
 
 (cl-defmethod llm-provider-request-prelude ((provider llm-vertex))
@@ -176,13 +181,19 @@ the key must be regenerated every hour."
       (llm-provider-extract-tool-uses provider (aref response 0))
     ;; In some error cases, the response does not have any candidates.
     (when (assoc-default 'candidates response)
-      (mapcar (lambda (call)
-                (make-llm-provider-utils-tool-use
-                 :name (assoc-default 'name call)
-                 :args (assoc-default 'args call)))
+      (mapcar (lambda (call-and-sig)
+                (make-llm-gemini-tool-use
+                 :name (assoc-default 'name (car call-and-sig))
+                 :args (assoc-default 'args (car call-and-sig))
+                 :thought-signature (or (cdr call-and-sig)
+                                        ;; Specific magic string for when there is no signature, should
+                                        ;; only happen when migrating the prompt from other models.
+                                        ;; See https://ai.google.dev/gemini-api/docs/gemini-3
+                                        "context_engineering_is_the_way_to_go")))
               (mapcan (lambda (maybe-call)
                         (when-let ((fc (assoc-default 'functionCall maybe-call)))
-                          (list fc)))
+                          (list (cons fc
+                                      (assoc-default 'thoughtSignature maybe-call)))))
                       (assoc-default
                        'parts (assoc-default
                                'content
@@ -193,7 +204,7 @@ the key must be regenerated every hour."
   `(:role ,(pcase (llm-chat-prompt-interaction-role interaction)
              ('user "user")
              ('assistant "model")
-             ('tool-results "function"))
+             ('tool-results "user"))
           :parts
           ,(cond
             ((eq 'tool-results (llm-chat-prompt-interaction-role interaction))
@@ -202,16 +213,16 @@ the key must be regenerated every hour."
                         `(:functionResponse
                           (:name ,(llm-chat-prompt-tool-result-tool-name fc)
                                  :response
-                                 (:name ,(llm-chat-prompt-tool-result-tool-name fc)
-                                        :content ,(llm-chat-prompt-tool-result-result fc)))))
+                                 (:output ,(llm-chat-prompt-tool-result-result fc)))))
                       (llm-chat-prompt-interaction-tool-results interaction))))
             ((and (consp (llm-chat-prompt-interaction-content interaction))
                   (llm-provider-utils-tool-use-p (car (llm-chat-prompt-interaction-content interaction))))
              (vconcat
               (mapcar (lambda (tool-use)
                         `(:functionCall
-                          (:name ,(llm-provider-utils-tool-use-name tool-use)
-                                 :args ,(llm-provider-utils-tool-use-args tool-use))))
+                          (:name ,(llm-gemini-tool-use-name tool-use)
+                                 :args ,(llm-gemini-tool-use-args tool-use))
+                          :thoughtSignature ,(llm-gemini-tool-use-thought-signature tool-use)))
                       (llm-chat-prompt-interaction-content interaction))))
             ((llm-multipart-p (llm-chat-prompt-interaction-content interaction))
              (vconcat (mapcar (lambda (part)
@@ -309,15 +320,25 @@ which is necessary to properly set some paremeters."
         (setq thinking-plist '(:includeThoughts t))
         (when-let ((budget (llm-chat-prompt-reasoning prompt))
                    (max-budget (if (eq model 'gemini-2.5-pro) 32768 24576)))
-          (if (and (eq model 'gemini-2.5-pro) (eq budget 'none))
-              (display-warning 'llm :warning "Cannot turn off reasoning in Gemini 2.5 Pro, ignoring reasoning setting")
-            (setq thinking-plist (plist-put thinking-plist
-                                            :thinkingBudget
-                                            (pcase budget
-                                              ('none 0)
-                                              ('light 1024)
-                                              ('medium (/ max-budget 2))
-                                              ('maximum max-budget)))))))
+          (if (and (or (eq model 'gemini-2.5-pro)
+                       (eq model 'gemini-3-pro))
+                   (eq budget 'none))
+              (display-warning 'llm :warning "Cannot turn off reasoning in selected model, ignoring reasoning setting")
+            (if (eq model 'gemini-3-pro)
+                (setq thinking-plist (plist-put thinking-plist
+                                                :thinking_level
+                                                (pcase budget
+                                                  ('light "low")
+                                                  ;; Medium is currently not supported, coming soon.
+                                                  ('medium "high")
+                                                  ('maximum "high"))))
+              (setq thinking-plist (plist-put thinking-plist
+                                              :thinkingBudget
+                                              (pcase budget
+                                                ('none 0)
+                                                ('light 1024)
+                                                ('medium (/ max-budget 2))
+                                                ('maximum max-budget))))))))
       (when thinking-plist
         (setq params-plist (plist-put params-plist :thinkingConfig thinking-plist))))
     (when params-plist
