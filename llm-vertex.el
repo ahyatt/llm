@@ -328,10 +328,10 @@ which is necessary to properly set some paremeters."
                 (setq thinking-plist (plist-put thinking-plist
                                                 :thinking_level
                                                 (pcase budget
-                                                  ('light 'low)
+                                                  ('light "low")
                                                   ;; Medium is currently not supported, coming soon.
-                                                  ('medium 'high)
-                                                  ('maximum 'high))))
+                                                  ('medium "high")
+                                                  ('maximum "high"))))
               (setq thinking-plist (plist-put thinking-plist
                                               :thinkingBudget
                                               (pcase budget
