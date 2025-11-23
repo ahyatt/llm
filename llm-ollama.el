@@ -218,7 +218,7 @@ These are just the text inside the tag, not the tag itself."))
 
 (cl-defmethod llm-provider-extract-tool-uses ((_ llm-ollama) response)
   (mapcar (lambda (call)
-            (let ((function (cdar call)))
+            (let ((function (cdadr call)))
               (make-llm-provider-utils-tool-use
                :name (assoc-default 'name function)
                :args (assoc-default 'arguments function))))
