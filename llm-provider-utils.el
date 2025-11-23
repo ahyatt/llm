@@ -710,7 +710,7 @@ This returns a JSON object (a list that can be converted to JSON)."
 (defun llm-provider-utils-append-to-prompt (prompt output &optional tool-results role)
   "Append OUTPUT to PROMPT as an assistant interaction.
 
-OUTPUT can be a string or a structure in the case of function calls.
+OUTPUT can be a string or a structure in the case of tool uses.
 
 TOOL-RESULTS is a list of results from the LLM output, if any.
 
