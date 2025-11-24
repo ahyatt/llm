@@ -34,7 +34,7 @@
 ;; Models defined at https://docs.anthropic.com/claude/docs/models-overview
 (cl-defstruct (llm-claude (:include llm-standard-chat-provider))
   (key nil :read-only t)
-  (chat-model "claude-sonnet-4-0" :read-only t))
+  (chat-model "claude-sonnet-4-5" :read-only t))
 
 (cl-defmethod llm-nonfree-message-info ((_ llm-claude))
   "Return Claude's nonfree ToS."
@@ -95,6 +95,15 @@
                                (vconcat
                                 (mapcar (lambda (f) (llm-claude--tool-call f))
                                         (llm-chat-prompt-tools prompt))))))
+    (when (and (llm-chat-prompt-response-format prompt)
+               (member 'json-response (llm-capabilities provider))
+               (not (eq 'json (llm-chat-prompt-response-format prompt))))
+      (setq request (plist-put request :output_format
+                               `(:type "json_schema"
+                                       :schema ,(let ((schema (llm-chat-prompt-response-format prompt)))
+                                                  (unless (plist-get schema :additionalProperties)
+                                                    (setq schema (plist-put schema :additionalProperties :false)))
+                                                  schema)))))
     (when (> (length system) 0)
       (setq request (plist-put request :system system)))
     (when (llm-chat-prompt-temperature prompt)
@@ -246,11 +255,13 @@ DATA is a vector of lists produced by `llm-provider-streaming-media-handler'."
     (nreverse result)))
 
 (cl-defmethod llm-provider-headers ((provider llm-claude))
-  `(("x-api-key" . ,(if (functionp (llm-claude-key provider))
-                        (funcall (llm-claude-key provider))
-                      (llm-claude-key provider)))
-    ("anthropic-version" . "2023-06-01")
-    ("anthropic-beta" . "tools-2024-04-04")))
+  (append
+   `(("x-api-key" . ,(if (functionp (llm-claude-key provider))
+                         (funcall (llm-claude-key provider))
+                       (llm-claude-key provider)))
+     ("anthropic-version" . "2023-06-01"))
+   (when (member 'json-response (llm-capabilities provider))
+     '(("anthropic-beta" . "structured-outputs-2025-11-13")))))
 
 (cl-defmethod llm-provider-chat-extract-error ((_ llm-claude) response)
   (when-let ((err (assoc-default 'error response)))
@@ -272,8 +283,11 @@ DATA is a vector of lists produced by `llm-provider-streaming-media-handler'."
   "Return the name of the provider."
   "Claude")
 
-(cl-defmethod llm-capabilities ((_ llm-claude))
-  (list 'streaming 'tool-use 'streaming-tool-use 'image-input 'pdf-input 'reasoning))
+(cl-defmethod llm-capabilities ((provider llm-claude))
+  (seq-union
+   '(streaming tool-use streaming-tool-use image-input pdf-input reasoning)
+   (when-let* ((model (llm-models-match (llm-claude-chat-model provider))))
+     (llm-model-capabilities model))))
 
 (cl-defmethod llm-provider-append-to-prompt ((_ llm-claude) prompt result
                                              &optional tool-use-results)

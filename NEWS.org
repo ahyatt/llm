@@ -1,6 +1,8 @@
 * Version 0.27.4
 - Fix bug (or perhaps breaking change) in Ollama tool use.
 - Add Gemini 3 model, update Gemini code to pass thought signatures
+- Add =json-response= capability to Claude 4.5 and 4.1 Opus models
+- Set Sonnet 4.5 as the default Claude model
 * Version 0.27.3
 - Add reasoning output for Gemini.
 - Add Claude 4.5 Sonnet and Haiku to support models, fix model matching for other Claude models.
