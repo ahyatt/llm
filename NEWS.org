@@ -3,6 +3,7 @@
 - Add Gemini 3 model, update Gemini code to pass thought signatures
 - Add =json-response= capability to Claude 4.5 and 4.1 Opus models
 - Set Sonnet 4.5 as the default Claude model
+- Add Claude Opus 4.5
 * Version 0.27.3
 - Add reasoning output for Gemini.
 - Add Claude 4.5 Sonnet and Haiku to support models, fix model matching for other Claude models.
