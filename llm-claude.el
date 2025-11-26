@@ -103,7 +103,8 @@
                                        :schema ,(let ((schema (llm-chat-prompt-response-format prompt)))
                                                   (unless (plist-get schema :additionalProperties)
                                                     (setq schema (plist-put schema :additionalProperties :false)))
-                                                  schema)))))
+                                                  (llm-provider-utils-convert-to-serializable
+                                                   schema))))))
     (when (> (length system) 0)
       (setq request (plist-put request :system system)))
     (when (llm-chat-prompt-temperature prompt)
