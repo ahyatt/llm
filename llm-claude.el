@@ -116,7 +116,7 @@
                                               ('auto "auto")
                                               ('any "any")
                                               ('none "none")
-                                              (string "tool")))
+                                              ((pred stringp) "tool")))
                                 (when (stringp (llm-tool-options-tool-choice options))
                                   (list :name (llm-tool-options-tool-choice options)))))))
     (when (llm-chat-prompt-reasoning prompt)

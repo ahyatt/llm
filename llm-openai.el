@@ -208,7 +208,7 @@ PROVIDER is the Open AI provider struct."
             ('auto "auto")
             ('none "none")
             ('required "required")
-            (string
+            ((pred stringp)
              (list
               :function (list :name (llm-tool-options-tool-choice options))
               :type "function"))))))
