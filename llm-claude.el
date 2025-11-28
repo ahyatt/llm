@@ -109,6 +109,16 @@
       (setq request (plist-put request :system system)))
     (when (llm-chat-prompt-temperature prompt)
       (setq request (plist-put request :temperature (llm-chat-prompt-temperature prompt))))
+    (when-let* ((options (llm-chat-prompt-tool-options prompt)))
+      (setq request (plist-put request :tool_choice
+                               (append
+                                (list :type (pcase (llm-tool-options-tool-choice options)
+                                              ('auto "auto")
+                                              ('any "any")
+                                              ('none "none")
+                                              (string "tool")))
+                                (when (stringp (llm-tool-options-tool-choice options))
+                                  (list :name (llm-tool-options-tool-choice options)))))))
     (when (llm-chat-prompt-reasoning prompt)
       (setq request (plist-put request :thinking
                                (let (thinking-plist)
