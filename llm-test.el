@@ -210,7 +210,9 @@
                                              :name "func"
                                              :description "desc"
                                              :args '((:name "arg1" :description "desc1" :type string)
-                                                     (:name "arg2" :description "desc2" :type integer :optional t))))))
+                                                     (:name "arg2" :description "desc2" :type integer :optional t))))
+                               :tool-options (make-llm-tool-options
+                                              :tool-choice "func")))
            :openai
            (:model "model"
                    :messages [(:role "user" :content "Hello world")]
@@ -223,7 +225,8 @@
                                                 :properties
                                                 (:arg1 (:description "desc1" :type "string")
                                                        :arg2 (:description "desc2" :type "integer"))
-                                                :required ["arg1"])))])
+                                                :required ["arg1"])))]
+                   :tool_choice (:function (:name "func") :type "function"))
            :gemini
            (:contents [(:role "user" :parts [(:text "Hello world")])]
                       :tools [(:function_declarations
@@ -234,7 +237,10 @@
                                               :properties
                                               (:arg1 (:description "desc1" :type "string")
                                                      :arg2 (:description "desc2" :type "integer"))
-                                              :required ["arg1"]))])])
+                                              :required ["arg1"]))])]
+                      :toolConfig (:functionCallingConfig
+                                   (:mode "ANY"
+                                          :allowedFunctionNames ["func"])))
            :ollama (:model "model"
                            :messages [(:role "user" :content "Hello world")]
                            :tools
@@ -261,6 +267,8 @@
                                           (:arg1 (:description "desc1" :type "string")
                                                  :arg2 (:description "desc2" :type "integer"))
                                           :required ["arg1"]))]
+                           :tool_choice (:type "tool"
+                                               :name "func")
                            :stream :false)))
   "A list of tests for `llm-provider-chat-request'.")
 
