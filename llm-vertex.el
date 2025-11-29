@@ -268,7 +268,7 @@ information than standard tool use."
                            ('auto "AUTO")
                            ('none "NONE")
                            ('any "ANY")
-                           (string "ANY")))
+                           ((pred stringp) "ANY")))
              (when (stringp (llm-tool-options-tool-choice options))
                `(:allowedFunctionNames [,(llm-tool-options-tool-choice options)]))))))))
    (llm-vertex--chat-parameters prompt model)))
