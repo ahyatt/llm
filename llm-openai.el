@@ -207,11 +207,12 @@ PROVIDER is the Open AI provider struct."
           (pcase (llm-tool-options-tool-choice options)
             ('auto "auto")
             ('none "none")
-            ('required "required")
+            ('any "required")
             ((pred stringp)
              (list
               :function (list :name (llm-tool-options-tool-choice options))
-              :type "function"))))))
+              :type "function"))
+            (_ (error "Unknown tool choice option: %s" (llm-tool-options-tool-choice options)))))))
 
 (defun llm-openai--build-tool-interaction (interaction)
   "Build the tool interaction for INTERACTION."

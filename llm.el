@@ -83,7 +83,7 @@ chooses whether to use a tool), or `any' (the LLM must call one of the
 tools), or the string name of a tool, to force the use of that tool.
 
 Not all providers can force a particular tool use."
-  tool-choice)
+  (tool-choice 'auto))
 
 (cl-defstruct llm-chat-prompt-interaction
   "This defines a single interaction given as part of a chat prompt.

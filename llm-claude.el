@@ -116,7 +116,9 @@
                                               ('auto "auto")
                                               ('any "any")
                                               ('none "none")
-                                              ((pred stringp) "tool")))
+                                              ((pred stringp) "tool")
+                                              (_ (error "Unknown tool choice option: %s"
+                                                        (llm-tool-options-tool-choice options)))))
                                 (when (stringp (llm-tool-options-tool-choice options))
                                   (list :name (llm-tool-options-tool-choice options)))))))
     (when (llm-chat-prompt-reasoning prompt)
