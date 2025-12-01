@@ -72,7 +72,18 @@ See %s for the details on the restrictions on use." name tos)))
 
 Use of this directly is deprecated, instead use `llm-make-chat-prompt'."
   context examples interactions tools temperature max-tokens response-format
-  reasoning non-standard-params)
+  reasoning non-standard-params tool-options)
+
+(cl-defstruct llm-tool-options
+  "Contains standarized options for tool use.
+
+TOOL-CHOICE is a symbol that indicates how tools are chosen, or a string
+tool name.  It can be `none' (no tools are used), `auto' (the LLM
+chooses whether to use a tool), or `any' (the LLM must call one of the
+tools), or the string name of a tool, to force the use of that tool.
+
+Not all providers can force a particular tool use."
+  (tool-choice 'auto))
 
 (cl-defstruct llm-chat-prompt-interaction
   "This defines a single interaction given as part of a chat prompt.
@@ -231,7 +242,7 @@ instead."
                  :args args
                  :async async))
 
-(cl-defun llm-make-chat-prompt (content &key context examples tools
+(cl-defun llm-make-chat-prompt (content &key context examples tools tool-options
                                         temperature max-tokens response-format
                                         reasoning non-standard-params)
   "Create a `llm-chat-prompt' with CONTENT sent to the LLM provider.
@@ -271,6 +282,14 @@ them, a `not-implemented' signal will be thrown.  This is
 optional.  When this is given, the LLM will either call the
 function or return text as normal, depending on what the LLM
 decides.
+
+TOOL-OPTIONS is a `llm-tool-options' struct, which can be used for
+setting whether tool callins is allowed or not or forcing a tool call to
+be used.  This is useful because some models work best when the same
+tools are in all the requests in a conversation, but the program wants
+to have some control over how they are called.  LLMs typically have some
+variablility in what tool options can be used, so not all can support
+every option.
 
 TEMPERATURE is a floating point number with a minimum of 0, and
 maximum of 1, which controls how predictable the result is, with
@@ -331,6 +350,7 @@ vectors (if a list).  This is optional."
                                      :content s))
                                   (if (listp content) content (list content)))
    :tools tools
+   :tool-options tool-options
    :temperature temperature
    :max-tokens max-tokens
    :response-format response-format

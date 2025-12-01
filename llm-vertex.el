@@ -250,15 +250,28 @@ information than standard tool use."
    (when (llm-chat-prompt-tools prompt)
      ;; Although Gemini claims to be compatible with Open AI's function declaration,
      ;; it's only somewhat compatible.
-     `(:tools
-       [(:function_declarations
-         ,(vconcat (mapcar
-                    (lambda (tool)
-                      `(:name ,(llm-tool-name tool)
-                              :description ,(llm-tool-description tool)
-                              :parameters ,(llm-provider-utils-openai-arguments
-                                            (llm-tool-args tool))))
-                    (llm-chat-prompt-tools prompt))))]))
+     (append
+      `(:tools
+        [(:function_declarations
+          ,(vconcat (mapcar
+                     (lambda (tool)
+                       `(:name ,(llm-tool-name tool)
+                               :description ,(llm-tool-description tool)
+                               :parameters ,(llm-provider-utils-openai-arguments
+                                             (llm-tool-args tool))))
+                     (llm-chat-prompt-tools prompt))))])
+      (when-let* ((options (llm-chat-prompt-tool-options prompt)))
+        `(:toolConfig
+          (:functionCallingConfig
+           ,(append
+             (list :mode (pcase (llm-tool-options-tool-choice options)
+                           ('auto "AUTO")
+                           ('none "NONE")
+                           ('any "ANY")
+                           ((pred stringp) "ANY")
+                           (_ (error "Unknown tool choice option: %s" (llm-tool-options-tool-choice options)))))
+             (when (stringp (llm-tool-options-tool-choice options))
+               `(:allowedFunctionNames [,(llm-tool-options-tool-choice options)]))))))))
    (llm-vertex--chat-parameters prompt model)))
 
 ;; TODO: remove after September 2025, this is only here so people can upgrade to

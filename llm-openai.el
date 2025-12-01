@@ -200,6 +200,20 @@ PROVIDER is the Open AI provider struct."
     (list :tools (vconcat (mapcar #'llm-provider-utils-openai-tool-spec
                                   (llm-chat-prompt-tools prompt))))))
 
+(defun llm-openai--build-tool-choice (prompt)
+  "Build the tool_choice field if present in PROMPT."
+  (when-let ((options (llm-chat-prompt-tool-options prompt)))
+    (list :tool_choice
+          (pcase (llm-tool-options-tool-choice options)
+            ('auto "auto")
+            ('none "none")
+            ('any "required")
+            ((pred stringp)
+             (list
+              :function (list :name (llm-tool-options-tool-choice options))
+              :type "function"))
+            (_ (error "Unknown tool choice option: %s" (llm-tool-options-tool-choice options)))))))
+
 (defun llm-openai--build-tool-interaction (interaction)
   "Build the tool interaction for INTERACTION."
   (mapcar
@@ -301,6 +315,7 @@ STREAMING if non-nil, turn on response streaming."
            (llm-openai--build-max-tokens prompt)
            (llm-openai--build-response-format prompt)
            (llm-openai--build-tools prompt)
+           (llm-openai--build-tool-choice prompt)
            (llm-openai--build-messages prompt)))
 
     ;; Merge non-standard params
