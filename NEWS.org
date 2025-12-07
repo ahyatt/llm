@@ -1,3 +1,5 @@
+* Version 0.28.1
+- Fix error on empty Claude responses
 * Version 0.28.0
 - Add tool calling options, for forbidding or forcing tool choice. 
 - Fix bug (or perhaps breaking change) in Ollama tool use.
