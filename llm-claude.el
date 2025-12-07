@@ -181,8 +181,9 @@
       (assoc-default 'text content))))
 
 (cl-defmethod llm-provider-extract-reasoning ((_ llm-claude) response)
-  (let ((content (aref (assoc-default 'content response) 0)))
-    (assoc-default 'thinking content)))
+  (when (> 0 (length (assoc-default 'content response)))
+    (let ((content (aref (assoc-default 'content response) 0)))
+      (assoc-default 'thinking content))))
 
 (cl-defmethod llm-provider-streaming-media-handler ((_ llm-claude)
                                                     receiver err-receiver)
