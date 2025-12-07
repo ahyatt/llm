@@ -176,12 +176,12 @@
                     tool-uses))))
 
 (cl-defmethod llm-provider-chat-extract-result ((_ llm-claude) response)
-  (when (> 0 (length (assoc-default 'content response)))
+  (when (> (length (assoc-default 'content response)) 0)
     (let ((content (aref (assoc-default 'content response) 0)))
       (assoc-default 'text content))))
 
 (cl-defmethod llm-provider-extract-reasoning ((_ llm-claude) response)
-  (when (> 0 (length (assoc-default 'content response)))
+  (when (> (length (assoc-default 'content response)) 0)
     (let ((content (aref (assoc-default 'content response) 0)))
       (assoc-default 'thinking content))))
 
