@@ -1,3 +1,5 @@
+* Version 0.28.2
+- Add Chat GPT post 5.0 series models, such as 5.1 and 5.2
 * Version 0.28.1
 - Fix error on empty Claude responses
 * Version 0.28.0
