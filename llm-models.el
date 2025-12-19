@@ -236,6 +236,12 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 1048576
     :regex "gemini-3-pro")
    (make-llm-model
+    :name "Gemini 3 Flash" :symbol 'gemini-3-flash
+    :capabilities '(generation tool-use image-input audio-input video-input json-response
+                               pdf-input caching reasoning)
+    :context-length 1048576
+    :regex "gemini-3-flash")
+   (make-llm-model
     :name "Gemini 2.0 Pro" :symbol 'gemini-2.0-pro
     :capabilities '(generation tool-use image-input audio-input video-input)
     :context-length 1048576
