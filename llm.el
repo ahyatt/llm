@@ -798,8 +798,7 @@ This should only be used for logging or debugging."
                                                 ", "))))
                           (concat (if content (format "Content: %s" content) "")
                                   (if tool-results
-                                      (format " Tool results: %s" tool-results)
-                                    )))))
+                                      (format " Tool results: %s" tool-results))))))
               (llm-chat-prompt-interactions prompt) "\n")
    "\n"
    (when (llm-chat-prompt-temperature prompt)
