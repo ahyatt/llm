@@ -267,11 +267,11 @@ These are just the text inside the tag, not the tag itself."))
                         (funcall receiver response)))))))
 
 (cl-defmethod llm-provider-collect-streaming-tool-uses ((_ llm-ollama) data)
-  (mapcar (lambda (fc) (let ((f-alist (cdr fc)))
-                         (make-llm-provider-utils-tool-use
-                          :name (assoc-default 'name f-alist)
-                          :args (assoc-default 'arguments f-alist))))
-          data))
+  ;; Ollama only supports one tool used at a time.
+  (when-let* ((f-alist (cdadr data)))
+    (list (make-llm-provider-utils-tool-use
+           :name (assoc-default 'name f-alist)
+           :args (assoc-default 'arguments f-alist)))))
 
 (cl-defmethod llm-name ((provider llm-ollama))
   (or (llm-ollama-chat-model provider)
@@ -282,7 +282,7 @@ These are just the text inside the tag, not the tag itself."))
                                         2048))
 
 (cl-defmethod llm-capabilities ((provider llm-ollama))
-  (append '(streaming streaming-tool-use json-response model-list)
+  (append '(streaming json-response model-list)
           (when (and (llm-ollama-embedding-model provider)
                      (let ((embedding-model (llm-models-match
                                              (llm-ollama-embedding-model provider))))
@@ -293,7 +293,7 @@ These are just the text inside the tag, not the tag itself."))
                       (chat-model (llm-models-match model))
                       (capabilities (llm-model-capabilities chat-model)))
             (append
-             (when (member 'tool-use capabilities) '(tool-use))
+             (when (member 'tool-use capabilities) '(tool-use streaming-tool-use))
              (seq-intersection capabilities '(image-input))))))
 
 (cl-defmethod llm-models ((provider llm-ollama))

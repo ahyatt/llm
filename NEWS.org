@@ -1,4 +1,6 @@
 * Version 0.28.3
+- Fixed breakage in Ollama streaming tool calling
+- Fixed incorrect Ollama streaming tool use capability reporting
 - Add Gemini 3 Flash
 * Version 0.28.2
 - Add Chat GPT post 5.0 series models, such as 5.1 and 5.2
