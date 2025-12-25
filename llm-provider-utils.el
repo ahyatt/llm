@@ -360,17 +360,20 @@ return a list of `llm-chat-prompt-tool-use' structs.")
      :headers (llm-provider-headers provider)
      :data (llm-provider-chat-request provider prompt nil)
      :on-success (lambda (data)
-                   (if-let ((err-msg (llm-provider-chat-extract-error provider data)))
-                       (llm-provider-utils-callback-in-buffer
-                        buf error-callback 'error
-                        err-msg)
-                     (llm-provider-utils-process-result
-                      provider prompt
-                      (llm-provider-utils-extract-all provider data)
-                      multi-output
-                      (lambda (result)
-                        (llm-provider-utils-callback-in-buffer
-                         buf success-callback result)))))
+                   (with-current-buffer (if (buffer-live-p buf)
+                                            buf
+                                          (generate-new-buffer " *llm-temp*" t))
+                     (if-let ((err-msg (llm-provider-chat-extract-error provider data)))
+                         (llm-provider-utils-callback-in-buffer
+                          buf error-callback 'error
+                          err-msg)
+                       (llm-provider-utils-process-result
+                        provider prompt
+                        (llm-provider-utils-extract-all provider data)
+                        multi-output
+                        (lambda (result)
+                          (llm-provider-utils-callback-in-buffer
+                           buf success-callback result))))))
      :on-error (lambda (_ data)
                  (llm-provider-utils-callback-in-buffer
                   buf error-callback 'error
@@ -443,18 +446,19 @@ Any strings will be concatenated, integers will be added, etc."
      :on-success
      (lambda (_)
        ;; We don't need the data at the end of streaming, so we can ignore it.
-       (llm-provider-utils-process-result
-        provider prompt
-        (llm-provider-utils-streaming-accumulate
-         current-result
-         (when-let ((tool-uses-raw (plist-get current-result
-                                              :tool-uses-raw)))
-           `(:tool-uses ,(llm-provider-collect-streaming-tool-uses
-                          provider tool-uses-raw))))
-        multi-output
-        (lambda (result)
-          (llm-provider-utils-callback-in-buffer
-           buf response-callback result))))
+       (with-current-buffer (if (buffer-live-p buf)
+                                (generate-new-buffer " *llm-temp*" t))
+         (llm-provider-utils-process-result
+          provider prompt
+          (llm-provider-utils-streaming-accumulate
+           current-result
+           (when-let ((tool-uses-raw (plist-get current-result
+                                                :tool-uses-raw)))
+             `(:tool-uses ,(llm-provider-collect-streaming-tool-uses
+                            provider tool-uses-raw))))
+          multi-output
+          (lambda (result)
+            (llm-provider-utils-callback-in-buffer buf response-callback result)))))
      :on-error (lambda (_ data)
                  (llm-provider-utils-callback-in-buffer
                   buf error-callback 'error
