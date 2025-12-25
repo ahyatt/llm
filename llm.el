@@ -776,16 +776,30 @@ This should only be used for logging or debugging."
                         (pcase (llm-chat-prompt-interaction-role i)
                           ('user "User")
                           ('system "System")
-                          ('assistant "Assistant"))
-                        (let ((content (llm-chat-prompt-interaction-content i)))
-                          (if (llm-multipart-p content)
-                              (mapcar (lambda (part) (if (llm-media-p part)
-                                                         (format "[%s data, %d bytes]"
-                                                                 (llm-media-mime-type part)
-                                                                 (length (llm-media-data part)))
-                                                       part))
-                                      (llm-multipart-parts content))
-                            content))))
+                          ('assistant "Assistant")
+                          ('tool-results "Tool Results")
+                          (_ (llm-chat-prompt-interaction-role i)))
+                        (let* ((content-raw (llm-chat-prompt-interaction-content i))
+                               (tool-result-raw (llm-chat-prompt-interaction-tool-results i))
+                               (content (if (llm-multipart-p content-raw)
+                                            (mapcar (lambda (part) (if (llm-media-p part)
+                                                                       (format "[%s data, %d bytes]"
+                                                                               (llm-media-mime-type part)
+                                                                               (length (llm-media-data part)))
+                                                                     part))
+                                                    (llm-multipart-parts content-raw))
+                                          content-raw))
+                               (tool-results (when tool-result-raw
+                                               (mapconcat
+                                                (lambda (tr)
+                                                  (format "[Tool: %s, Result: %s]"
+                                                          (llm-chat-prompt-tool-result-tool-name tr)
+                                                          (llm-chat-prompt-tool-result-result tr)))
+                                                tool-result-raw
+                                                ", "))))
+                          (concat (if content (format "Content: %s" content) "")
+                                  (if tool-results
+                                      (format " Tool results: %s" tool-results))))))
               (llm-chat-prompt-interactions prompt) "\n")
    "\n"
    (when (llm-chat-prompt-temperature prompt)
