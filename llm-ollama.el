@@ -112,46 +112,12 @@ PROVIDER is the llm-ollama provider."
 (cl-defmethod llm-provider-batch-embeddings-extract-result ((_ llm-ollama) response)
   (append (assoc-default 'embeddings response) nil))
 
-(eval-and-compile
-  (defconst llm-ollama-reasoning-tags '("think" "reasoning")
-    "A list of possibilities for reasoning tags in Ollama responses.
-
-These are just the text inside the tag, not the tag itself."))
-
 (cl-defmethod llm-provider-chat-extract-result ((_ llm-ollama) response)
   "Return the chat response from the server RESPONSE."
-  (let ((raw-result (assoc-default 'content (assoc-default 'message response))))
-    ;; The raw result may have reasoning content in, which is in <think> tags
-    ;; (for DeepSeek reasoning).  We want to strip that out.
-    (with-temp-buffer
-      (insert raw-result)
-      (goto-char 0)
-      (if (seq-find (lambda (tag)
-                      (search-forward (format "</%s>" tag) nil t))
-                    llm-ollama-reasoning-tags)
-          (string-trim (buffer-substring (point) (point-max)))
-        raw-result))))
+  (assoc-default 'content (assoc-default 'message response)))
 
 (cl-defmethod llm-provider-extract-reasoning ((_ llm-ollama) response)
-  (let ((raw-result (assoc-default 'content (assoc-default 'message response))))
-    ;; Reasoning content is in <think> tags (for DeepSeek reasoning).  We want to
-    ;; extract the content between these tags.
-    (with-temp-buffer
-      (insert raw-result)
-      (goto-char 0)
-      (when (re-search-forward
-             (rx (seq (literal "<")
-                      (group (eval `(or ,@llm-ollama-reasoning-tags)))
-                      (literal ">")))
-             nil t)
-        (when-let* ((end (save-excursion
-                           (re-search-forward
-                            (rx (seq
-                                 (literal "</")
-                                 (group (literal (match-string 1)))
-                                 (literal ">"))) nil t))))
-          ;; +3 to account for the length of the two brackets and slash
-          (buffer-substring (point) (- end (+ 3 (length (match-string 1))))))))))
+  (assoc-default 'thinking (assoc-default 'message response)))
 
 (defun llm-ollama--response-format (format)
   "Return the response format for FORMAT."
@@ -256,34 +222,28 @@ These are just the text inside the tag, not the tag itself."))
 (cl-defmethod llm-provider-streaming-media-handler ((_ llm-ollama) receiver _)
   (cons 'application/x-ndjson
         (plz-media-type:application/x-ndjson
-         :handler (let ((in-reasoning))
-                    (lambda (data)
-                      (let* ((message (assoc-default 'message data))
-                             (text (assoc-default 'content message))
-                             (tool-call (assoc-default 'tool_calls message))
-                             (response nil))
-                        (when (and text (> (length text) 0))
-                          ;; The response from ollama should just have the tag and
-                          ;; nothing more.
-                          (cond
-                           ((string-match (rx
-                                           (seq "<"
-                                                (eval `(or ,@llm-ollama-reasoning-tags))
-                                                ">")) text)
-                            (setq in-reasoning t))
-                           ((string-match (rx
-                                           (seq "</"
-                                                (eval `(or ,@llm-ollama-reasoning-tags))
-                                                ">")) text)
-                            (setq in-reasoning nil))
-                           (t
-                            (setq response
-                                  (plist-put response (if in-reasoning :reasoning :text) text)))))
-                        (when tool-call
-                          (setq response
-                                (plist-put response :tool-uses-raw
-                                           (aref tool-call 0))))
-                        (funcall receiver response)))))))
+         :handler (lambda (data)
+                    (let* ((message (assoc-default 'message data))
+                           (text (assoc-default 'content message))
+                           (reasoning (assoc-default 'thinking message))
+                           (tool-call (assoc-default 'tool_calls message))
+                           (response nil))
+                      (when reasoning
+                        (setq response
+                              (plist-put response :reasoning
+                                         (concat
+                                          (or (plist-get response :reasoning) "")
+                                          reasoning))))
+                      (when text
+                        (setq response
+                              (plist-put response :text (concat
+                                                         (or (plist-get response :text) "")
+                                                         text))))
+                      (when tool-call
+                        (setq response
+                              (plist-put response :tool-uses-raw
+                                         (aref tool-call 0))))
+                      (funcall receiver response))))))
 
 (cl-defmethod llm-provider-collect-streaming-tool-uses ((_ llm-ollama) data)
   ;; Ollama only supports one tool used at a time.
