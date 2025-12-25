@@ -162,11 +162,17 @@ PROVIDER is the llm-ollama provider."
                                      (llm-ollama--response-format
                                       (llm-chat-prompt-response-format prompt)))))
     (setq request-plist (plist-put request-plist :stream (if streaming t :false)))
-    (when (llm-chat-prompt-reasoning prompt)
+    (when (and (llm-chat-prompt-reasoning prompt)
+               (not (eq 'none (llm-chat-prompt-reasoning prompt))))
       (setq request-plist (plist-put request-plist :think
-                                     (if (eq 'none (llm-chat-prompt-reasoning prompt))
-                                         :false
-                                       't))))
+                                     (if (eq 'gpt-oss (llm-models-match (llm-ollama-chat-model provider)))
+                                         (pcase (llm-chat-prompt-reasoning prompt)
+                                           ('light "low")
+                                           ('medium "medium")
+                                           ('maximum "high"))
+                                       (if (eq 'none (llm-chat-prompt-reasoning prompt))
+                                           :false
+                                         't)))))
     (when (llm-chat-prompt-temperature prompt)
       (setq options (plist-put options :temperature (llm-chat-prompt-temperature prompt))))
     (when (llm-chat-prompt-max-tokens prompt)
