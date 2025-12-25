@@ -747,7 +747,8 @@ SUCCESS-CALLBACK.
 
 SUCCESS-CALLBACK is the callback that will be run when all functions
 complete."
-  (when (plist-get partial-result :text)
+  (when (and (plist-get partial-result :text)
+             (> (length (plist-get partial-result :text)) 0))
     (llm-provider-append-to-prompt provider prompt (plist-get partial-result :text)))
   (if-let ((tool-uses (plist-get partial-result :tool-uses)))
       ;; If we have tool uses, execute them, and on the callback, we will

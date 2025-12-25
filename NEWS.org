@@ -1,4 +1,6 @@
 * Version 0.28.4
+- Removed bad interactions made in Ollama tool calls
+- Fixed Ollama tool calling requests
 - Fixed Ollama reasoning, whose API has changed
 - Added gpt-oss, supported low/medium/high reasoning with Ollama
 * Version 0.28.3
