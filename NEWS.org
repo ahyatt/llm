@@ -1,5 +1,6 @@
 * Version 0.28.4
 - Removed bad interactions made in Ollama tool calls
+- Fixed Ollama tool calling requests
 * Version 0.28.3
 - Fixed breakage in Ollama streaming tool calling
 - Fixed incorrect Ollama streaming tool use capability reporting

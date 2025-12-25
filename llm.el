@@ -777,6 +777,7 @@ This should only be used for logging or debugging."
                           ('user "User")
                           ('system "System")
                           ('assistant "Assistant")
+                          ('tool-results "Tool Results")
                           (_ (llm-chat-prompt-interaction-role i)))
                         (let* ((content-raw (llm-chat-prompt-interaction-content i))
                                (tool-result-raw (llm-chat-prompt-interaction-tool-results i))

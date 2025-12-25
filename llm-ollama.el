@@ -163,26 +163,52 @@ These are just the text inside the tag, not the tag itself."))
   (llm-provider-utils-combine-to-system-prompt prompt llm-ollama-example-prelude)
   (let (request-plist messages options)
     (setq messages
-          (vconcat (mapcar (lambda (interaction)
+          (vconcat (mapcan (lambda (interaction)
                              (let* ((role (llm-chat-prompt-interaction-role interaction))
                                     (content (llm-chat-prompt-interaction-content interaction))
-                                    (content-text "")
+                                    (tool-results (llm-chat-prompt-interaction-tool-results interaction))
+                                    (tool-call-p (and (listp content)
+                                                      (llm-provider-utils-tool-use-p (car content))))
                                     (images nil))
-                               (if (stringp content)
-                                   (setq content-text content)
-                                 (if (eq 'user role)
-                                     (dolist (part (llm-multipart-parts content))
-                                       (if (llm-media-p part)
-                                           (setq images (append images (list part)))
-                                         (setq content-text (concat content-text part))))
-                                   (setq content-text (json-serialize content))))
-                               (append
-                                `(:role ,(symbol-name role)
-                                        :content ,content-text)
-                                (when images
-                                  `(:images
-                                    ,(vconcat (mapcar (lambda (img) (base64-encode-string (llm-media-data img) t))
-                                                      images)))))))
+                               ;; Tool results expand to one tool line per
+                               ;; result, so multiple lines per this
+                               ;; interaction.
+                               (if tool-results
+                                   (mapcar (lambda (r)
+                                             `(:role "tool"
+                                                     :tool_name ,(llm-chat-prompt-tool-result-tool-name r)
+                                                     :content ,(llm-chat-prompt-tool-result-result r)))
+                                           tool-results)
+                                 (list (append
+                                        `(:role
+                                          ,(symbol-name role)
+                                          ,(if tool-call-p :tool_calls :content)
+                                          ,(cond
+                                            ((stringp content) content)
+                                            (tool-call-p
+                                             (cl-loop for tool in content
+                                                      and index from 0
+                                                      vconcat
+                                                      `((:type "function"
+                                                               :function
+                                                               (:index ,index
+                                                                       :name
+                                                                       ,(llm-provider-utils-tool-use-name tool)
+                                                                       :arguments
+                                                                       ,(llm-provider-utils-tool-use-args tool))))))
+                                            ((llm-multipart-p content)
+                                             (cl-loop for part in (llm-multipart-parts content) do
+                                                      (when (llm-media-p part)
+                                                        (setq images (append images (list part))))
+                                                      concat
+                                                      (if (llm-media-p part)
+                                                          ""
+                                                        part)))
+                                            (t (setq content-text (json-serialize content)))))
+                                        (when images
+                                          `(:images
+                                            ,(vconcat (mapcar (lambda (img) (base64-encode-string (llm-media-data img) t))
+                                                              images)))))))))
                            (llm-chat-prompt-interactions prompt))))
     (setq request-plist (plist-put request-plist :messages messages))
     (setq request-plist (plist-put request-plist :model (llm-ollama-chat-model provider)))
@@ -225,14 +251,7 @@ These are just the text inside the tag, not the tag itself."))
           (assoc-default 'tool_calls (assoc-default 'message response))))
 
 (cl-defmethod llm-provider-populate-tool-uses ((_ llm-ollama) prompt tool-uses)
-  (llm-provider-utils-append-to-prompt
-   prompt
-   (vconcat (mapcar (lambda (tool-use)
-                      `(:function (:name ,(llm-provider-utils-tool-use-name tool-use)
-                                         :arguments ,(json-serialize
-                                                      (llm-provider-utils-tool-use-args tool-use)
-                                                      :false-object :json-false))))
-                    tool-uses))))
+  (llm-provider-utils-append-to-prompt prompt tool-uses))
 
 (cl-defmethod llm-provider-streaming-media-handler ((_ llm-ollama) receiver _)
   (cons 'application/x-ndjson
