@@ -3,6 +3,7 @@
 - Fixed Ollama tool calling requests
 - Fixed Ollama reasoning, whose API has changed
 - Added gpt-oss, supported low/medium/high reasoning with Ollama
+- Run tools in the original buffer
 * Version 0.28.3
 - Fixed breakage in Ollama streaming tool calling
 - Fixed incorrect Ollama streaming tool use capability reporting
