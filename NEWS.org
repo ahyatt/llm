@@ -1,3 +1,5 @@
+* Version 0.28.5
+- Fix for running tools in the original buffer with streaming
 * Version 0.28.4
 - Removed bad interactions made in Ollama tool calls
 - Fixed Ollama tool calling requests
