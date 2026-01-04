@@ -447,7 +447,8 @@ Any strings will be concatenated, integers will be added, etc."
      (lambda (_)
        ;; We don't need the data at the end of streaming, so we can ignore it.
        (with-current-buffer (if (buffer-live-p buf)
-                                (generate-new-buffer " *llm-temp*" t))
+                                buf
+                              (generate-new-buffer " *llm-temp*" t))
          (llm-provider-utils-process-result
           provider prompt
           (llm-provider-utils-streaming-accumulate
