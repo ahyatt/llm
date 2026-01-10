@@ -235,7 +235,8 @@ PROVIDER is the Open AI provider struct."
 
 (defun llm-openai--build-tool-uses (fcs)
   "Convert back from the generic representation to the Open AI.
-            FCS is a list of `llm-provider-utils-tool-use' structs."
+
+FCS is a list of `llm-provider-utils-tool-use' structs."
   (vconcat
    (mapcar (lambda (fc)
              `(:id ,(llm-provider-utils-tool-use-id fc)
