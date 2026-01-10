@@ -26,6 +26,7 @@
 (require 'plz-media-type)
 (require 'rx)
 (require 'url-http)
+(require 'llm)
 
 (defcustom llm-request-plz-timeout nil
   "The number of seconds to wait for a response from a HTTP server.
@@ -74,31 +75,48 @@ TIMEOUT is the number of seconds to wait for a response."
      (seq-let [error-sym message data] error
        (cond
         ((eq 'plz-http-error error-sym)
-         (let ((response (plz-error-response data)))
-           (error "LLM request failed with code %d: %s (additional information: %s)"
-                  (plz-response-status response)
-                  (nth 2 (assq (plz-response-status response) url-http-codes))
-                  (plz-response-body response))))
+         (let* ((response (plz-error-response data))
+                (status (plz-response-status response))
+                (body (plz-response-body response)))
+           (cond
+            ((or (eq status 401) (eq status 403))
+             (signal 'llm-request-authentication-error (list body)))
+            ((eq status 400)
+             (signal 'llm-request-bad-request (list body)))
+            (t
+             (signal 'llm-request-error
+                     (list (format "LLM request failed with code %d: %s (additional information: %s)"
+                                   status
+                                   (nth 2 (assq status url-http-codes))
+                                   body)))))))
         ((and (eq 'plz-curl-error error-sym)
               (eq 28 (car (plz-error-curl-error data))))
-         (error "LLM request timed out"))
+         (signal 'llm-request-timeout nil))
         (t (signal error-sym (list message data))))))))
 
 (defun llm-request-plz--handle-error (error on-error)
   "Handle the ERROR with the ON-ERROR callback."
   (cond ((plz-error-curl-error error)
          (let ((curl-error (plz-error-curl-error error)))
-           (funcall on-error 'error
-                    (format "curl error code %d: %s"
-                            (car curl-error)
-                            (cdr curl-error)))))
+           (if (eq 28 (car curl-error))
+               (funcall on-error 'llm-request-timeout (cdr curl-error))
+             (funcall on-error 'llm-request-error
+                      (format "curl error code %d: %s"
+                              (car curl-error)
+                              (cdr curl-error))))))
         ((plz-error-response error)
          (when-let ((response (plz-error-response error))
                     (status (plz-response-status response))
                     (body (plz-response-body response)))
-           (funcall on-error 'error body)))
+           (cond
+            ((or (eq status 401) (eq status 403))
+             (funcall on-error 'llm-request-authentication-error body))
+            ((eq status 400)
+             (funcall on-error 'llm-request-bad-request body))
+            (t
+             (funcall on-error 'llm-request-error body)))))
         ((plz-error-message error)
-         (funcall on-error 'error (plz-error-message error)))
+         (funcall on-error 'llm-request-error (plz-error-message error)))
         (t (user-error "Unexpected error: %s" error))))
 
 (cl-defun llm-request-plz-async (url &key headers data on-success media-type
