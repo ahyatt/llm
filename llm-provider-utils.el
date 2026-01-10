@@ -397,8 +397,11 @@ Any strings will be concatenated, integers will be added, etc."
       (if new
           (progn
             (unless (eq (type-of current) (type-of new))
-              (signal 'llm-invalid-argument (list (format "Cannot accumulate different types of streaming results: %s and %s"
-                                                          current new))))
+              (signal
+               'llm-invalid-argument
+               (list (format
+                      "Cannot accumulate different types of streaming results: %s and %s"
+                      current new))))
             (pcase (type-of current)
               ('string (concat current new))
               ('integer (+ current new))
@@ -861,7 +864,7 @@ have returned results."
                                               ;; optional, signal an error.
                                               (unless (plist-get arg :optional)
                                                 (signal 'llm-tool-missing-argument
-                                                        `(:tool ,name :arg ,arg)))))))
+                                                        `((:tool ,name :arg ,arg))))))))
             (end-func (lambda (result)
                         (llm--log
                          'api-funcall
@@ -878,7 +881,7 @@ have returned results."
                                    (if multi-output
                                        (llm-provider-utils-final-multi-output-result
                                         (append partial-result
-                                                `(:tool-results ,tool-use-and-results)))
+                                                `((:tool-results ,tool-use-and-results))))
                                      tool-use-and-results))))))
        ;; Check to see that there were no unknown args.
        (dolist (arg-key (map-keys arguments))
@@ -887,7 +890,7 @@ have returned results."
                                   arg-key))
                   (llm-tool-args tool))
            (signal 'llm-tool-unknown-argument
-                   `(:tool ,name :arg ,arg-key))))
+                   `((:tool ,name :arg ,arg-key)))))
 
        (if (llm-tool-async tool)
            (apply (llm-tool-function tool)

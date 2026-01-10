@@ -117,9 +117,11 @@
                                               ('any "any")
                                               ('none "none")
                                               ((pred stringp) "tool")
-                                              (_ (signal 'llm-not-supported (list (format "Unknown tool choice option: %s"
-                                                                                          (llm-tool-options-tool-choice options)))))))
-                                (when (stringp (llm-tool-options-tool-choice options))                                 (list :name (llm-tool-options-tool-choice options)))))))
+                                              (_ (signal 'llm-not-supported
+                                                         (list (format "Unknown tool choice option: %s"
+                                                                       (llm-tool-options-tool-choice options)))))))
+                                (when (stringp (llm-tool-options-tool-choice options))
+                                  (list :name (llm-tool-options-tool-choice options)))))))
     (when (llm-chat-prompt-reasoning prompt)
       (setq request (plist-put request :thinking
                                (let (thinking-plist)
@@ -152,7 +154,8 @@
                                  "image")
                               :source ,source)))
                    (t
-                    (signal 'llm-invalid-argument (list (format "Unsupported multipart content: %s" part))))))
+                    (signal 'llm-invalid-argument
+                            (list (format "Unsupported multipart content: %s" part))))))
            (llm-multipart-parts content))))
 (cl-defmethod llm-provider-extract-tool-uses ((_ llm-claude) response)
   (let ((content (append (assoc-default 'content response) nil)))

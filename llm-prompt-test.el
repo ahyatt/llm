@@ -61,21 +61,21 @@ to converge."
                       :name 'var-1 :tickets 10
                       :generator (funcall
                                   (iter-lambda ()
-                                      (while t (iter-yield 'a)))))
+                                    (while t (iter-yield 'a)))))
                      (make-llm-prompt-variable-full
                       :name 'var-2 :tickets 20
                       :generator (funcall
                                   (iter-lambda ()
-                                      (while t (iter-yield 'b)))))
+                                    (while t (iter-yield 'b)))))
                      (make-llm-prompt-variable-full
                       :name 'var-3 :tickets 30
                       :generator (funcall
                                   (iter-lambda ()
-                                      (while t (iter-yield 'c)))))
+                                    (while t (iter-yield 'c)))))
                      (make-llm-prompt-variable-full
                       :name 'var-4 :tickets 30
                       :generator (funcall (iter-lambda ()
-                                              (iter-yield 'd))))))
+                                            (iter-yield 'd))))))
          (selector (llm-prompt--select-tickets vars))
          (iters 20000))
     (dotimes (_ iters)
@@ -98,7 +98,7 @@ to converge."
                       :name 'var-1 :tickets 10
                       :generator (funcall
                                   (iter-lambda ()
-                                      (while t (iter-yield 'a)))))))
+                                    (while t (iter-yield 'a)))))))
          (selector (llm-prompt--select-tickets vars)))
     (push (cdr (iter-next selector)) result)
     (push (cdr (iter-next selector)) result)
@@ -110,7 +110,7 @@ to converge."
                       :name 'var :tickets 10
                       :generator (funcall
                                   (iter-lambda ()
-                                      (iter-yield 'a))))))
+                                    (iter-yield 'a))))))
          (selector (llm-prompt--select-tickets vars)))
     (should (equal (cdr (iter-next selector)) 'a))
     (condition-case nil

@@ -251,7 +251,8 @@ from the variable."
                      (add-location (if (consp (cdr val-cons))
                                        (cddr val-cons) 'front)))
                 (unless (member add-location '(front back))
-                  (signal 'llm-invalid-argument '("Add location specification must be one of 'front or 'back")))
+                  (signal 'llm-invalid-argument
+                          '("Add location specification must be one of 'front or 'back")))
                 ;; Only add if there is space, otherwise we ignore this value.
                 (when (<= (+ total-tokens (llm-count-tokens provider sval))
                           (* (/ llm-prompt-default-max-pct 100.0)
@@ -295,7 +296,8 @@ generator."
   (with-temp-buffer
     (let ((prompt-text (gethash name llm-prompt-prompts)))
       (unless prompt-text
-        (signal 'llm-invalid-argument (list (format "Could not find prompt with name %s" name))))
+        (signal 'llm-invalid-argument
+                (list (format "Could not find prompt with name %s" name))))
       (apply #'llm-prompt-fill-text prompt-text provider keys))))
 
 (provide 'llm-prompt)
