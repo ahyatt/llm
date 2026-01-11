@@ -99,7 +99,8 @@ PROVIDER is the Open AI provider struct."
 
 (cl-defmethod llm-openai--check-key ((provider llm-openai))
   (unless (llm-openai-key provider)
-    (error "To call Open AI API, add a key to the `llm-openai' provider")))
+    (signal 'llm-provider-unconfigured
+            '("To call Open AI API, add a key to the `llm-openai' provider"))))
 
 (cl-defmethod llm-openai--check-key ((_ llm-openai-compatible))
   ;; It isn't always the case that a key is needed for Open AI compatible APIs.
@@ -212,7 +213,9 @@ PROVIDER is the Open AI provider struct."
              (list
               :function (list :name (llm-tool-options-tool-choice options))
               :type "function"))
-            (_ (error "Unknown tool choice option: %s" (llm-tool-options-tool-choice options)))))))
+            (_ (signal 'llm-not-supported
+                       (list (format "Unknown tool choice option: %s"
+                                     (llm-tool-options-tool-choice options)))))))))
 
 (defun llm-openai--build-tool-interaction (interaction)
   "Build the tool interaction for INTERACTION."
@@ -232,6 +235,7 @@ PROVIDER is the Open AI provider struct."
 
 (defun llm-openai--build-tool-uses (fcs)
   "Convert back from the generic representation to the Open AI.
+
 FCS is a list of `llm-provider-utils-tool-use' structs."
   (vconcat
    (mapcar (lambda (fc)

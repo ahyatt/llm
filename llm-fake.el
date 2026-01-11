@@ -66,7 +66,10 @@ message cons.  If nil, the response will be a simple vector."
                (pcase (type-of result)
                  ('string result)
                  ('cons (signal (car result) (cdr result)))
-                 (_ (error "Incorrect type found in `chat-action-func': %s" (type-of result)))))
+                 (_ (signal
+                     'llm-invalid-argument
+                     (list (format "Incorrect type found in `chat-action-func': %s"
+                                   (type-of result)))))))
            "Sample response from `llm-chat-async'")))
     (setf (llm-chat-prompt-interactions prompt)
           (append (llm-chat-prompt-interactions prompt)
@@ -87,7 +90,9 @@ message cons.  If nil, the response will be a simple vector."
         (pcase (type-of result)
           ('string (setq text result))
           ('cons (signal (car result) (cdr result)))
-          (_ (error "Incorrect type found in `chat-action-func': %s" (type-of result))))))
+          (_ (signal 'llm-invalid-argument
+                     (list (format "Incorrect type found in `chat-action-func': %s"
+                                   (type-of result))))))))
     (let ((accum ""))
       (mapc (lambda (word)
               (setq accum (concat accum word " "))
@@ -110,7 +115,8 @@ message cons.  If nil, the response will be a simple vector."
         (pcase (type-of result)
           ('vector result)
           ('cons (signal (car result) (cdr result)))
-          (_ (error "Incorrect type found in `chat-embedding-func': %s" (type-of result)))))
+          (_ (signal 'llm-invalid
+                     (list (format "Incorrect type found in `chat-embedding-func': %s" (type-of result)))))))
     [0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9]))
 
 (cl-defmethod llm-embedding-async ((provider llm-fake) string vector-callback error-callback)

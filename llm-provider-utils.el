@@ -397,8 +397,11 @@ Any strings will be concatenated, integers will be added, etc."
       (if new
           (progn
             (unless (eq (type-of current) (type-of new))
-              (error "Cannot accumulate different types of streaming results: %s and %s"
-                     current new))
+              (signal
+               'llm-invalid-argument
+               (list (format
+                      "Cannot accumulate different types of streaming results: %s and %s"
+                      current new))))
             (pcase (type-of current)
               ('string (concat current new))
               ('integer (+ current new))
@@ -820,7 +823,8 @@ This will convert all :json-false and :false values to nil."
    ((member args '(:json-false :false)) nil)
    (t args)))
 
-(defun llm-provider-utils-execute-tool-uses (provider prompt tool-uses multi-output partial-result success-callback)
+(defun llm-provider-utils-execute-tool-uses (provider prompt tool-uses multi-output
+                                                      partial-result success-callback)
   "Execute TOOL-USES, a list of `llm-provider-utils-tool-use'.
 
 A response suitable for returning to the client will be returned.
@@ -845,14 +849,22 @@ have returned results."
      for tool-use in tool-uses do
      (let* ((name (llm-provider-utils-tool-use-name tool-use))
             (arguments (llm-provider-utils-tool-use-args tool-use))
-            (tool (seq-find
-                   (lambda (f) (equal name (llm-tool-name f)))
-                   (llm-chat-prompt-tools prompt)))
+            (tool (or
+                   (seq-find
+                    (lambda (f) (equal name (llm-tool-name f)))
+                    (llm-chat-prompt-tools prompt))
+                   (signal 'llm-tool-unknown-tool `(:tool ,name))))
             (call-args (cl-loop for arg in (llm-tool-args tool)
-                                collect (cdr (seq-find (lambda (a)
-                                                         (eq (intern (plist-get arg :name))
-                                                             (car a)))
-                                                       arguments))))
+                                collect (cdr (or
+                                              (seq-find (lambda (a)
+                                                          (eq (intern (plist-get arg :name))
+                                                              (car a)))
+                                                        arguments)
+                                              ;; Arg wasn't found, if it wasn't
+                                              ;; optional, signal an error.
+                                              (unless (plist-get arg :optional)
+                                                (signal 'llm-tool-missing-argument
+                                                        `((:tool ,name :arg ,arg))))))))
             (end-func (lambda (result)
                         (llm--log
                          'api-funcall
@@ -871,6 +883,15 @@ have returned results."
                                         (append partial-result
                                                 `(:tool-results ,tool-use-and-results)))
                                      tool-use-and-results))))))
+       ;; Check to see that there were no unknown args.
+       (dolist (arg-key (map-keys arguments))
+         (unless (seq-find
+                  (lambda (a) (eq (intern (plist-get a :name))
+                                  arg-key))
+                  (llm-tool-args tool))
+           (signal 'llm-tool-unknown-argument
+                   `((:tool ,name :arg ,arg-key)))))
+
        (if (llm-tool-async tool)
            (apply (llm-tool-function tool)
                   (append (list end-func) call-args))

@@ -104,7 +104,11 @@ information than standard tool use."
                   (float-time (time-subtract (current-time) (or (llm-vertex-key-gentime provider) 0)))))
     (let ((result (string-trim (shell-command-to-string (concat llm-vertex-gcloud-binary " auth print-access-token")))))
       (when (string-match-p "ERROR" result)
-        (error "Could not refresh gcloud access token, received the following error: %s" result))
+        (signal
+         'llm-provider-error
+         (list (format
+                "Could not refresh gcloud access token, received the following error: %s"
+                result))))
       ;; We need to make this unibyte, or else it doesn't causes problems when
       ;; the user is using multibyte strings.
       (setf (llm-vertex-key provider) (encode-coding-string result 'utf-8)))
@@ -269,7 +273,9 @@ information than standard tool use."
                            ('none "NONE")
                            ('any "ANY")
                            ((pred stringp) "ANY")
-                           (_ (error "Unknown tool choice option: %s" (llm-tool-options-tool-choice options)))))
+                           (_ (signal
+                               'llm-not-supported
+                               (list (format "Unknown tool choice option: %s" (llm-tool-options-tool-choice options)))))))
              (when (stringp (llm-tool-options-tool-choice options))
                `(:allowedFunctionNames [,(llm-tool-options-tool-choice options)]))))))))
    (llm-vertex--chat-parameters prompt model)))

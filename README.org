@@ -227,6 +227,57 @@ Conversations can take place by repeatedly calling ~llm-chat~ and its variants. 
 #+end_src
 ** Caution about ~llm-chat-prompt-interactions~
 The interactions in a prompt may be modified by conversation or by the conversion of the context and examples to what the LLM understands.  Different providers require different things from the interactions.  Some can handle system prompts, some cannot.  Some require alternating user and assistant chat interactions, others can handle anything.  It's important that clients keep to behaviors that work on all providers.  Do not attempt to read or manipulate ~llm-chat-prompt-interactions~ after initially setting it up for the first time, because you are likely to make changes that only work for some providers.  Similarly, don't directly create a prompt with ~make-llm-chat-prompt~, because it is easy to create something that wouldn't work for all providers.
+** Error handling
+The =llm= package defines several error symbols that can be signaled during operations. These errors follow a hierarchy, allowing you to catch errors at different levels of specificity.
+
+*** Error hierarchy
+All LLM-related errors inherit from ~llm-error~:
+- ~llm-error~: The base error for all LLM operations.
+  - ~llm-invalid-argument~: Signaled when an invalid argument is provided to an LLM function.
+  - ~llm-not-supported~: Signaled when a requested operation or feature is not supported by the provider or model.
+  - ~llm-provider-error~: The base error for provider-related issues.
+    - ~llm-provider-unconfigured~: Signaled when the provider is not configured correctly (e.g., missing API key).
+  - ~llm-request-error~: The base error for request failures.
+    - ~llm-request-timeout~: Signaled when a request times out.
+    - ~llm-request-authentication-error~: Signaled when authentication fails (e.g., invalid API key).
+    - ~llm-request-bad-request~: Signaled when the request was invalid (e.g., bad format).
+  - ~llm-tool-call-error~: The base error for all tool calling errors.
+    - ~llm-tool-unknown-tool~: Signaled when an LLM attempts to call a tool that was not provided in the prompt's tools list.
+    - ~llm-tool-unknown-argument~: Signaled when an LLM calls a tool with an argument that is not defined in the tool's argument specification.
+    - ~llm-tool-missing-argument~: Signaled when an LLM calls a tool but omits a required (non-optional) argument.
+
+*** Error data
+Most errors return a list with a string as their data (the same as the standard error).
+
+Some errors have structured data instead.  These are those errors;
+When these errors are signaled, they include a data plist with additional information:
+
+- ~llm-tool-unknown-tool~: ~(:tool TOOL-NAME)~
+  - ~TOOL-NAME~: The name of the tool the LLM attempted to call.
+
+- ~llm-tool-unknown-argument~: ~(:tool TOOL-NAME :arg ARG-KEY)~
+  - ~TOOL-NAME~: The name of the tool being called.
+  - ~ARG-KEY~: The argument key that was not recognized.
+
+- ~llm-tool-missing-argument~: ~(:tool TOOL-NAME :arg ARG-SPEC)~
+  - ~TOOL-NAME~: The name of the tool being called.
+  - ~ARG-SPEC~: The full argument specification plist for the missing required argument.
+
+*** Example
+#+begin_src emacs-lisp
+(condition-case err
+    (llm-chat my-provider my-prompt)
+  (llm-tool-unknown-tool
+   (message "Unknown tool requested: %s" (plist-get (cdr err) :tool)))
+  (llm-tool-call-error
+   (message "Tool call error: %s" err))
+  (llm-invalid-argument
+   (message "Invalid argument: %s" (error-message-string err)))
+  (llm-provider-error
+   (message "Provider error: %s" (error-message-string err)))
+  (llm-error
+   (message "LLM error: %s" err)))
+#+end_src
 ** Tool use
 Tool use is a way to give the LLM a list of functions it can call, and have it call the functions for you.  The standard interaction has the following steps:
 1. The client sends the LLM a prompt with tools it can use.

@@ -23,6 +23,7 @@
 
 (require 'cl-macs)
 (require 'llm-provider-utils)
+(require 'llm)
 
 (ert-deftest llm-provider-utils-openai-arguments ()
   (let* ((args
@@ -159,6 +160,78 @@
                  (llm-provider-utils--normalize-args '(1 2 [t :false t]))))
   (should (equal '(:a 1 :b nil)
                  (llm-provider-utils--normalize-args '(:a 1 :b :json-false)))))
+
+(cl-defstruct llm-testing-provider (llm-standard-chat-provider) ())
+
+(cl-defmethod llm-provider-populate-tool-uses ((provider llm-testing-provider)
+                                               prompt tool-uses))
+
+(ert-deftest llm-provider-utils-execute-tool-uses--missing-tool ()
+  (should-error
+   (llm-provider-utils-execute-tool-uses
+    (make-llm-testing-provider)
+    (llm-make-chat-prompt
+     ""
+     :tools (list
+             (llm-make-tool
+              :name "tool-a"
+              :description "Tool A"
+              :function (lambda (&rest args) "Result A")
+              :args '())))
+    (list
+     (make-llm-provider-utils-tool-use
+      :id "1"
+      :name "tool-b"
+      :args '()))
+    nil
+    nil
+    #'identity)
+   :type '(llm-tool-unknown-tool)))
+
+(ert-deftest llm-provider-utils-execute-tool-uses--unknown-arg ()
+  (should-error
+   (llm-provider-utils-execute-tool-uses
+    (make-llm-testing-provider)
+    (llm-make-chat-prompt
+     ""
+     :tools (list
+             (llm-make-tool
+              :name "tool-a"
+              :description "Tool A"
+              :function (lambda (&rest args) "Result A")
+              :args '((:name "arg1" :type string :description "Argument 1")))))
+    (list
+     (make-llm-provider-utils-tool-use
+      :id "1"
+      :name "tool-a"
+      :args '((arg1 . "value1")
+              (arg2 . "value2"))))
+    nil
+    nil
+    #'identity)
+   :type '(llm-tool-unknown-argument)))
+
+(ert-deftest llm-provider-utils-execute-tool-uses--missing-arg ()
+  (should-error
+   (llm-provider-utils-execute-tool-uses
+    (make-llm-testing-provider)
+    (llm-make-chat-prompt
+     ""
+     :tools (list
+             (llm-make-tool
+              :name "tool-a"
+              :description "Tool A"
+              :function (lambda (&rest args) "Result A")
+              :args '((:name "arg1" :type string :description "Argument 1")))))
+    (list
+     (make-llm-provider-utils-tool-use
+      :id "1"
+      :name "tool-a"
+      :args '()))
+    nil
+    nil
+    #'identity)
+   :type '(llm-tool-missing-argument)))
 
 (provide 'llm-provider-utils-test)
 ;;; llm-provider-utils-test.el ends here

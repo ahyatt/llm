@@ -338,9 +338,9 @@ different providers, because it is likely to cause a request error.  The
 cars of the alist are strings and the cdrs can be strings, numbers or
 vectors (if a list).  This is optional."
   (unless content
-    (error "CONTENT is required"))
+    (signal 'llm-invalid-argument '("CONTENT is required")))
   (when (and (listp content) (zerop (mod (length content) 2)))
-    (error "CONTENT, as a list, must have an odd number of elements"))
+    (signal 'llm-invalid-argument '("CONTENT, as a list, must have an odd number of elements")))
   (make-llm-chat-prompt
    :context context
    :examples examples
@@ -396,7 +396,8 @@ the output) `tool-uses' (a list of plists with tool `:name' and
 
 (cl-defmethod llm-chat ((_ (eql nil)) _ &optional _)
   "Catch trivial configuration mistake."
-  (error "LLM provider was nil.  Please set the provider in the application you are using"))
+  (signal 'llm-provider-unconfigured
+          '("LLM provider was nil.  Please set the provider in the application you are using")))
 
 (cl-defmethod llm-chat :before (provider _ &optional _)
   "Issue a warning if the LLM is non-free."
@@ -513,7 +514,8 @@ be passed to `llm-cancel-request'."
 
 (cl-defmethod llm-chat-streaming ((_ (eql nil)) _ _ _ _ &optional _)
   "Catch trivial configuration mistake."
-  (error "LLM provider was nil.  Please set the provider in the application you are using"))
+  (signal 'llm-provider-unconfigured
+          '("LLM provider was nil.  Please set the provider in the application you are using")))
 
 (cl-defmethod llm-chat-streaming :before (provider _ _ _ _ &optional _)
   "Issue a warning if the LLM is non-free."
@@ -581,11 +583,12 @@ be passed to `llm-cancel-request'."
                               (lambda (text) (insert-text text))
                               (lambda (text) (insert-text text)
                                 (funcall finish-callback))
-                              (lambda (_ msg) (error "Error calling the LLM: %s" msg))))))))
+                              (lambda (type msg) (signal type (list msg)))))))))
 
 (cl-defmethod llm-chat-async ((_ (eql nil)) _ _ _ &optional _)
   "Catch trivial configuration mistake."
-  (error "LLM provider was nil.  Please set the provider in the application you are using"))
+  (signal 'llm-provider-unconfigured
+          '("LLM provider was nil.  Please set the provider in the application you are using")))
 
 (cl-defmethod llm-chat-async :before (provider _ _ _ &optional _)
   "Issue a warning if the LLM is non-free."
@@ -646,7 +649,8 @@ call."
 
 (cl-defmethod llm-embedding ((_ (eql nil)) _)
   "Catch trivial configuration mistake."
-  (error "LLM provider was nil.  Please set the provider in the application you are using"))
+  (signal 'llm-provider-unconfigured
+          '("LLM provider was nil.  Please set the provider in the application you are using")))
 
 (cl-defmethod llm-embedding :before (provider _)
   "Issue a warning if the LLM is non-free."
@@ -666,7 +670,8 @@ be passed to `llm-cancel-request'."
 
 (cl-defmethod llm-embedding-async ((_ (eql nil)) _ _ _)
   "Catch trivial configuration mistake."
-  (error "LLM provider was nil.  Please set the provider in the application you are using"))
+  (signal 'llm-provider-unconfigured
+          '("LLM provider was nil.  Please set the provider in the application you are using")))
 
 (cl-defmethod llm-embedding-async :before (provider _ _ _)
   "Issue a warning if the LLM is non-free."
@@ -685,7 +690,8 @@ PROVIDER is the provider struct that will be used for an LLM call."
 
 (cl-defmethod llm-batch-embeddings ((_ (eql nil)) _)
   "Catch trivial configuration mistake."
-  (error "LLM provider was nil.  Please set the provider in the application you are using"))
+  (signal 'llm-provider-unconfigured
+          '("LLM provider was nil.  Please set the provider in the application you are using")))
 
 (cl-defmethod llm-batch-embeddings :before (provider _)
   "Issue a warning if the LLM is non-free."
@@ -704,7 +710,8 @@ and a string message."
 
 (cl-defmethod llm-batch-embeddings-async ((_ (eql nil)) _ _ _)
   "Catch trivial configuration mistake."
-  (error "LLM provider was nil.  Please set the provider in the application you are using"))
+  (signal 'llm-provider-unconfigured
+          '("LLM provider was nil.  Please set the provider in the application you are using")))
 
 (cl-defmethod llm-batch-embeddings-async :before (provider _ _ _)
   "Issue a warning if the LLM is non-free."
@@ -806,6 +813,43 @@ This should only be used for logging or debugging."
      (format "Temperature: %s\n" (llm-chat-prompt-temperature prompt)))
    (when (llm-chat-prompt-max-tokens prompt)
      (format "Max tokens: %s\n" (llm-chat-prompt-max-tokens prompt)))))
+
+;; Error conditions
+(define-error
+ 'llm-error "An error occurred in LLM operations")
+
+(define-error
+ 'llm-invalid-argument "Invalid argument for LLM operation" 'llm-error)
+(define-error
+ 'llm-not-supported "Operation or feature not supported" 'llm-error)
+
+(define-error
+ 'llm-provider-error "LLM provider error" 'llm-error)
+(define-error
+ 'llm-provider-unconfigured "LLM provider is not configured correctly" 'llm-provider-error)
+
+(define-error
+ 'llm-request-error "LLM request failed" 'llm-error)
+(define-error
+ 'llm-request-timeout "LLM request timed out" 'llm-request-error)
+(define-error
+ 'llm-request-authentication-error "LLM request authentication failed" 'llm-request-error)
+(define-error
+ 'llm-request-bad-request "LLM request was invalid" 'llm-request-error)
+
+(define-error
+ 'llm-tool-call-error "An error occurred when calling an LLM tool" 'llm-error)
+(define-error
+ 'llm-tool-unknown-tool "An LLM tool was called, but not found in the available tools"
+ 'llm-tool-call-error)
+(define-error
+ 'llm-tool-unknown-argument
+ "An LLM tool was called with an unknown argument"
+ 'llm-tool-call-error)
+(define-error
+ 'llm-tool-missing-argument
+ "A tool was called missing a required argument"
+ 'llm-tool-call-error)
 
 (provide 'llm)
 ;;; llm.el ends here
