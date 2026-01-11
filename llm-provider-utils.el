@@ -881,7 +881,7 @@ have returned results."
                                    (if multi-output
                                        (llm-provider-utils-final-multi-output-result
                                         (append partial-result
-                                                `((:tool-results ,tool-use-and-results))))
+                                                `(:tool-results ,tool-use-and-results)))
                                      tool-use-and-results))))))
        ;; Check to see that there were no unknown args.
        (dolist (arg-key (map-keys arguments))
