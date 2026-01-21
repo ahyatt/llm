@@ -190,8 +190,7 @@ PROVIDER is the llm-ollama provider."
     (setq request-plist (plist-put request-plist :stream (if streaming t :false)))
     (let ((model (llm-models-match (llm-ollama-chat-model provider))))
       (when (and (llm-chat-prompt-reasoning prompt)
-                 (member 'reasoning (llm-model-capabilities model))
-                 (not (eq 'none (llm-chat-prompt-reasoning prompt))))
+                 (member 'reasoning (llm-model-capabilities model)))
         (setq request-plist (plist-put request-plist :think
                                        (if (eq 'gpt-oss model)
                                            (pcase (llm-chat-prompt-reasoning prompt)
