@@ -192,11 +192,12 @@ PROVIDER is the llm-ollama provider."
       (when (and (llm-chat-prompt-reasoning prompt)
                  (member 'reasoning (llm-model-capabilities model)))
         (setq request-plist (plist-put request-plist :think
-                                       (if (eq 'gpt-oss model)
+                                       (if (eq 'gpt-oss (llm-model-symbol model))
                                            (pcase (llm-chat-prompt-reasoning prompt)
                                              ('light "low")
                                              ('medium "medium")
-                                             ('maximum "high"))
+                                             ('maximum "high")
+                                             ('none :false))
                                          (if (eq 'none (llm-chat-prompt-reasoning prompt))
                                              :false
                                            't))))))
