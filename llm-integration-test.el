@@ -333,18 +333,27 @@ else.  We really just want to see if it's in the right ballpark."
 
 (llm-def-integration-test llm-boolean-tool-use (provider)
   (when (member 'tool-use (llm-capabilities provider))
-    (llm-chat provider (llm-make-chat-prompt
-                        "Is Lyon the capital of France?"
-                        :tools
-                        (list (llm-make-tool
-                               :function (lambda (result)
-                                           (should-not result))
-                               :name "verifier"
-                               :description "Test the LLM's decision on the veracity of the statement."
-                               :args '((:name "llm-decision"
-                                              :description "The decision on the statement by the LLM."
-                                              :type boolean))
-                               :async nil))))))
+    ;; We test if it is a list to verify that the tool was used.  We can't test
+    ;; the exact value due to the statement, value, which is necessary for worse
+    ;; model to pass, since they just feel the need to always pass a statement.
+    (should (listp
+             (llm-chat provider (llm-make-chat-prompt
+                                 "Is Lyon the capital of France?  You must answer using the verifier tool."
+                                 :tools
+                                 (list (llm-make-tool
+                                        :function (lambda (result &optional _)
+                                                    (should-not result))
+                                        :name "verifier"
+                                        :description "Record the LLM's decision on the veracity of the statement."
+                                        :args '((:name "decision"
+                                                       :description "The true/false judgement on the veracity of the statement"
+                                                       :type boolean
+                                                       :required t)
+                                                (:name "statement"
+                                                       :description "Statement explaining the decision"
+                                                       :type string))
+                                        :async nil))
+                                 :tool-options (make-llm-tool-options :tool-choice 'any)))))))
 
 (llm-def-integration-test llm-tool-use-multi-output (provider)
   (when (member 'tool-use (llm-capabilities provider))
