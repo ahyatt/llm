@@ -343,7 +343,9 @@ return a list of `llm-chat-prompt-tool-use' structs.")
                                           provider response)
                                          multi-output
                                          (lambda (result)
-                                           (setq final-result result))))
+                                           (setq final-result result))
+                                         (lambda (type msg)
+                                           (signal type msg))))
     ;; In most cases, final-result will be available immediately.  However, when
     ;; executing tools, we need to wait for their callbacks, and only after
     ;; those are called with this be ready.
@@ -373,7 +375,10 @@ return a list of `llm-chat-prompt-tool-use' structs.")
                         multi-output
                         (lambda (result)
                           (llm-provider-utils-callback-in-buffer
-                           buf success-callback result))))))
+                           buf success-callback result))
+                        (lambda (type msg)
+                          (llm-provider-utils-callback-in-buffer
+                           buf error-callback type msg))))))
      :on-error (lambda (_ data)
                  (llm-provider-utils-callback-in-buffer
                   buf error-callback 'error
@@ -462,7 +467,9 @@ Any strings will be concatenated, integers will be added, etc."
                             provider tool-uses-raw))))
           multi-output
           (lambda (result)
-            (llm-provider-utils-callback-in-buffer buf response-callback result)))))
+            (llm-provider-utils-callback-in-buffer buf response-callback result))
+          (lambda (type msg)
+            (llm-provider-utils-callback-in-buffer buf error-callback type msg)))))
      :on-error (lambda (_ data)
                  (llm-provider-utils-callback-in-buffer
                   buf error-callback 'error
@@ -738,7 +745,8 @@ ROLE will be `assistant' by default, but can be passed in for other roles."
                                   (format "%s" output))
                        :tool-results tool-results)))))
 
-(defun llm-provider-utils-process-result (provider prompt partial-result multi-output success-callback)
+(defun llm-provider-utils-process-result (provider prompt partial-result multi-output success-callback
+                                                   error-callback)
   "Process the RESPONSE from the provider for PROMPT.
 This execute function calls if there are any, does any result
 appending to the prompt, and returns an appropriate response for
@@ -754,7 +762,9 @@ MULTI-OUTPUT is true if multiple outputs are expected to be passed to
 SUCCESS-CALLBACK.
 
 SUCCESS-CALLBACK is the callback that will be run when all functions
-complete."
+complete.
+
+ERROR-CALLBACK is the callback that will be run on error."
   (when (and (plist-get partial-result :text)
              (> (length (plist-get partial-result :text)) 0))
     (llm-provider-append-to-prompt provider prompt (plist-get partial-result :text)))
@@ -764,7 +774,7 @@ complete."
       ;; will be done inside `llm-provider-utils-execute-tool-uses'.
       (llm-provider-utils-execute-tool-uses
        provider prompt tool-uses multi-output
-       partial-result success-callback)
+       partial-result success-callback error-callback)
     (funcall success-callback
              (if multi-output partial-result
                (plist-get partial-result :text)))))
@@ -824,7 +834,8 @@ This will convert all :json-false and :false values to nil."
    (t args)))
 
 (defun llm-provider-utils-execute-tool-uses (provider prompt tool-uses multi-output
-                                                      partial-result success-callback)
+                                                      partial-result success-callback
+                                                      error-callback)
   "Execute TOOL-USES, a list of `llm-provider-utils-tool-use'.
 
 A response suitable for returning to the client will be returned.
@@ -853,50 +864,65 @@ have returned results."
                    (seq-find
                     (lambda (f) (equal name (llm-tool-name f)))
                     (llm-chat-prompt-tools prompt))
-                   (signal 'llm-tool-unknown-tool `(:tool ,name))))
-            (call-args (cl-loop for arg in (llm-tool-args tool)
-                                collect (cdr (or
-                                              (seq-find (lambda (a)
-                                                          (eq (intern (plist-get arg :name))
-                                                              (car a)))
-                                                        arguments)
-                                              ;; Arg wasn't found, if it wasn't
-                                              ;; optional, signal an error.
-                                              (unless (plist-get arg :optional)
-                                                (signal 'llm-tool-missing-argument
-                                                        `((:tool ,name :arg ,arg))))))))
-            (end-func (lambda (result)
-                        (llm--log
-                         'api-funcall
-                         :provider provider
-                         :msg (format "%s --> %s"
-                                      (format "%S" (cons name call-args))
-                                      (format "%s" result)))
-                        (push (cons name result) tool-use-and-results)
-                        (push (cons tool-use result) results)
-                        (when (= (length results) (length tool-uses))
-                          (llm-provider-utils-populate-tool-uses
-                           provider prompt results)
-                          (funcall success-callback
-                                   (if multi-output
-                                       (llm-provider-utils-final-multi-output-result
-                                        (append partial-result
-                                                `(:tool-results ,tool-use-and-results)))
-                                     tool-use-and-results))))))
-       ;; Check to see that there were no unknown args.
-       (dolist (arg-key (map-keys arguments))
-         (unless (seq-find
-                  (lambda (a) (eq (intern (plist-get a :name))
-                                  arg-key))
-                  (llm-tool-args tool))
-           (signal 'llm-tool-unknown-argument
-                   `((:tool ,name :arg ,arg-key)))))
+                   (progn
+                     (funcall error-callback 'llm-tool-unknown-tool
+                              (format "Unknown tool '%s' called" name))
+                     nil)))
+            (call-args (when tool
+                         (cl-loop for arg in (llm-tool-args tool)
+                                  collect (cdr (or
+                                                (seq-find (lambda (a)
+                                                            (eq (intern (plist-get arg :name))
+                                                                (car a)))
+                                                          arguments)
+                                                ;; Arg wasn't found, if it wasn't
+                                                ;; optional, signal an error.
+                                                (progn
+                                                  (unless (plist-get arg :optional)
+                                                    (funcall error-callback 'llm-tool-missing-argument
+                                                             (format "Missing required argument '%s' for tool '%s'"
+                                                                     (plist-get arg :name)
+                                                                     name)))
+                                                  nil))))))
+            (end-func (when call-args
+                        (lambda (result)
+                          (llm--log
+                           'api-funcall
+                           :provider provider
+                           :msg (format "%s --> %s"
+                                        (format "%S" (cons name call-args))
+                                        (format "%s" result)))
+                          (push (cons name result) tool-use-and-results)
+                          (push (cons tool-use result) results)
+                          (when (= (length results) (length tool-uses))
+                            (llm-provider-utils-populate-tool-uses
+                             provider prompt results)
+                            (funcall success-callback
+                                     (if multi-output
+                                         (llm-provider-utils-final-multi-output-result
+                                          (append partial-result
+                                                  `(:tool-results ,tool-use-and-results)))
+                                       tool-use-and-results))))))
+            (failed nil))
+       (when end-func
+         ;; Check to see that there were no unknown args.
+         (dolist (arg-key (map-keys arguments))
+           (unless (seq-find
+                    (lambda (a) (eq (intern (plist-get a :name))
+                                    arg-key))
+                    (llm-tool-args tool))
+             (funcall error-callback 'llm-tool-unknown-argument
+                      (format "Unknown argument '%s' for tool '%s'"
+                              (symbol-name arg-key)
+                              name))
+             (setf failed t)))
 
-       (if (llm-tool-async tool)
-           (apply (llm-tool-function tool)
-                  (append (list end-func) call-args))
-         (funcall end-func (apply (llm-tool-function tool)
-                                  (llm-provider-utils--normalize-args call-args))))))))
+         (unless failed
+           (if (llm-tool-async tool)
+               (apply (llm-tool-function tool)
+                      (append (list end-func) call-args))
+             (funcall end-func (apply (llm-tool-function tool)
+                                      (llm-provider-utils--normalize-args call-args))))))))))
 
 
 ;; This is a useful method for getting out of the request buffer when it's time
