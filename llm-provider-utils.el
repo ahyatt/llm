@@ -1,6 +1,6 @@
 ;;; llm-provider-utils.el --- Functions to make building providers easier -*- lexical-binding: t; package-lint-main-file: "llm.el"; ; byte-compile-docstring-max-column: 200-*-
 
-;; Copyright (c) 2023-2025  Free Software Foundation, Inc.
+;; Copyright (c) 2023-2026  Free Software Foundation, Inc.
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
@@ -741,9 +741,18 @@ ROLE will be `assistant' by default, but can be passed in for other roles."
                        :content (if (or (not output)
                                         (and (not (stringp output))
                                              (not tool-results)))
-                                    output
-                                  (format "%s" output))
-                       :tool-results tool-results)))))
+                                    (llm-provider-utils--normalize-args output :false)
+                                  (format
+                                   "%s"
+                                   (llm-provider-utils--normalize-args output)))
+                       :tool-results (mapcar
+                                      (lambda (r)
+                                        (setf (llm-chat-prompt-tool-result-result r)
+                                              (llm-provider-utils--normalize-args
+                                               (llm-chat-prompt-tool-result-result r)
+                                               :false))
+                                        r)
+                                      tool-results))))))
 
 (defun llm-provider-utils-process-result (provider prompt partial-result multi-output success-callback
                                                    error-callback)
@@ -815,22 +824,18 @@ This transforms the plist so that:
                                    value)
                          value))))
 
-(defun llm-provider-utils--normalize-args (args)
+(defun llm-provider-utils--normalize-args (args &optional false-val)
   "Normalize ARGS to a form that can be passed to the user.
 
-This will convert all :json-false and :false values to nil."
+This will convert all :json-false and :false values to FALSE-VAL."
   (cond
-   ((vectorp args) (vconcat (mapcar #'llm-provider-utils--normalize-args args)))
-   ((listp args) (mapcar #'llm-provider-utils--normalize-args args))
-   ((plistp args) (let (new-plist)
-                    (map-do
-                     (lambda (key value)
-                       (setq new-plist
-                             (plist-put new-plist
-                                        key
-                                        (llm-provider-utils--normalize-args value))))
-                     args)))
-   ((member args '(:json-false :false)) nil)
+   ((vectorp args) (vconcat (mapcar (lambda (a)
+                                      (llm-provider-utils--normalize-args a false-val))
+                                    args)))
+   ((consp args) (cons
+                  (llm-provider-utils--normalize-args (car args) false-val)
+                  (llm-provider-utils--normalize-args (cdr args) false-val)))
+   ((member args '(:json-false :false)) false-val)
    (t args)))
 
 (defun llm-provider-utils-execute-tool-uses (provider prompt tool-uses multi-output
@@ -859,7 +864,9 @@ have returned results."
     (cl-loop
      for tool-use in tool-uses do
      (let* ((name (llm-provider-utils-tool-use-name tool-use))
-            (arguments (llm-provider-utils-tool-use-args tool-use))
+            (arguments
+             (llm-provider-utils--normalize-args
+              (llm-provider-utils-tool-use-args tool-use)))
             (tool (or
                    (seq-find
                     (lambda (f) (equal name (llm-tool-name f)))
