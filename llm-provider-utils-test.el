@@ -68,6 +68,22 @@
   (should (equal (llm-provider-utils-convert-to-serializable '(:inner '(:a foo :b bar)))
                  '(:inner '(:a "foo" :b "bar")))))
 
+(ert-deftest llm-providers-utils-append-to-prompt ()
+  (let ((prompt (llm-make-chat-prompt "Prompt")))
+    (llm-provider-utils-append-to-prompt prompt '(:a 1 :b :json-false)
+                                         (list
+                                          (make-llm-chat-prompt-tool-result
+                                           :tool-name "tool"
+                                           :result :json-false)))
+    (should (equal (nth 1 (llm-chat-prompt-interactions prompt))
+                   (make-llm-chat-prompt-interaction
+                    :role 'tool-results
+                    :content "(:a 1 :b nil)"
+                    :tool-results (list
+                                   (make-llm-chat-prompt-tool-result
+                                    :tool-name "tool"
+                                    :result :false)))))))
+
 (ert-deftest llm-provider-utils-combine-to-system-prompt ()
   (let* ((interaction1 (make-llm-chat-prompt-interaction :role 'user :content "Hello"))
          (example1 (cons "Request 1" "Response 1"))
