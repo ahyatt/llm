@@ -840,7 +840,8 @@ This will convert all :json-false and :false values to FALSE-VAL."
                               new-plist
                               key
                               (llm-provider-utils--normalize-args value false-val))))
-                     args)))
+                     args)
+                    new-plist))
    ((consp args) (cons
                   (llm-provider-utils--normalize-args (car args) false-val)
                   (llm-provider-utils--normalize-args (cdr args) false-val)))
