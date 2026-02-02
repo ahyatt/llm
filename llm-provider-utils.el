@@ -832,16 +832,6 @@ This will convert all :json-false and :false values to FALSE-VAL."
    ((vectorp args) (vconcat (mapcar (lambda (a)
                                       (llm-provider-utils--normalize-args a false-val))
                                     args)))
-   ((plistp args) (let (new-plist)
-                    (map-do
-                     (lambda (key value)
-                       (setq new-plist
-                             (plist-put
-                              new-plist
-                              key
-                              (llm-provider-utils--normalize-args value false-val))))
-                     args)
-                    new-plist))
    ((consp args) (cons
                   (llm-provider-utils--normalize-args (car args) false-val)
                   (llm-provider-utils--normalize-args (cdr args) false-val)))
@@ -874,7 +864,9 @@ have returned results."
     (cl-loop
      for tool-use in tool-uses do
      (let* ((name (llm-provider-utils-tool-use-name tool-use))
-            (arguments (llm-provider-utils-tool-use-args tool-use))
+            (arguments
+             (llm-provider-utils--normalize-args
+              (llm-provider-utils-tool-use-args tool-use)))
             (tool (or
                    (seq-find
                     (lambda (f) (equal name (llm-tool-name f)))

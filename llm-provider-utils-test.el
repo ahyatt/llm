@@ -175,7 +175,9 @@
   (should (equal '(1 2 [t nil t])
                  (llm-provider-utils--normalize-args '(1 2 [t :false t]))))
   (should (equal '(:a 1 :b nil)
-                 (llm-provider-utils--normalize-args '(:a 1 :b :json-false)))))
+                 (llm-provider-utils--normalize-args '(:a 1 :b :json-false))))
+  (should (equal '((a . 1) (b . nil))
+                 (llm-provider-utils--normalize-args '((a . 1) (b . :json-false))))))
 
 (cl-defstruct llm-testing-provider (llm-standard-chat-provider) ())
 
