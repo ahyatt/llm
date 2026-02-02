@@ -829,15 +829,20 @@ This transforms the plist so that:
 
 This will convert all :json-false and :false values to FALSE-VAL."
   (cond
-   ((vectorp args) (vconcat (mapcar #'llm-provider-utils--normalize-args args)))
-   ((listp args) (mapcar #'llm-provider-utils--normalize-args args))
+   ((vectorp args) (vconcat (mapcar (lambda (a)
+                                      (llm-provider-utils--normalize-args a false-val))
+                                    args)))
+   ((consp args) (cons
+                  (llm-provider-utils--normalize-args (car args) false-val)
+                  (llm-provider-utils--normalize-args (cdr args) false-val)))
    ((plistp args) (let (new-plist)
                     (map-do
                      (lambda (key value)
                        (setq new-plist
-                             (plist-put new-plist
-                                        key
-                                        (llm-provider-utils--normalize-args value))))
+                             (plist-put
+                              new-plist
+                              key
+                              (llm-provider-utils--normalize-args value false-val))))
                      args)))
    ((member args '(:json-false :false)) false-val)
    (t args)))
