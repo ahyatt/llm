@@ -68,7 +68,7 @@
   (should (equal (llm-provider-utils-convert-to-serializable '(:inner '(:a foo :b bar)))
                  '(:inner '(:a "foo" :b "bar")))))
 
-(ert-deftest llm-providers-utils-append-to-prompt ()
+(ert-deftest llm-provider-utils-append-to-prompt ()
   (let ((prompt (llm-make-chat-prompt "Prompt")))
     (llm-provider-utils-append-to-prompt prompt '(:a 1 :b :json-false)
                                          (list
