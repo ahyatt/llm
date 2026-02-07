@@ -1,6 +1,7 @@
 * Version 0.29.0
 - Check for tool use mismatches and define new errors for them
 - Normalize false values in tool args or tool call results
+- Add Claude Opus 4.6
 * Version 0.28.5
 - Improved the tool calling docs
 - Fix for running tools in the original buffer with streaming
