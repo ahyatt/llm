@@ -387,7 +387,12 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :name "gpt-oss" :symbol 'gpt-oss
     :capabilities '(generation free-software reasoning tool-use) ; Apache license
     :context-length 128000
-    :regex "gpt-oss")))
+    :regex "gpt-oss")
+   (make-llm-model
+    :name "Kimi K2.5" :symbol 'kimi-k2.5
+    :capabilities '(generation free-software reasoning tool-use) ; Modified MIT license
+    :context-length 256000
+    :regex "kimi-k2\\.5")))
 
 (defun llm-models-by-symbol (symbol)
   "Return the model with SYMBOL."
