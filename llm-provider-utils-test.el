@@ -184,6 +184,48 @@
 (cl-defmethod llm-provider-populate-tool-uses ((provider llm-testing-provider)
                                                prompt tool-uses))
 
+(cl-defmethod llm-provider-append-to-prompt ((provider llm-testing-provider)
+                                             prompt content
+                                             &optional tool-results)
+  (llm-provider-utils-append-to-prompt prompt content tool-results
+                                       (if tool-results
+                                           'user
+                                         'assistant)))
+
+(ert-deftest llm-provider-utils-execute-tool-uses--parallel-same-tool ()
+  (let ((prompt (llm-make-chat-prompt
+                 ""
+                 :tools (list (llm-make-tool :name "a"
+                                             :function (lambda (callback arg)
+                                                         (funcall callback (format "Result for %s" arg)))
+                                             :args '((:name "argument"
+                                                            :type integer
+                                                            :description "An argument"))
+                                             :async t)))))
+    (llm-provider-utils-execute-tool-uses
+     (make-llm-testing-provider)
+     prompt
+     (list
+      (make-llm-provider-utils-tool-use
+       :id "1"
+       :name "a"
+       :args '((argument . "foo")))
+      (make-llm-provider-utils-tool-use
+       :id "2"
+       :name "a"
+       :args '((argument . "bar"))))
+     t
+     nil
+     #'ignore
+     (lambda (_ err) (error "Should not error: %s" err)))
+    (let* ((last-interaction (car (last (llm-chat-prompt-interactions prompt))))
+           (tool-results (llm-chat-prompt-interaction-tool-results last-interaction)))
+      (dolist (id '("1" "2"))
+        (should (seq-find (lambda (result) (equal (llm-chat-prompt-tool-result-call-id result)
+                                                  id))
+                          tool-results))))))
+
+
 (ert-deftest llm-provider-utils-execute-tool-uses--missing-tool ()
   (llm-provider-utils-execute-tool-uses
    (make-llm-testing-provider)
