@@ -879,6 +879,8 @@ have returned results."
     (cl-loop
      for tool-use in tool-uses do
      (let* ((name (llm-provider-utils-tool-use-name tool-use))
+            ;; Need this otherwise closures will capture the loop variable and all end up with the same value.
+            (tool-use tool-use)
             (arguments
              (llm-provider-utils--normalize-args
               (llm-provider-utils-tool-use-args tool-use)))
