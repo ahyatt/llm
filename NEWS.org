@@ -3,6 +3,7 @@
 - Normalize false values in tool args or tool call results
 - Add Claude Opus 4.6
 - Fix bug running two async calls in parallel
+- Set Gemini default to 3.0 pro
 * Version 0.28.5
 - Improved the tool calling docs
 - Fix for running tools in the original buffer with streaming

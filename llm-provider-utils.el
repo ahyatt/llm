@@ -828,15 +828,30 @@ This transforms the plist so that:
   "Normalize ARGS to a form that can be passed to the user.
 
 This will convert all :json-false and :false values to FALSE-VAL."
-  (cond
-   ((vectorp args) (vconcat (mapcar (lambda (a)
-                                      (llm-provider-utils--normalize-args a false-val))
-                                    args)))
-   ((consp args) (cons
-                  (llm-provider-utils--normalize-args (car args) false-val)
-                  (llm-provider-utils--normalize-args (cdr args) false-val)))
-   ((member args '(:json-false :false)) false-val)
-   (t args)))
+  (if (member args '(:json-false :false))
+      false-val
+    (let ((stack (list args))
+          (current nil))
+      (while stack
+        (setq current (pop stack))
+        (cond
+         ((consp current)
+          (if (member (car current) '(:json-false :false))
+              (setcar current false-val)
+            (when (or (consp (car current)) (vectorp (car current)))
+              (push (car current) stack)))
+          (if (member (cdr current) '(:json-false :false))
+              (setcdr current false-val)
+            (when (or (consp (cdr current)) (vectorp (cdr current)))
+              (push (cdr current) stack))))
+         ((vectorp current)
+          (dotimes (i (length current))
+            (let ((val (aref current i)))
+              (if (member val '(:json-false :false))
+                  (aset current i false-val)
+                (when (or (consp val) (vectorp val))
+                  (push val stack))))))))
+      args)))
 
 (defun llm-provider-utils-execute-tool-uses (provider prompt tool-uses multi-output
                                                       partial-result success-callback
