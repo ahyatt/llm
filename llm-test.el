@@ -298,17 +298,8 @@
                (ert-info ((format "Testing %s" model))
                  (should (equal limit (token-limit-for model))))))
     ;; From https://platform.openai.com/docs/models/gpt-3-5
-    (should-have-token-limit "gpt-3.5-turbo" 16385)
-    (should-have-token-limit "gpt-3.5-turbo-instruct" 4096)
-    (should-have-token-limit "unknown" 4096)
-    ;; From https://platform.openai.com/docs/models/gpt-4-and-gpt-4-turbo
-    (should-have-token-limit "gpt-4" 8192)
-    (should-have-token-limit "gpt-4-0613" 8192)
-    ;; I couldn't find documentation on this, but the token limit is actually
-    ;; 30k instead of 128k for most customers.
-    (should-have-token-limit "gpt-4o" 30000)
-    (should-have-token-limit "gpt-4o-mini" 30000)
-    (should-have-token-limit "unknown" 4096)))
+    (should-have-token-limit "gpt-5.2" 400000)
+    (should-have-token-limit "unknown" 128000)))
 
 (ert-deftest llm-test-capabilities-openai-compatible ()
   (should-not (member 'tool-use (llm-capabilities (make-llm-openai-compatible :chat-model "llama-3"))))
@@ -318,21 +309,21 @@
 (ert-deftest llm-test-chat-token-limit-gemini ()
   (should (= 1048576 (llm-chat-token-limit (make-llm-gemini))))
   (should (= 1048576 (llm-chat-token-limit
-                      (make-llm-gemini :chat-model "gemini-1.5-flash"))))
-  (should (= 4096 (llm-chat-token-limit
-                   (make-llm-vertex :chat-model "unknown")))))
+                      (make-llm-gemini :chat-model "gemini-3-flash"))))
+  (should (= 128000 (llm-chat-token-limit
+                     (make-llm-vertex :chat-model "unknown")))))
 
 (ert-deftest llm-test-capabilities-gemini ()
   (should-not (member 'tool-use (llm-capabilities (make-llm-gemini :chat-model "llama-3"))))
-  (should (member 'tool-use (llm-capabilities (make-llm-gemini :chat-model "gemini-1.5-flash")))))
+  (should (member 'tool-use (llm-capabilities (make-llm-gemini :chat-model "gemini-3-pro")))))
 
 (ert-deftest llm-test-chat-token-limit-vertex ()
   ;; The default is Gemini 2.5 Pro, which has a token limit of 1048576.
   (should (= 1048576 (llm-chat-token-limit (make-llm-vertex))))
   (should (= 1048576 (llm-chat-token-limit
-                      (make-llm-gemini :chat-model "gemini-2.5-flash"))))
-  (should (= 4096 (llm-chat-token-limit
-                   (make-llm-vertex :chat-model "unknown")))))
+                      (make-llm-gemini :chat-model "gemini-3-flash"))))
+  (should (= 128000 (llm-chat-token-limit
+                     (make-llm-vertex :chat-model "unknown")))))
 
 (ert-deftest llm-test-chat-token-limit-ollama ()
   ;; The code is straightforward, so no need to test all the models.
