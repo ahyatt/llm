@@ -577,7 +577,8 @@ If MODEL cannot be found, warn and return DEFAULT, which by default is 4096."
     (if matched-model
         (llm-model-context-length matched-model)
       (warn "No model predefined for model %s, using restrictive defaults" model)
-      (or default 4096))))
+      ;; 128000 chosen to be a lower bound on reasonably up to date models.
+      (or default 128000))))
 
 (defun llm-provider-utils--encolon (s)
   "Turn S into a symbol preceded by a colon."
