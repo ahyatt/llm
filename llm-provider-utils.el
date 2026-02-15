@@ -572,7 +572,8 @@ conversation history will follow."
 
 (defun llm-provider-utils-model-token-limit (model &optional default)
   "Return the token limit for MODEL.
-If MODEL cannot be found, warn and return DEFAULT, which by default is 4096."
+If MODEL cannot be found, warn and return DEFAULT, which by default is
+128000."
   (let ((matched-model (llm-models-match model)))
     (if matched-model
         (llm-model-context-length matched-model)
