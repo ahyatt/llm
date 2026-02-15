@@ -309,19 +309,19 @@
 (ert-deftest llm-test-chat-token-limit-gemini ()
   (should (= 1048576 (llm-chat-token-limit (make-llm-gemini))))
   (should (= 1048576 (llm-chat-token-limit
-                      (make-llm-gemini :chat-model "gemini-3.0-flash"))))
+                      (make-llm-gemini :chat-model "gemini-3-flash"))))
   (should (= 128000 (llm-chat-token-limit
                      (make-llm-vertex :chat-model "unknown")))))
 
 (ert-deftest llm-test-capabilities-gemini ()
   (should-not (member 'tool-use (llm-capabilities (make-llm-gemini :chat-model "llama-3"))))
-  (should (member 'tool-use (llm-capabilities (make-llm-gemini :chat-model "gemini-3.0-flash")))))
+  (should (member 'tool-use (llm-capabilities (make-llm-gemini :chat-model "gemini-3-pro")))))
 
 (ert-deftest llm-test-chat-token-limit-vertex ()
   ;; The default is Gemini 2.5 Pro, which has a token limit of 1048576.
   (should (= 1048576 (llm-chat-token-limit (make-llm-vertex))))
   (should (= 1048576 (llm-chat-token-limit
-                      (make-llm-gemini :chat-model "gemini-3.0-flash"))))
+                      (make-llm-gemini :chat-model "gemini-3-flash"))))
   (should (= 128000 (llm-chat-token-limit
                      (make-llm-vertex :chat-model "unknown")))))
 
