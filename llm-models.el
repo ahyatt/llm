@@ -364,10 +364,25 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 8192
     :regex "snowflake-arctic-embed2")
    (make-llm-model
+    :name "LFM2.5" :symbol 'lfm2.5-thinking
+    :capabilities '(generation tool-use)
+    :context-length 128000
+    :regex "lfm2\\.5")
+   (make-llm-model
+    :name "LFM2" :symbol 'lfm2
+    :capabilities '(generation tool-use)
+    :context-length 32768
+    :regex "lfm2")
+   (make-llm-model
     :name "Qwen 2.5" :symbol 'qwen-2.5
     :capabilities '(generation tool-use)  ;; Apache license for some variations only
     :context-length 128000
     :regex "qwen-?2\\.5")
+   (make-llm-model
+    :name "Qwen 3.5" :symbol 'qwen-3.5
+    :capabilities '(generation tool-use free-software)  ;; Apache 2 license
+    :context-length 256000
+    :regex "qwen-?3\\.5")
    (make-llm-model
     :name "Qwen 3 Coder Next" :symbol 'qwen-3-coder-next
     :capabilities '(generation tool-use free-software)  ;; Apache 2 license

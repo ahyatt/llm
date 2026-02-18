@@ -1,3 +1,5 @@
+* Version 0.29.1
+- Added Qwen 3.5, LFM2 and LFM 2.5 Thinking
 * Version 0.29.0
 - Check for tool use mismatches and define new errors for them
 - Normalize false values in tool args or tool call results
