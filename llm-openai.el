@@ -385,8 +385,7 @@ RESPONSE can be nil if the response is complete."
                              (when-let ((usage (assoc-default 'usage response-alist)))
                                (when (not (eq usage :null))
                                  (funcall receiver
-                                          (list :token-use
-                                                `(:input-tokens ,(assoc-default 'prompt_tokens usage)))))))))))))))
+                                          `(:input-tokens ,(assoc-default 'prompt_tokens usage))))))))))))))
 
 (cl-defmethod llm-provider-collect-streaming-tool-uses ((_ llm-openai) data)
   (llm-provider-utils-openai-collect-streaming-tool-uses data))
