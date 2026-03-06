@@ -389,8 +389,10 @@ conversation so far.
 
 If MULTI-OUTPUT is non-nil the response is a plist with the possible
 keys: `text' (textual output), `reasoning' (reasoning that accompanies
-the output) `tool-uses' (a list of plists with tool `:name' and
-`:args'), and `tool-results' (an alist of results of a calling tools)"
+the output), `input-tokens' (the number of tokens in the input to the
+LLM), `output-tokens' (the number of tokens in the output of the LLM),
+`tool-uses' (a list of plists with tool `:name' and `:args'), and
+`tool-results' (an alist of results of a calling tools)"
   (ignore provider prompt multi-output)
   (signal 'not-implemented nil))
 
