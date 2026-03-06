@@ -177,7 +177,8 @@ PROVIDER is the Open AI provider struct."
 (defun llm-openai--build-streaming (streaming)
   "Add streaming field if STREAMING is non-nil."
   (when streaming
-    (list :stream t)))
+    (list :stream t
+          :stream_options '(:include_usage t))))
 
 (defun llm-openai--build-temperature (prompt)
   "Build the temperature field if present in PROMPT."
@@ -332,6 +333,10 @@ STREAMING if non-nil, turn on response streaming."
   (assoc-default 'content
                  (assoc-default 'message (aref (cdr (assoc 'choices response)) 0))))
 
+(cl-defmethod llm-provider-extract-token-use ((_ llm-openai) response)
+  (let ((usage (assoc-default 'usage response)))
+    `(:input-tokens ,(assoc-default 'prompt_tokens usage))))
+
 (cl-defmethod llm-provider-extract-tool-uses ((_ llm-openai) response)
   (mapcar (lambda (call)
             (let ((tool (cdr (nth 2 call))))
@@ -370,12 +375,18 @@ RESPONSE can be nil if the response is complete."
                     ,(lambda (event)
                        (let ((data (plz-event-source-event-data event)))
                          (unless (equal data "[DONE]")
-                           (when-let ((response (llm-openai--get-partial-chat-response
-                                                 (json-parse-string data :object-type 'alist))))
-                             (funcall receiver (if (stringp response)
-                                                   (list :text response)
-                                                 (list :tool-uses-raw
-                                                       response))))))))))))
+                           (let ((response-alist (json-parse-string data :object-type 'alist)))
+                             (when-let ((response (llm-openai--get-partial-chat-response
+                                                   response-alist)))
+                               (funcall receiver (if (stringp response)
+                                                     (list :text response)
+                                                   (list :tool-uses-raw
+                                                         response))))
+                             (when-let ((usage (assoc-default 'usage response-alist)))
+                               (when (not (eq usage :null))
+                                 (funcall receiver
+                                          (list :token-use
+                                                `(:input-tokens ,(assoc-default 'prompt_tokens usage)))))))))))))))
 
 (cl-defmethod llm-provider-collect-streaming-tool-uses ((_ llm-openai) data)
   (llm-provider-utils-openai-collect-streaming-tool-uses data))

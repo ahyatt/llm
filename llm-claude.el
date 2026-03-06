@@ -186,6 +186,11 @@
     (let ((content (aref (assoc-default 'content response) 0)))
       (assoc-default 'thinking content))))
 
+(cl-defmethod llm-provider-extract-token-use ((_ llm-claude) response)
+  (let ((usage (assoc-default 'usage response)))
+    `(:input-tokens ,(assoc-default 'input_tokens usage)
+                    :output-tokens ,(assoc-default 'output_tokens usage))))
+
 (cl-defmethod llm-provider-streaming-media-handler ((_ llm-claude)
                                                     receiver err-receiver)
   (cons 'text/event-stream
@@ -194,7 +199,18 @@
                    (ping . ignore)
                    (message_stop . ignore)
                    (content_block_stop . ignore)
-                   (message_delta . ignore)
+                   (message_delta
+                    .
+                    ,(lambda (event)
+                       (let* ((data (plz-event-source-event-data event))
+                              (json (json-parse-string data :object-type 'alist))
+                              (usage (assoc-default 'usage json))
+                              (input-tokens (assoc-default 'input_tokens usage))
+                              (output-tokens (assoc-default 'output_tokens usage)))
+                         (when (or input-tokens output-tokens)
+                           (funcall receiver
+                                    `(:input-tokens ,input-tokens
+                                                    :output-tokens ,output-tokens))))))
                    (error . ,(lambda (event)
                                (funcall err-receiver (plz-event-source-event-data event))))
                    (content_block_start
@@ -222,10 +238,14 @@
                               (json (json-parse-string data :object-type 'alist))
                               (delta (assoc-default 'delta json))
                               (type (assoc-default 'type delta))
-                              (index (assoc-default 'index json)))
+                              (index (assoc-default 'index json))
+                              (usage (assoc-default 'usage json))
+                              (input-tokens (assoc-default 'input_tokens usage))
+                              (output-tokens (assoc-default 'output_tokens usage)))
                          (cond
                           ((equal type "text_delta")
-                           (funcall receiver `(:text ,(assoc-default 'text delta))))
+                           (funcall receiver `(:text ,(assoc-default 'text delta)
+                                                     :usage ,usage)))
                           ((equal type "thinking_delta")
                            (funcall receiver `(:reasoning ,(assoc-default 'text delta))))
                           ((equal type "input_json_delta")

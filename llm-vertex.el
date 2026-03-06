@@ -180,6 +180,11 @@ information than standard tool use."
                                           parts)))
         (assoc-default 'text thought-part)))))
 
+(cl-defmethod llm-provider-extract-token-use ((provider llm-google) response)
+  (if-let* ((usage (assoc-default 'usageMetadata response)))
+      `(:input-tokens ,(assoc-default 'promptTokenCount usage)
+                      :output-tokens ,(assoc-default 'candidatesTokenCount usage))))
+
 (cl-defmethod llm-provider-extract-tool-uses ((provider llm-google) response)
   (if (vectorp response)
       (llm-provider-extract-tool-uses provider (aref response 0))
@@ -374,10 +379,12 @@ which is necessary to properly set some paremeters."
          (lambda (element)
            (when-let ((err-response (llm-provider-chat-extract-error provider element)))
              (funcall err-receiver err-response))
-           (if-let ((response (llm-provider-chat-extract-result provider element)))
-               (funcall receiver `(:text ,response))
-             (when-let ((fc (llm-provider-extract-tool-uses provider element)))
-               (funcall receiver `(:tool-uses ,fc))))))))
+           (if-let* ((response (llm-provider-chat-extract-result provider element))
+                     (usage (llm-provider-extract-token-use provider element)))
+               (funcall receiver (append `(:text ,response) usage))
+             (when-let* ((fc (llm-provider-extract-tool-uses provider element))
+                         (usage (llm-provider-extract-token-use provider element)))
+               (funcall receiver (append `(:tool-uses ,fc) usage))))))))
 
 (cl-defmethod llm-provider-collect-streaming-tool-uses ((_ llm-google) data)
   (car data))
