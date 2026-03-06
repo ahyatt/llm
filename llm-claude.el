@@ -239,9 +239,7 @@
                               (delta (assoc-default 'delta json))
                               (type (assoc-default 'type delta))
                               (index (assoc-default 'index json))
-                              (usage (assoc-default 'usage json))
-                              (input-tokens (assoc-default 'input_tokens usage))
-                              (output-tokens (assoc-default 'output_tokens usage)))
+                              (usage (assoc-default 'usage json)))
                          (cond
                           ((equal type "text_delta")
                            (funcall receiver `(:text ,(assoc-default 'text delta)
