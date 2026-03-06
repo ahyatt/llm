@@ -180,7 +180,7 @@ information than standard tool use."
                                           parts)))
         (assoc-default 'text thought-part)))))
 
-(cl-defmethod llm-provider-extract-token-use ((provider llm-google) response)
+(cl-defmethod llm-provider-extract-token-use ((_ llm-google) response)
   (if-let* ((usage (assoc-default 'usageMetadata response)))
       `(:input-tokens ,(assoc-default 'promptTokenCount usage)
                       :output-tokens ,(assoc-default 'candidatesTokenCount usage))))
