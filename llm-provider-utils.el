@@ -910,7 +910,7 @@ have returned results."
                                                                      (plist-get arg :name)
                                                                      name)))
                                                   nil))))))
-            (end-func (when tool-uses
+            (end-func (when (and tool tool-uses)
                         (lambda (result)
                           (llm--log
                            'api-funcall
