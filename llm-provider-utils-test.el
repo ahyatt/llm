@@ -225,6 +225,26 @@
                                                   id))
                           tool-results))))))
 
+(ert-deftest llm-provider-utils-execute-tool-uses--no-args ()
+  (let* ((prompt (llm-make-chat-prompt
+                  ""
+                  :tools (list (llm-make-tool
+                                :name "a"
+                                :function (lambda () 'success)))))
+         result)
+    (llm-provider-utils-execute-tool-uses
+     (make-llm-testing-provider)
+     prompt
+     (list
+      (make-llm-provider-utils-tool-use
+       :id "1"
+       :name "a"
+       :args nil))
+     t
+     nil
+     (lambda (r) (setq result r))
+     (lambda (_ err) (error "Should not error: %s" err)))
+    (should (equal result '(:tool-results (("a" . success)))))))
 
 (ert-deftest llm-provider-utils-execute-tool-uses--missing-tool ()
   (llm-provider-utils-execute-tool-uses
