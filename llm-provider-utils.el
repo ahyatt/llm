@@ -228,6 +228,13 @@ list of `llm-provider-utils-tool-use'.")
   "By default, the standard provider has no reasoning extractor."
   nil)
 
+(cl-defgeneric llm-provider-extract-token-use (provider response)
+  "Return a plist of token use information from RESPONSE for the PROVIDER.")
+
+(cl-defmethod llm-provider-extract-token-use ((_ llm-standard-chat-provider) _)
+  "By default, the standard provider has no token use extractor."
+  nil)
+
 (cl-defgeneric llm-provider-populate-tool-uses (provider prompt tool-uses)
   "For PROVIDER, in PROMPT, record TOOL-USES.
 This is the recording before the function calls were executed, in the prompt.
@@ -325,10 +332,13 @@ return a list of `llm-chat-prompt-tool-use' structs.")
         (tool-uses (llm-provider-extract-tool-uses
                     provider response))
         (reasoning (llm-provider-extract-reasoning
-                    provider response)))
+                    provider response))
+        (token-use-plist (llm-provider-extract-token-use
+                          provider response)))
     (append (when text `(:text ,text))
             (when tool-uses `(:tool-uses ,tool-uses))
-            (when reasoning `(:reasoning ,reasoning)))))
+            (when reasoning `(:reasoning ,reasoning))
+            token-use-plist)))
 
 (cl-defmethod llm-chat ((provider llm-standard-chat-provider) prompt &optional multi-output)
   (llm-provider-request-prelude provider)

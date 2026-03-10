@@ -101,7 +101,7 @@
            :prompt (lambda () (llm-make-chat-prompt "Hello world"))
            :openai-stream (:model "model"
                                   :messages [(:role "user" :content "Hello world")]
-                                  :stream t)
+                                  :stream t :stream_options (:include_usage t))
            :openai (:model "model"
                            :messages [(:role "user" :content "Hello world")])
 
@@ -121,7 +121,7 @@
            :prompt (lambda () (llm-make-chat-prompt "Hello world" :temperature 0.5))
            :openai-stream (:model "model"
                                   :messages [(:role "user" :content "Hello world")]
-                                  :stream t
+                                  :stream t :stream_options (:include_usage t)
                                   :temperature 1.0)
            :gemini (:contents [(:role "user" :parts [(:text "Hello world")])]
                               :generationConfig (:temperature 1.0))
@@ -142,7 +142,7 @@
            :openai-stream (:model "model"
                                   :messages [(:role "system" :content "context\nExamples of how you should respond follow.\nUser: input1\nAssistant: output1\nUser: input2\nAssistant: output2")
                                              (:role "user" :content "Hello world")]
-                                  :stream t)
+                                  :stream t  :stream_options (:include_usage t))
            :gemini (:system_instruction
                     (:parts (:text "context\nExamples of how you should respond follow.\nUser: input1\nAssistant: output1\nUser: input2\nAssistant: output2"))
                     :contents [(:role "user" :parts [(:text "Hello world")])])

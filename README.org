@@ -185,6 +185,11 @@ The possible plist keys are:
    - ~:reasoning~, for reasoning output, when the model separates it.
    - ~:tool-uses~, the tools that the llm identified to be called, as a list of plists, with ~:name~ and ~:args~ values.
    - ~:tool-results~, the results of calling the tools.
+   - ~:input-tokens~, the number of input tokens, when available
+   - ~:output-tokens~, the number of output tokens, when available
+
+The input and output token counts should be consistently available per-provider,
+but not all providers support output tokens, and some don't support either.
 *** JSON schema
 By using the ~response-format~ argument to ~llm-make-chat-prompt~, you can ask the LLM to return items according to a specified JSON schema, based on the [[https://json-schema.org][JSON Schema Spec]].  Not everything is supported, but the most commonly used parts are.  To specify the JSON schema, we use a plist-based approach.  JSON objects are defined with ~(:type object :properties (:<var1> <schema1> :<var2> <schema2> ... :<varn> <scheman>) :required (<req var1> ... <req varn>))~.  Arrays are defined with ~(:type array :items <schema>)~.  Enums are defined with ~(:enum [<val1> <val2> <val3>])~.  You can also request integers, strings, and other types defined by the JSON Schema Spec, by just having ~(:type <type>)~.  Typically, LLMs often require the top-level schema object to be an object, and often that all properties on the top-level object must be required.
 

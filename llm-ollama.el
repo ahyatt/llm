@@ -123,6 +123,12 @@ PROVIDER is the llm-ollama provider."
 (cl-defmethod llm-provider-extract-reasoning ((_ llm-ollama) response)
   (assoc-default 'thinking (assoc-default 'message response)))
 
+(cl-defmethod llm-provider-extract-token-use ((_ llm-ollama) response)
+  (when-let* ((input-tokens (assoc-default 'prompt_eval_count response))
+              (output-tokens (assoc-default 'eval_count response)))
+    `(:input-tokens ,input-tokens
+                    :output-tokens ,output-tokens)))
+
 (defun llm-ollama--response-format (format)
   "Return the response format for FORMAT."
   (if (eq format 'json)
@@ -237,6 +243,8 @@ PROVIDER is the llm-ollama provider."
          :handler (lambda (data)
                     (let* ((message (assoc-default 'message data))
                            (text (assoc-default 'content message))
+                           (input-tokens (assoc-default 'prompt_eval_count data))
+                           (output-tokens (assoc-default 'eval_count data))
                            (reasoning (assoc-default 'thinking message))
                            (tool-call (assoc-default 'tool_calls message))
                            (response nil))
@@ -255,6 +263,12 @@ PROVIDER is the llm-ollama provider."
                         (setq response
                               (plist-put response :tool-uses-raw
                                          (aref tool-call 0))))
+                      (when input-tokens
+                        (setq response
+                              (plist-put response :input-tokens input-tokens)))
+                      (when output-tokens
+                        (setq response
+                              (plist-put response :output-tokens output-tokens)))
                       (funcall receiver response))))))
 
 (cl-defmethod llm-provider-collect-streaming-tool-uses ((_ llm-ollama) data)
