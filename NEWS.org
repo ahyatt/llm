@@ -2,6 +2,7 @@
 - Add =:input-tokens= and =:output-tokens= to multioutput result.
 - Added Qwen 3.5, LFM2 and LFM 2.5 Thinking
 - Added Gemini 3.1 Pro
+- Added Chat GPT 5.4, with extra context
 - Fixed inability of zero-arg tools to be called
 * Version 0.29.0
 - Check for tool use mismatches and define new errors for them

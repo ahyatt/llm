@@ -126,6 +126,11 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 400000
     :regex "gpt-5-mini")
    (make-llm-model
+    :name "GPT-5.4" :symbol 'gpt-5-4
+    :capabilities '(generation tool-use image-input json-response reasoning)
+    :context-length 1000000
+    :regex (rx (seq "gpt-5\\.4" (or string-end (seq (or "-" ".") (+ digit))))))
+   (make-llm-model
     :name "GPT-5" :symbol 'gpt-5
     :capabilities '(generation tool-use image-input json-response reasoning)
     :context-length 400000
