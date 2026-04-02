@@ -354,8 +354,10 @@ STREAMING if non-nil, turn on response streaming."
 ;; Several Open AI compatible providers such as oMLX include a
 ;; "reasoning_content" field in the response.
 (cl-defmethod llm-provider-extract-reasoning ((_ llm-openai-compatible) response)
-  (assoc-default 'reasoning_content
-                 (assoc-default 'message (aref (cdr (assoc 'choices response)) 0))))
+  (when-let ((message (assoc-default 'message (aref (cdr (assoc 'choices response)) 0))))
+    (or
+     (assoc-default 'reasoning_content message)
+     (assoc-default 'reasoning message))))
 
 
 (cl-defmethod llm-provider-populate-tool-uses ((_ llm-openai) prompt tool-uses)

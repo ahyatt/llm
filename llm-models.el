@@ -430,6 +430,11 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 256000
     :regex "kimi-k2\\.5")
    (make-llm-model
+    :name "StepFun 3.5 Flash" :symbol 'stepfun-3.5-flash
+    :capabilities '(generation reasoning tool-use)
+    :context-length 256000
+    :regex "step-3.5-flash")
+   (make-llm-model
     :name "glm-5" :symbol 'glm-5
     :capabilities '(generation free-software reasoning tool-use) ; Apache license
     :context-length 200000

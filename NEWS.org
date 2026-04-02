@@ -1,6 +1,7 @@
 * Version 0.30.1
 - Add Claude Sonnet 4.6.
-- Add support for Open AI compatible =reasoning_content= blocks.
+- Add StepFun 3.5 Flash
+- Add support for Open AI compatible =reasoning_content= and =reasoning= blocks.
 * Version 0.30.0
 - Add =:input-tokens= and =:output-tokens= to multioutput result.
 - Added Qwen 3.5, LFM2 and LFM 2.5 Thinking
