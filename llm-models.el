@@ -330,6 +330,11 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 128000
     :regex "gemma-?3")
    (make-llm-model
+    :name "Gemma 4" :symbol 'gemma-4
+    :capabilities '(generation free-software tool-use audio-input video-input reasoning)  ;; Apache license
+    :context-length 128000
+    :regex "gemma-?4")
+   (make-llm-model
     :name "deepseek-r1" :symbol 'deepseek-r1
     :capabilities '(generation reasoning free-software)  ;; MIT license
     :context-length 128000
