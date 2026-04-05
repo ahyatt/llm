@@ -1,7 +1,8 @@
 * Version 0.30.1
 - Add Claude Sonnet 4.6
 - Add StepFun 3.5 Flash
-- Add Gemma 4i.
+- Add Gemma 4
+- Add Gemini 3.1 Flash Lite
 - Add support for Open AI compatible =reasoning_content= and =reasoning= blocks
 * Version 0.30.0
 - Add =:input-tokens= and =:output-tokens= to multioutput result.
