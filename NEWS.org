@@ -3,6 +3,7 @@
 - Add StepFun 3.5 Flash
 - Add Gemma 4
 - Add Gemini 3.1 Flash Lite
+- Added OpenRouter as a top-level model type
 - Add support for Open AI compatible =reasoning_content= and =reasoning= blocks
 * Version 0.30.0
 - Add =:input-tokens= and =:output-tokens= to multioutput result.
