@@ -1,16 +1,14 @@
-* Version 0.30.1
-- Add Claude Sonnet 4.6
-- Add StepFun 3.5 Flash
-- Add Gemma 4
-- Add Gemini 3.1 Flash Lite
-- Added OpenRouter as a top-level model type
-- Add support for Open AI compatible =reasoning_content= and =reasoning= blocks
 * Version 0.30.0
 - Add =:input-tokens= and =:output-tokens= to multioutput result.
-- Added Qwen 3.5, LFM2 and LFM 2.5 Thinking
-- Added Gemini 3.1 Pro
-- Added Chat GPT 5.4, with extra context
 - Fixed inability of zero-arg tools to be called
+- Added OpenRouter as a top-level model type
+- Add support for Open AI compatible =reasoning_content= and =reasoning= blocks  
+- Added Qwen 3.5, LFM2 and LFM 2.5 Thinking
+- Added Gemini 3.1 Pro, Gemini 3.1 Flash Lite
+- Added Chat GPT 5.4, with extra context
+- Added StepFun 3.5 Flash
+- Added Gemma 4
+- Added Claude Sonnet 4.6
 * Version 0.29.0
 - Check for tool use mismatches and define new errors for them
 - Normalize false values in tool args or tool call results
