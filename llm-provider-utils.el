@@ -827,7 +827,7 @@ This transforms the plist so that:
   (cl-loop for (key value) on tool-results
            by 'cddr
            if (and (not (and (eq key :text) (equal value "")))
-                   (member key '(:text :tool-uses :tool-results)))
+                   (member key '(:text :tool-uses :tool-results :reasoning)))
            nconc (list key
                        (if (eq key :tool-uses)
                            (mapcar (lambda (tool-use)
