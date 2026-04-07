@@ -391,6 +391,19 @@ RESPONSE can be nil if the response is complete."
                                  (assoc-default 'tool_calls delta)))))
       content-or-call)))
 
+(defun llm-openai--get-partial-reasoning-response (response)
+  "Return the reasoning in the partial chat response from RESPONSE.
+RESPONSE can be nil if the response is complete.  This only works for
+Open AI compatible providers that include reasoning in the delta, such
+as oMLX."
+  (when response
+    (let* ((choices (assoc-default 'choices response))
+           (delta (when (> (length choices) 0)
+                    (assoc-default 'delta (aref choices 0)))))
+      (llm-provider-utils-json-val
+       (or (assoc-default 'reasoning delta)
+           (assoc-default 'reasoning_content delta))))))
+
 (cl-defmethod llm-provider-streaming-media-handler ((_ llm-openai) receiver _)
   (cons 'text/event-stream
         (plz-event-source:text/event-stream
@@ -400,12 +413,19 @@ RESPONSE can be nil if the response is complete."
                        (let ((data (plz-event-source-event-data event)))
                          (unless (equal data "[DONE]")
                            (let ((response-alist (json-parse-string data :object-type 'alist)))
-                             (when-let ((response (llm-openai--get-partial-chat-response
-                                                   response-alist)))
-                               (funcall receiver (if (stringp response)
-                                                     (list :text response)
-                                                   (list :tool-uses-raw
-                                                         response))))
+                             (let ((text-response (llm-openai--get-partial-chat-response
+                                                   response-alist))
+                                   (reasoning-response (llm-openai--get-partial-reasoning-response
+                                                        response-alist)))
+                               (when (or text-response reasoning-response)
+                                 (funcall receiver (append
+                                                    (when text-response
+                                                      (if (stringp text-response)
+                                                          (list :text text-response)
+                                                        (list :tool-uses-raw
+                                                              text-response)))
+                                                    (when reasoning-response
+                                                      (list :reasoning reasoning-response))))))
                              (when-let ((usage (assoc-default 'usage response-alist)))
                                (when (not (eq usage :null))
                                  (funcall receiver
