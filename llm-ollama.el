@@ -180,7 +180,7 @@ PROVIDER is the llm-ollama provider."
                                                       (if (llm-media-p part)
                                                           ""
                                                         part)))
-                                            (t (json-serialize content))))
+                                            (t (llm-provider-utils-json-serialize content))))
                                         (when images
                                           `(:images
                                             ,(vconcat (mapcar (lambda (img) (base64-encode-string (llm-media-data img) t))
