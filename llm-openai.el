@@ -260,7 +260,7 @@ FCS is a list of `llm-provider-utils-tool-use' structs."
                    :function
                    (:name ,(llm-provider-utils-tool-use-name fc)
                           :arguments ,(llm-provider-utils-json-serialize
-                                        (llm-provider-utils-tool-use-args fc)))))
+                                       (llm-provider-utils-tool-use-args fc)))))
            fcs)))
 
 (defun llm-openai--build-messages (prompt)
