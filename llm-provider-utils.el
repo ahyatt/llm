@@ -977,5 +977,13 @@ If F is nil, nothing is done."
   (when (and val (not (eq val :null)))
     val))
 
+(defun llm-provider-utils-json-serialize (object)
+  "Serialize OBJECT to a JSON string, ensuring the result is multibyte.
+
+`json-serialize' returns a unibyte string, which can cause issues when
+the result has non-ASCII characters and is embedded into a structure
+that will itself be serialized with `json-serialize'."
+  (decode-coding-string (json-serialize object) 'utf-8))
+
 (provide 'llm-provider-utils)
 ;;; llm-provider-utils.el ends here
