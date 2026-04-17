@@ -167,6 +167,11 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 200000
     :regex "claude-opus-4-5")
    (make-llm-model
+    :name "Claude 4.7 Opus":symbol 'claude-4-7-opus
+    :capabilities '(generation tool-use image-input pdf-input caching json-response)
+    :context-length 1000000
+    :regex "claude-opus-4-7")
+   (make-llm-model
     :name "Claude 4.6 Opus" :symbol 'claude-4-6-opus
     :capabilities '(generation tool-use image-input pdf-input caching json-response)
     :context-length 200000
@@ -410,6 +415,11 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :capabilities '(generation tool-use free-software)  ;; Apache 2 license
     :context-length 256000
     :regex "qwen-?3\\.5")
+   (make-llm-model
+    :name "Qwen 3.6" :symbol 'qwen-3.6
+    :capabilities '(generation tool-use free-software image-input) ;; Apache 2 license
+    :context-length 1000000
+    :regex "qwen-?3\\.6")
    (make-llm-model
     :name "Qwen 3 Coder Next" :symbol 'qwen-3-coder-next
     :capabilities '(generation tool-use free-software)  ;; Apache 2 license
