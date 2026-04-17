@@ -388,18 +388,18 @@ STREAMING if non-nil, turn on response streaming."
                          (unless (equal data "[DONE]")
                            (let ((response-alist (json-parse-string data :object-type 'alist)))
                              (when-let* ((choices (assoc-default 'choices response-alist))
-																				 (delta (and (> (length choices) 0)
-																										 (assoc-default 'delta (aref choices 0)))))
-															 (let ((text (llm-provider-utils-json-val (assoc-default 'content delta)))
-																		 (tool-calls (llm-provider-utils-json-val (assoc-default 'tool_calls delta)))
-																		 (reasoning (llm-provider-utils-json-val
-																								 (or (assoc-default 'reasoning delta)
-																										 (assoc-default 'reasoning_content delta)))))
-																 (when-let ((output (append
-																										 (and (not (string-empty-p reasoning)) `(:text ,text))
-																										 (and tool-calls `(:tool-uses-raw ,tool-calls))
-																										 (and (not (string-empty-p reasoning)) `(:reasoning ,reasoning)))))
-																	 (funcall receiver output))))
+										 (delta (and (> (length choices) 0)
+													 (assoc-default 'delta (aref choices 0)))))
+							   (let ((text (llm-provider-utils-json-val (assoc-default 'content delta)))
+									 (tool-calls (llm-provider-utils-json-val (assoc-default 'tool_calls delta)))
+									 (reasoning (llm-provider-utils-json-val
+												 (or (assoc-default 'reasoning delta)
+													 (assoc-default 'reasoning_content delta)))))
+								 (when-let ((output (append
+													 (unless (string-empty-p reasoning) `(:text ,text))
+													 (when tool-calls `(:tool-uses-raw ,tool-calls))
+													 (unless (string-empty-p reasoning) `(:reasoning ,reasoning)))))
+								   (funcall receiver output))))
                              (when-let ((usage (assoc-default 'usage response-alist)))
                                (when (not (eq usage :null))
                                  (funcall receiver
