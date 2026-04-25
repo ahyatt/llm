@@ -356,6 +356,16 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 65536
     :regex "deepseek-chat")
    (make-llm-model
+    :name "Deepseek V4 Pro" :symbol 'deepseek-v4-pro
+    :capabilities '(generation reasoning tool-use free-software)  ;; MIT license
+    :context-length 1000000
+    :regex "deepseek-v4-pro")
+   (make-llm-model
+    :name "Deepseek V4 Fash" :symbol 'deepseek-v4-flash
+    :capabilities '(generation reasoning tool-use free-software)  ;; MIT license
+    :context-length 1000000
+    :regex "deepseek-v4-flash")
+   (make-llm-model
     :name "Mistral" :symbol 'mistral
     :capabilities '(generation tool-use free-software)  ;; Apache license
     :context-length 8192
@@ -411,6 +421,11 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 256000
     :regex "qwen-?3\\.5")
    (make-llm-model
+    :name "Qwen 3.6" :symbol 'qwen-3.6
+    :capabilities '(generation tool-use free-software)  ;; Apache 2 license
+    :context-length 1000000
+    :regex "qwen-?3\\.6")
+   (make-llm-model
     :name "Qwen 3 Coder Next" :symbol 'qwen-3-coder-next
     :capabilities '(generation tool-use free-software)  ;; Apache 2 license
     :context-length 256000
@@ -440,6 +455,11 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :capabilities '(generation free-software reasoning tool-use) ; Modified MIT license
     :context-length 256000
     :regex "kimi-k2\\.5")
+   (make-llm-model
+    :name "Kimi K2.6" :symbol 'kimi-k2.6
+    :capabilities '(generation free-software reasoning tool-use) ; Modified MIT license
+    :context-length 256000
+    :regex "kimi-k2\\.6")
    (make-llm-model
     :name "StepFun 3.5 Flash" :symbol 'stepfun-3.5-flash
     :capabilities '(generation reasoning tool-use)
