@@ -263,6 +263,9 @@ FCS is a list of `llm-provider-utils-tool-use' structs."
                                        (llm-provider-utils-tool-use-args fc)))))
            fcs)))
 
+(cl-defgeneric llm-openai--build-reasoning (provider prompt)
+  "Build the reasoning field for PROVIDER and PROMPT.")
+
 (defun llm-openai--build-messages (prompt)
   "Build the :messages field based on interactions in PROMPT."
   (let ((interactions (llm-chat-prompt-interactions prompt)))
@@ -331,6 +334,7 @@ STREAMING if non-nil, turn on response streaming."
           (append
            (llm-openai--build-model provider)
            (llm-openai--build-streaming streaming)
+           (llm-openai--build-reasoning provider prompt)
            (llm-openai--build-temperature prompt)
            (llm-openai--build-max-tokens prompt)
            (llm-openai--build-response-format prompt)
