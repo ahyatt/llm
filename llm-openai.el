@@ -266,6 +266,9 @@ FCS is a list of `llm-provider-utils-tool-use' structs."
 (cl-defgeneric llm-openai--build-reasoning (provider prompt)
   "Build the reasoning field for PROVIDER and PROMPT.")
 
+(cl-defmethod llm-openai--build-reasoning ((provider llm-openai) prompt)
+  nil)
+
 (defun llm-openai--build-messages (prompt)
   "Build the :messages field based on interactions in PROMPT."
   (let ((interactions (llm-chat-prompt-interactions prompt)))
