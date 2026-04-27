@@ -123,7 +123,12 @@
                                 (when (stringp (llm-tool-options-tool-choice options))
                                   (list :name (llm-tool-options-tool-choice options)))))))
     (when-let* ((model (llm-models-match (llm-claude-chat-model provider))))
-      (when (member (llm-model-symbol model) '(claude-4-6-opus claude-4-6-sonnet claude-4-7-opus))
+      (message "Tool options: %S" (llm-chat-prompt-tool-options prompt))
+      (when (and (member (llm-model-symbol model) '(claude-4-6-opus claude-4-6-sonnet claude-4-7-opus))
+                 ;; For some reason, Claude doesn't let you set thinking when forced to make a tool call.
+                 (not (equal (and (llm-chat-prompt-tool-options prompt)
+                                  (llm-tool-options-tool-choice (llm-chat-prompt-tool-options prompt)))
+                             'any)))
         (setq request (plist-put request :thinking `(:type
                                                      ,(if (eq 'none (llm-chat-prompt-reasoning prompt))
                                                           "disabled"
