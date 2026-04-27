@@ -392,7 +392,13 @@ else.  We really just want to see if it's in the right ballpark."
       (llm-chat provider prompt))))
 
 (llm-def-integration-test llm-reasoning (provider)
-  (when (member 'reasoning (llm-capabilities provider))
+  ;; Right now `reasoning' means both the capability of doing reasoning, and the
+  ;; output of reasoning.  These should probably be split in the future, but for
+  ;; now, Open AI is the only provider that does reasoning and doesn't also
+  ;; output the reasoning, so we just ignore Open AI here.
+  (when (and (member 'reasoning (llm-capabilities provider))
+             (or (not (llm-openai-p provider))
+                 (llm-openai-compatible-p provider)))
     (let ((prompt (llm-make-chat-prompt "Will interest rates fall in the next year?" :reasoning 'medium)))
       (should (plist-get (llm-chat provider prompt t) :reasoning)))))
 
