@@ -361,7 +361,7 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 1000000
     :regex "deepseek-v4-pro")
    (make-llm-model
-    :name "Deepseek V4 Fash" :symbol 'deepseek-v4-flash
+    :name "Deepseek V4 Flash" :symbol 'deepseek-v4-flash
     :capabilities '(generation reasoning tool-use free-software)  ;; MIT license
     :context-length 1000000
     :regex "deepseek-v4-flash")

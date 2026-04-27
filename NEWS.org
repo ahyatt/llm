@@ -2,6 +2,7 @@
 - Fix json encoding error caused by utf-8 strings for Open AI and Ollama
 - Add Kimi K2.6, Qwen 3.6 and Deepseek V4.
 - Improved support for Open AI streaming for tool calls, by [Renato Ferreira](https://github.com/renatofdds)
+- Add reasoning controls to DeepSeek and OpenAI
 * Version 0.30.1
 - Fix lack of reasoning response when doing tool calls
 - Added support for Open AI compatible =reasoning_content= and =reasoning= blocks for streaming

@@ -52,7 +52,7 @@ will use a reasonable default.
 
 EMBEDDING-MODEL is the model to use for embeddings.  If unset, it
 will use a reasonable default."
-  key (chat-model "gpt-4o") (embedding-model "text-embedding-3-small"))
+  key (chat-model "gpt-5.4-mini") (embedding-model "text-embedding-3-small"))
 
 (cl-defstruct (llm-openai-compatible (:include llm-openai
                                                (chat-model "unset")
@@ -263,6 +263,21 @@ FCS is a list of `llm-provider-utils-tool-use' structs."
                                        (llm-provider-utils-tool-use-args fc)))))
            fcs)))
 
+(cl-defgeneric llm-openai--build-reasoning (provider prompt)
+  "Build the reasoning field for PROVIDER and PROMPT.")
+
+(cl-defmethod llm-openai--build-reasoning ((_ llm-openai) prompt)
+  (when (llm-chat-prompt-reasoning prompt)
+    (list :reasoning_effort
+          (pcase (llm-chat-prompt-reasoning prompt)
+            ('none "none")
+            ('light "minimal")
+            ('medium "medium")
+            ('maximum "xhigh")
+            (_ (signal 'llm-not-supported
+                       (list (format "Unknown reasoning effort option: %s"
+                                     (llm-chat-prompt-reasoning prompt)))))))))
+
 (defun llm-openai--build-messages (prompt)
   "Build the :messages field based on interactions in PROMPT."
   (let ((interactions (llm-chat-prompt-interactions prompt)))
@@ -331,6 +346,7 @@ STREAMING if non-nil, turn on response streaming."
           (append
            (llm-openai--build-model provider)
            (llm-openai--build-streaming streaming)
+           (llm-openai--build-reasoning provider prompt)
            (llm-openai--build-temperature prompt)
            (llm-openai--build-max-tokens prompt)
            (llm-openai--build-response-format prompt)

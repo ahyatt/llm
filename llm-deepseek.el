@@ -74,6 +74,17 @@ RESPONSE can be nil if the response is complete."
           (when-let* ((model (llm-models-match (llm-deepseek-chat-model provider))))
             (llm-model-capabilities model))))
 
+(cl-defmethod llm-openai--build-reasoning ((_ llm-deepseek) prompt)
+  (when (llm-chat-prompt-reasoning prompt)
+    (pcase (llm-chat-prompt-reasoning prompt)
+      ('none '(:thinking (:type "disabled")))
+      ('light '(:thinking (:type "enabled") :reasoning_effort "low"))
+      ('medium '(:thinking (:type "enabled") :reasoning-effort "medium"))
+      ('maximum '(:thinking (:type "enabled") :reasoning-effort "high"))
+      (_ (signal 'llm-not-supported
+                 (list (format "Unknown reasoning effort option: %s"
+                               (llm-chat-prompt-reasoning prompt))))))))
+
 (provide 'llm-deepseek)
 
 ;;; llm-deepseek.el ends here
