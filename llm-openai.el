@@ -52,7 +52,7 @@ will use a reasonable default.
 
 EMBEDDING-MODEL is the model to use for embeddings.  If unset, it
 will use a reasonable default."
-  key (chat-model "gpt-4o") (embedding-model "text-embedding-3-small"))
+  key (chat-model "gpt-5.4-mini") (embedding-model "text-embedding-3-small"))
 
 (cl-defstruct (llm-openai-compatible (:include llm-openai
                                                (chat-model "unset")
@@ -267,7 +267,16 @@ FCS is a list of `llm-provider-utils-tool-use' structs."
   "Build the reasoning field for PROVIDER and PROMPT.")
 
 (cl-defmethod llm-openai--build-reasoning ((provider llm-openai) prompt)
-  nil)
+  (when (llm-chat-prompt-reasoning prompt)
+    (list :reasoning_effort
+          (pcase (llm-chat-prompt-reasoning prompt)
+            ('none "none")
+            ('light "minimal")
+            ('medium "medium")
+            ('maximum "xhigh")
+            (_ (signal 'llm-not-supported
+                       (list (format "Unknown reasoning effort option: %s"
+                                     (llm-chat-prompt-reasoning prompt)))))))))
 
 (defun llm-openai--build-messages (prompt)
   "Build the :messages field based on interactions in PROMPT."
