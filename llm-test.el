@@ -112,11 +112,9 @@
            :claude (:model "model"
                            :max_tokens 8192
                            :messages [(:role "user" :content "Hello world")]
-                           :thinking (:type "adaptive")
                            :stream :false)
            :claude-stream (:model "model"
                                   :max_tokens 8192
-                                  :thinking (:type "adaptive")
                                   :messages [(:role "user" :content "Hello world")]
                                   :stream t))
     (:name "Request with temperature"
@@ -133,7 +131,6 @@
                            :stream :false)
            :claude (:model "model"
                            :max_tokens 8192
-                           :thinking (:type "adaptive")
                            :messages [(:role "user" :content "Hello world")]
                            :temperature 0.5
                            :stream :false))
@@ -156,7 +153,6 @@
            :claude (:model "model"
                            :max_tokens 8192
                            :messages [(:role "user" :content "Hello world")]
-                           :thinking (:type "adaptive")
                            :system "context\nHere are 2 examples of how to respond:\n\nUser: input1\nAssistant: output1\nUser: input2\nAssistant: output2"
                            :stream :false))
     (:name "Request with conversation"
@@ -178,7 +174,6 @@
                            :messages [(:role "user" :content "Hello world")
                                       (:role "assistant" :content "Hello human")
                                       (:role "user" :content "I am user!")]
-                           :thinking (:type "adaptive")
                            :stream :false))
     (:name "Request with image"
            :prompt (lambda () (llm-make-chat-prompt
@@ -207,7 +202,6 @@
                                              :content
                                              [(:type "text" :text "What is this?")
                                               (:type "image" :source (:type "base64" :media_type "image/png" :data "aW1hZ2UgZGF0YQ=="))])]
-                           :thinking (:type "adaptive")
                            :stream :false))
     (:name "Request with tools"
            :prompt (lambda () (llm-make-chat-prompt
@@ -264,7 +258,6 @@
            :claude (:model "model"
                            :max_tokens 8192
                            :messages [(:role "user" :content "Hello world")]
-                           :thinking (:type "adaptive")
                            :tools
                            [(:name "func"
                                    :description "desc"

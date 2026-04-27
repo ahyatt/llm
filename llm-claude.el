@@ -34,7 +34,7 @@
 ;; Models defined at https://docs.anthropic.com/claude/docs/models-overview
 (cl-defstruct (llm-claude (:include llm-standard-chat-provider))
   (key nil :read-only t)
-  (chat-model "claude-sonnet-4-5" :read-only t))
+  (chat-model "claude-sonnet-4-6" :read-only t))
 
 (cl-defmethod llm-nonfree-message-info ((_ llm-claude))
   "Return Claude's nonfree ToS."
@@ -122,10 +122,12 @@
                                                                        (llm-tool-options-tool-choice options)))))))
                                 (when (stringp (llm-tool-options-tool-choice options))
                                   (list :name (llm-tool-options-tool-choice options)))))))
-    (setq request (plist-put request :thinking `(:type
-                                                 ,(if (eq 'none (llm-chat-prompt-reasoning prompt))
-                                                      "disabled"
-                                                    "adaptive"))))
+    (when-let* ((model (llm-models-match (llm-claude-chat-model provider))))
+      (when (member (llm-model-symbol model) '(claude-4-6-opus claude-4-6-sonnet claude-4-7-opus))
+        (setq request (plist-put request :thinking `(:type
+                                                     ,(if (eq 'none (llm-chat-prompt-reasoning prompt))
+                                                          "disabled"
+                                                        "adaptive"))))))
     (when (llm-chat-prompt-reasoning prompt)
       (setq request (plist-put request :output_config `(:effort
                                                         ,(pcase (llm-chat-prompt-reasoning prompt)
@@ -174,9 +176,11 @@
                     tool-uses))))
 
 (cl-defmethod llm-provider-chat-extract-result ((_ llm-claude) response)
-  (when (> (length (assoc-default 'content response)) 0)
-    (let ((content (aref (assoc-default 'content response) 0)))
-      (assoc-default 'text content))))
+  (let ((len (length (assoc-default 'content response))))
+    (cl-loop for i from 0 below len
+             for content = (aref (assoc-default 'content response) i)
+             when (equal "text" (assoc-default 'type content))
+             return (assoc-default 'text content))))
 
 (cl-defmethod llm-provider-extract-reasoning ((_ llm-claude) response)
   (when (> (length (assoc-default 'content response)) 0)
