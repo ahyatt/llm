@@ -158,32 +158,32 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
    ;; https://docs.anthropic.com/en/docs/about-claude/models
    (make-llm-model
     :name "Claude 4.5 Sonnet" :symbol 'claude-4.5-sonnet
-    :capabilities '(generation tool-use image-input pdf-input caching json-response)
+    :capabilities '(generation tool-use image-input pdf-input caching json-response reasoning)
     :context-length 200000
     :regex "claude-sonnet-4-5")
    (make-llm-model
     :name "Claude 4.5 Haiku" :symbol 'claude-4.5-haiku
-    :capabilities '(generation tool-use image-input pdf-input caching)
+    :capabilities '(generation tool-use image-input pdf-input caching reasoning)
     :context-length 200000
     :regex "claude-haiku-4-5")
    (make-llm-model
     :name "Claude 4.5 Opus" :symbol 'claude-4-5-opus
-    :capabilities '(generation tool-use image-input pdf-input caching json-response)
+    :capabilities '(generation tool-use image-input pdf-input caching json-response reasoning)
     :context-length 200000
     :regex "claude-opus-4-5")
    (make-llm-model
     :name "Claude 4.6 Opus" :symbol 'claude-4-6-opus
-    :capabilities '(generation tool-use image-input pdf-input caching json-response)
+    :capabilities '(generation tool-use image-input pdf-input caching json-response reasoning)
     :context-length 200000
     :regex "claude-opus-4-6")
    (make-llm-model
     :name "Claude 4.6 Sonnet" :symbol 'claude-4-6-sonnet
-    :capabilities '(generation tool-use image-input pdf-input caching json-response)
+    :capabilities '(generation tool-use image-input pdf-input caching json-response reasoning)
     :context-length 200000
     :regex "claude-sonnet-4-6")
    (make-llm-model
     :name "Claude 4.7 Opus" :symbol 'claude-4-7-opus
-    :capabilities '(generation tool-use image-input pdf-input caching json-response)
+    :capabilities '(generation tool-use image-input pdf-input caching json-response reasoning)
     :context-length 200000
     :regex "claude-opus-4-7")
    (make-llm-model
@@ -432,7 +432,7 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :regex "qwen-?3\\.5")
    (make-llm-model
     :name "Qwen 3.6" :symbol 'qwen-3.6
-    :capabilities '(generation tool-use free-software)  ;; Apache 2 license
+    :capabilities '(generation tool-use free-software image-input) ;; Apache 2 license
     :context-length 1000000
     :regex "qwen-?3\\.6")
    (make-llm-model
