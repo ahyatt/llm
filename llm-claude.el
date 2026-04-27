@@ -123,9 +123,9 @@
                                 (when (stringp (llm-tool-options-tool-choice options))
                                   (list :name (llm-tool-options-tool-choice options)))))))
     (setq request (plist-put request :thinking `(:type
-                                                 (if (eq 'none (llm-chat-prompt-reasoning prompt))
-                                                     "disabled"
-                                                   "adaptive"))))
+                                                 ,(if (eq 'none (llm-chat-prompt-reasoning prompt))
+                                                      "disabled"
+                                                    "adaptive"))))
     (when (llm-chat-prompt-reasoning prompt)
       (setq request (plist-put request :output_config `(:effort
                                                         ,(pcase (llm-chat-prompt-reasoning prompt)
