@@ -131,6 +131,11 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 1000000
     :regex (rx (seq "gpt-5\\.4" (or string-end (seq (or "-" ".") (+ digit))))))
    (make-llm-model
+    :name "GPT-5.5" :symbol 'gpt-5-5
+    :capabilities '(generation tool-use image-input json-response reasoning)
+    :context-length 1000000
+    :regex (rx (seq "gpt-5\\.5" (or string-end (seq (or "-" ".") (+ digit))))))
+   (make-llm-model
     :name "GPT-5" :symbol 'gpt-5
     :capabilities '(generation tool-use image-input json-response reasoning)
     :context-length 400000
@@ -176,6 +181,11 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :capabilities '(generation tool-use image-input pdf-input caching json-response)
     :context-length 200000
     :regex "claude-sonnet-4-6")
+   (make-llm-model
+    :name "Claude 4.7 Opus" :symbol 'claude-4-7-opus
+    :capabilities '(generation tool-use image-input pdf-input caching json-response)
+    :context-length 200000
+    :regex "claude-opus-4-7")
    (make-llm-model
     :name "Claude 4.1 Opus" :symbol 'claude-4-1-opus
     :capabilities '(generation tool-use image-input pdf-input caching json-response)

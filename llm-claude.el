@@ -122,20 +122,16 @@
                                                                        (llm-tool-options-tool-choice options)))))))
                                 (when (stringp (llm-tool-options-tool-choice options))
                                   (list :name (llm-tool-options-tool-choice options)))))))
+    (setq request (plist-put request :thinking `(:type
+                                                 (if (eq 'none (llm-chat-prompt-reasoning prompt))
+                                                     "disabled"
+                                                   "adaptive"))))
     (when (llm-chat-prompt-reasoning prompt)
-      (setq request (plist-put request :thinking
-                               (let (thinking-plist)
-                                 (setq thinking-plist (plist-put thinking-plist
-                                                                 :type
-                                                                 (if (eq (llm-chat-prompt-reasoning prompt) 'none)
-                                                                     "disabled" "enabled")))
-                                 (if (not (eq (llm-chat-prompt-reasoning prompt) 'none))
-                                     (plist-put thinking-plist :budget_tokens
-                                                (pcase (llm-chat-prompt-reasoning prompt)
-                                                  ('light 3000)
-                                                  ('medium 10000)
-                                                  ('maximum 32000))))
-                                 thinking-plist))))
+      (setq request (plist-put request :output_config `(:effort
+                                                        ,(pcase (llm-chat-prompt-reasoning prompt)
+                                                           ('light "low")
+                                                           ('medium "medium")
+                                                           ('maximum "max"))))))
     (append request (llm-provider-utils-non-standard-params-plist prompt))))
 
 (defun llm-claude--multipart-content (content)
@@ -157,6 +153,7 @@
                     (signal 'llm-invalid-argument
                             (list (format "Unsupported multipart content: %s" part))))))
            (llm-multipart-parts content))))
+
 (cl-defmethod llm-provider-extract-tool-uses ((_ llm-claude) response)
   (let ((content (append (assoc-default 'content response) nil)))
     (cl-loop for item in content
