@@ -83,7 +83,7 @@ RESPONSE can be nil if the response is complete."
       ('maximum '(:thinking (:type "enabled") :reasoning-effort "high"))
       (_ (signal 'llm-not-supported
                  (list (format "Unknown reasoning effort option: %s"
-                               (llm-chat-prompt-reasoning provider))))))))
+                               (llm-chat-prompt-reasoning prompt))))))))
 
 (provide 'llm-deepseek)
 
