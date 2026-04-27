@@ -292,7 +292,7 @@ we need to check for a model post 5.2 (if it supports reasoning at all)."
     (list :reasoning_effort
           (pcase (llm-chat-prompt-reasoning prompt)
             ('none "none")
-            ('light "minimal")
+            ('light "low")
             ('medium "medium")
             ('maximum "xhigh")
             (_ (signal 'llm-not-supported
