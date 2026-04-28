@@ -348,7 +348,7 @@ which is necessary to properly set some paremeters."
                        (eq model 'gemini-3-pro))
                    (eq budget 'none))
               (display-warning 'llm :warning "Cannot turn off reasoning in selected model, ignoring reasoning setting")
-            (if (string-match "3\." (symbol-name model))
+            (if (string-match "3-" (symbol-name model))
                 (setq thinking-plist (plist-put thinking-plist
                                                 :thinking_level
                                                 (pcase budget
