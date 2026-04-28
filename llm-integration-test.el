@@ -48,6 +48,7 @@
 ;;; Code:
 
 (require 'llm)
+(require 'llm-openai)  ;; required for excluding Open AI from reasoning tests
 (require 'ert)
 (require 'seq)
 (require 'image)

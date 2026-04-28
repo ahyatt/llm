@@ -186,7 +186,7 @@ Models can potentially return many types of information, though, so the ~multi-o
 
 The possible plist keys are:
    - ~:text~ , for the main textual output.
-   - ~:reasoning~, for reasoning output, when the model separates it.
+   - ~:reasoning~, for reasoning output, when the model provides it.
    - ~:tool-uses~, the tools that the llm identified to be called, as a list of plists, with ~:name~ and ~:args~ values.
    - ~:tool-results~, the results of calling the tools.
    - ~:input-tokens~, the number of input tokens, when available

@@ -283,8 +283,10 @@ we need to check for a model post 5.2 (if it supports reasoning at all)."
   (and (member 'reasoning (llm-capabilities provider))
        (let* ((model (llm-openai-chat-model provider))
               (major-minor (llm-openai--parse-version model)))
-         (and (>= (car major-minor) 5)
-              (>= (cdr major-minor) 2)))))
+         (or (>= (car major-minor) 6)
+             (and
+              (>= (car major-minor) 5)
+              (>= (cdr major-minor) 2))))))
 
 (cl-defmethod llm-openai--build-reasoning ((provider llm-openai) prompt)
   (when (and (llm-chat-prompt-reasoning prompt)
