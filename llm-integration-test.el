@@ -263,7 +263,8 @@ else.  We really just want to see if it's in the right ballpark."
     (while (not (or result err-result))
       (sleep-for 0.1))
     (if err-result (error err-result))
-    (should (plist-get result :text))
+    (dolist (key '(:text :input-tokens))
+      (should (plist-get result key)))
     (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim (plist-get result :text))))))
 
 (llm-def-integration-test llm-chat-streaming (provider)
@@ -320,6 +321,8 @@ else.  We really just want to see if it's in the right ballpark."
                   (time-less-p (time-subtract (current-time) start-time) 60))
         (sleep-for 0.1))
       (if err-result (error err-result))
+      (dolist (key '(:text :input-tokens))
+        (should (plist-get result key)))
       (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim (plist-get returned-result :text))))
       (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim (plist-get streamed-result :text)))))))
 

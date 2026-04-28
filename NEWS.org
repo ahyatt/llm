@@ -6,6 +6,7 @@
 - Fix reasoning for Claude Opus 4.7 and Chat GPT.
 - Changed default Claude model to 4.6 Sonnet
 - Fix text extraction for Claude when using reasoning
+- Return token counts when streaming
 * Version 0.30.1
 - Fix lack of reasoning response when doing tool calls
 - Added support for Open AI compatible =reasoning_content= and =reasoning= blocks for streaming
