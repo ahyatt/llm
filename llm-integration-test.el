@@ -322,7 +322,7 @@ else.  We really just want to see if it's in the right ballpark."
         (sleep-for 0.1))
       (if err-result (error err-result))
       (dolist (key '(:text :input-tokens))
-        (should (plist-get result key)))
+        (should (plist-get returned-result key)))
       (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim (plist-get returned-result :text))))
       (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim (plist-get streamed-result :text)))))))
 
