@@ -348,10 +348,14 @@ which is necessary to properly set some paremeters."
                        (eq model 'gemini-3-pro))
                    (eq budget 'none))
               (display-warning 'llm :warning "Cannot turn off reasoning in selected model, ignoring reasoning setting")
-            (if (eq model 'gemini-3-pro)
+            (if (string-match "3\." (symbol-name model))
                 (setq thinking-plist (plist-put thinking-plist
                                                 :thinking_level
                                                 (pcase budget
+                                                  ;; Gemini 3.1 Pro cannot turn off thinking.
+                                                  ;; See https://ai.google.dev/gemini-api/docs/thinking#set-budget
+                                                  ('none (if (eq model 'gemini-3-1-pro)
+                                                             "low" "minimal"))
                                                   ('light "low")
                                                   ;; Medium is currently not supported, coming soon.
                                                   ('medium "high")
