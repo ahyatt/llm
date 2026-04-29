@@ -708,6 +708,19 @@ This returns a JSON object (a list that can be converted to JSON)."
                  :parameters ,(llm-provider-utils-openai-arguments
                                (llm-tool-args tool)))))
 
+(defun llm-provider-utils-parse-openai-tool-arguments (arguments)
+  "Parse Open AI compatible tool call ARGUMENTS.
+Signal `llm-tool-call-error' when ARGUMENTS is not valid JSON."
+  (condition-case err
+      (json-parse-string
+       (if (or (null arguments) (= (length arguments) 0)) "{}" arguments)
+       :object-type 'alist)
+    (error
+     (signal 'llm-tool-call-error
+             (list
+              (format "Invalid JSON in tool call arguments: %s"
+                      (error-message-string err)))))))
+
 (defun llm-provider-utils-openai-collect-streaming-tool-uses (data)
   "Read Open AI compatible streaming output DATA to collect tool-uses."
   (let* ((num-index (+ 1 (seq-max (seq-map (lambda (tu) (assoc-default 'index tu)) data))))
@@ -729,8 +742,8 @@ This returns a JSON object (a list that can be converted to JSON)."
                              arguments))))
     (cl-loop for call in (append cvec nil)
              do (setf (llm-provider-utils-tool-use-args call)
-                      (json-parse-string (llm-provider-utils-tool-use-args call)
-                                         :object-type 'alist))
+                      (llm-provider-utils-parse-openai-tool-arguments
+                       (llm-provider-utils-tool-use-args call)))
              finally return (when (> (length cvec) 0)
                               (append cvec nil)))))
 

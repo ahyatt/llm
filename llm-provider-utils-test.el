@@ -60,6 +60,27 @@
                   :required ["location"])))
     (should (equal result expected))))
 
+(ert-deftest llm-provider-utils-parse-openai-tool-arguments ()
+  (should (equal (llm-provider-utils-parse-openai-tool-arguments "")
+                 nil))
+  (should (equal (llm-provider-utils-parse-openai-tool-arguments
+                  "{\"content\":\"├── research_plan.md\"}")
+                 '((content . "├── research_plan.md"))))
+  (should-error
+   (llm-provider-utils-parse-openai-tool-arguments
+    "{\"content\":\"├── research_plan.md\"")
+   :type 'llm-tool-call-error))
+
+(ert-deftest llm-provider-utils-openai-collect-streaming-tool-uses-invalid-json ()
+  (should-error
+   (llm-provider-utils-openai-collect-streaming-tool-uses
+    [((index . 0)
+      (id . "call_1")
+      (function
+       (name . "write_file")
+       (arguments . "{\"content\":\"├── research_plan.md\"")))])
+   :type 'llm-tool-call-error))
+
 (ert-deftest llm-provider-utils-convert-to-serializable ()
   (should (equal (llm-provider-utils-convert-to-serializable '(:a 1 :b 2))
                  '(:a 1 :b 2)))

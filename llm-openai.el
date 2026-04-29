@@ -397,10 +397,8 @@ STREAMING if non-nil, turn on response streaming."
               (make-llm-provider-utils-tool-use
                :id (assoc-default 'id call)
                :name (assoc-default 'name tool)
-               :args (json-parse-string
-                      (let ((args (assoc-default 'arguments tool)))
-                        (if (= (length args) 0) "{}" args))
-                      :object-type 'alist))))
+               :args (llm-provider-utils-parse-openai-tool-arguments
+                      (assoc-default 'arguments tool)))))
           (assoc-default 'tool_calls
                          (assoc-default 'message
                                         (aref (assoc-default 'choices response) 0)))))
