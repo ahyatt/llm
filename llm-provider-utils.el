@@ -715,7 +715,7 @@ Signal `llm-tool-call-error' when ARGUMENTS is not valid JSON."
       (json-parse-string
        (if (or (null arguments) (= (length arguments) 0)) "{}" arguments)
        :object-type 'alist)
-    (error
+    ((json-parse-error json-end-of-file)
      (signal 'llm-tool-call-error
              (list
               (format "Invalid JSON in tool call arguments: %s"
