@@ -386,6 +386,16 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 256000
     :regex "mistral-medium-3\\.5")
    (make-llm-model
+    :name "Xiaomi: MiMo-V2.5" :symbol 'mimo-v2.5
+    :capabilities '(generation tool-use free-software image-input video-input audio-input)  ;; MIT license
+    :context-length 1048576
+    :regex "mimo-v2\\.5")
+   (make-llm-model
+    :name "Xiaomi: MiMo-V2.5 Pro" :symbol 'mimo-v2.5-pro
+    :capabilities '(generation tool-use free-software image-input video-input audio-input)  ;; MIT license
+    :context-length 1048576
+    :regex "mimo-v2\\.5-pro")
+   (make-llm-model
     :name "Llava" :symbol 'llava
     :capabilities '(generation image-input free-software)  ;; Apache license
     :context-length 4096
