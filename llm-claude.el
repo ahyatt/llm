@@ -32,7 +32,16 @@
 (require 'rx)
 
 ;; Models defined at https://docs.anthropic.com/claude/docs/models-overview
-(cl-defstruct (llm-claude (:include llm-standard-chat-provider))
+(cl-defstruct (llm-claude
+               (:include llm-standard-chat-provider)
+               (:constructor make-llm-claude
+                             (&key default-chat-temperature
+                                   default-chat-max-tokens
+                                   default-chat-non-standard-params
+                                   ((:key raw-key))
+                                   (chat-model "claude-sonnet-4-6")
+                                   &aux
+                                   (key (llm-provider-utils--wrap-key raw-key)))))
   (key nil :read-only t)
   (chat-model "claude-sonnet-4-6" :read-only t))
 

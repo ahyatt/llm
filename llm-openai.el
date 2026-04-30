@@ -42,7 +42,17 @@
   :type 'string
   :group 'llm-openai)
 
-(cl-defstruct (llm-openai (:include llm-standard-full-provider))
+(cl-defstruct (llm-openai
+               (:include llm-standard-full-provider)
+               (:constructor make-llm-openai
+                             (&key default-chat-temperature
+                                   default-chat-max-tokens
+                                   default-chat-non-standard-params
+                                   ((:key raw-key))
+                                   (chat-model "gpt-5.4-mini")
+                                   (embedding-model "text-embedding-3-small")
+                                   &aux
+                                   (key (llm-provider-utils--wrap-key raw-key)))))
   "A structure for holding information needed by Open AI's API.
 
 KEY is the API key for Open AI, which is required.
@@ -54,9 +64,20 @@ EMBEDDING-MODEL is the model to use for embeddings.  If unset, it
 will use a reasonable default."
   key (chat-model "gpt-5.4-mini") (embedding-model "text-embedding-3-small"))
 
-(cl-defstruct (llm-openai-compatible (:include llm-openai
-                                               (chat-model "unset")
-                                               (embedding-model "unset")))
+(cl-defstruct (llm-openai-compatible
+               (:include llm-openai
+                         (chat-model "unset")
+                         (embedding-model "unset"))
+               (:constructor make-llm-openai-compatible
+                             (&key default-chat-temperature
+                                   default-chat-max-tokens
+                                   default-chat-non-standard-params
+                                   ((:key raw-key))
+                                   (chat-model "unset")
+                                   (embedding-model "unset")
+                                   url
+                                   &aux
+                                   (key (llm-provider-utils--wrap-key raw-key)))))
   "A structure for other APIs that use the Open AI's API.
 
 URL is the URL to use for the API, up to the command.  So, for
@@ -65,8 +86,19 @@ https://api.example.com/v1/chat, then URL should be
 \"https://api.example.com/v1/\"."
   url)
 
-(cl-defstruct (llm-openrouter (:include llm-openai-compatible
-                                        (url "https://openrouter.ai/api/v1/")))
+(cl-defstruct (llm-openrouter
+               (:include llm-openai-compatible
+                         (url "https://openrouter.ai/api/v1/"))
+               (:constructor make-llm-openrouter
+                             (&key default-chat-temperature
+                                   default-chat-max-tokens
+                                   default-chat-non-standard-params
+                                   ((:key raw-key))
+                                   (chat-model "unset")
+                                   (embedding-model "unset")
+                                   (url "https://openrouter.ai/api/v1/")
+                                   &aux
+                                   (key (llm-provider-utils--wrap-key raw-key)))))
   "A structure for Open Router.
 
 This is mostly compatible with Open AI's API but has some minor API

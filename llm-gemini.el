@@ -32,7 +32,17 @@
 (require 'llm-provider-utils)
 (require 'json)
 
-(cl-defstruct (llm-gemini (:include llm-google))
+(cl-defstruct (llm-gemini
+               (:include llm-google)
+               (:constructor make-llm-gemini
+                             (&key default-chat-temperature
+                                   default-chat-max-tokens
+                                   default-chat-non-standard-params
+                                   ((:key raw-key))
+                                   (embedding-model "embedding-001")
+                                   (chat-model "gemini-3.1-pro-preview")
+                                   &aux
+                                   (key (llm-provider-utils--wrap-key raw-key)))))
   "A struct representing a Gemini client.
 
 KEY is the API key for the client.

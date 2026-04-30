@@ -73,6 +73,19 @@ NAME is the tool name.
 ARG is an alist of arguments to their values."
   id name args)
 
+(defun llm-provider-utils--wrap-key (key)
+  "Return KEY wrapped so provider structs do not print secret strings.
+Function values are already suitable because providers resolve them
+at request time."
+  (if (or (null key) (functionp key))
+      key
+    (let ((token (make-symbol "llm-key")))
+      (put token 'secret key)
+      (fset token
+            (lambda ()
+              (get token 'secret)))
+      token)))
+
 ;; Methods necessary for both embedding and chat requests.
 
 (cl-defgeneric llm-provider-request-prelude (provider)

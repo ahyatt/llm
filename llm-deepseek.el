@@ -29,9 +29,20 @@
 (require 'llm-models)
 (require 'cl-lib)
 
-(cl-defstruct (llm-deepseek (:include llm-openai-compatible
-                                      (url "https://api.deepseek.com")
-                                      (chat-model "deepseek-chat"))))
+(cl-defstruct (llm-deepseek
+               (:include llm-openai-compatible
+                         (url "https://api.deepseek.com")
+                         (chat-model "deepseek-chat"))
+               (:constructor make-llm-deepseek
+                             (&key default-chat-temperature
+                                   default-chat-max-tokens
+                                   default-chat-non-standard-params
+                                   ((:key raw-key))
+                                   (chat-model "deepseek-chat")
+                                   (embedding-model "unset")
+                                   (url "https://api.deepseek.com")
+                                   &aux
+                                   (key (llm-provider-utils--wrap-key raw-key))))))
 
 (cl-defmethod llm-nonfree-message-info ((_ llm-deepseek))
   "Location for the terms of service and privacy policy."

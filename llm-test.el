@@ -96,6 +96,23 @@
                     (mapcar #'llm-test-normalize json-obj))))
         (t json-obj)))
 
+(ert-deftest llm-test-provider-key-not-printed ()
+  (let* ((secret "llm-test-secret")
+         (provider (make-llm-openai-compatible
+                    :url "http://127.0.0.1:8000/v1"
+                    :chat-model "model"
+                    :key secret))
+         (printed (prin1-to-string provider))
+         (key (llm-openai-compatible-key provider)))
+    (should (functionp key))
+    (should (symbolp key))
+    (should (equal secret (funcall key)))
+    (should-not (string-match-p (regexp-quote secret) printed))
+    (should-not (string-match-p (regexp-quote secret)
+                                (prin1-to-string (symbol-function key))))
+    (should (equal `(("Authorization" . ,(format "Bearer %s" secret)))
+                   (llm-provider-headers provider)))))
+
 (defconst llm-test-chat-requests-to-responses
   `((:name "Simple request"
            :prompt (lambda () (llm-make-chat-prompt "Hello world"))
