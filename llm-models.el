@@ -381,6 +381,11 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 8192
     :regex "mistral")
    (make-llm-model
+    :name "Mistral Medium 3.5" :symbol 'mistral-medium-3.5
+    :capabilities '(generation tool-use free-software image-input reasoning)  ;; Modified MIT license
+    :context-length 256000
+    :regex "mistral-medium-3\\.5")
+   (make-llm-model
     :name "Llava" :symbol 'llava
     :capabilities '(generation image-input free-software)  ;; Apache license
     :context-length 4096
