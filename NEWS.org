@@ -1,3 +1,5 @@
+* Version 0.30.3
+- Fix for OpenRouter breakage
 * Version 0.30.2
 - Fix json encoding error caused by utf-8 strings for Open AI and Ollama
 - Add Claude Opus 4.7, Kimi K2.6, Qwen 3.6, Chat GPT 5.5, Mistral Medium 3.5, XiaoMi 2.5, and Deepseek V4.
