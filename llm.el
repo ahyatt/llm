@@ -842,7 +842,8 @@ This should only be used for logging or debugging."
  'llm-request-authentication-error "LLM request authentication failed" 'llm-request-error)
 (define-error
  'llm-request-bad-request "LLM request was invalid" 'llm-request-error)
-
+(define-error
+ 'llm-request-refusal "LLM provider refused the request" 'llm-request-error)
 (define-error
  'llm-tool-call-error "An error occurred when calling an LLM tool" 'llm-error)
 (define-error

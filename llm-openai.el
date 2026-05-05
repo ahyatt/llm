@@ -291,7 +291,9 @@ If it cannot be parsed, return nil.  Otherwise, return a cons of (MAJOR
 The Open AI models have inconsistent and confusing support pre-5.2, so
 we need to check for a model post 5.2 (if it supports reasoning at all)."
   (and (member 'reasoning (llm-capabilities provider))
-       (let* ((model (llm-openai-chat-model provider))
+       (let* ((model (if (listp (llm-openai-chat-model provider))
+                         (car (llm-openai-chat-model provider))
+                       (llm-openai-chat-model provider)))
               (major-minor (llm-openai--parse-version model)))
          (or (>= (car major-minor) 6)
              (and
@@ -388,7 +390,6 @@ STREAMING if non-nil, turn on response streaming."
     (setq request-plist
           (append
            (llm-openai--build-model provider)
-           (llm-openai--build-streaming streaming)
            (llm-openai--build-reasoning provider prompt)
            (llm-openai--build-temperature prompt)
            (llm-openai--build-max-tokens prompt)
@@ -399,6 +400,7 @@ STREAMING if non-nil, turn on response streaming."
            (when (llm-chat-prompt-context prompt)
              (list :instructions (llm-chat-prompt-context prompt)))
            (list :store :false)
+           (list :stream (if streaming t :false))
            '(:include ["reasoning.encrypted_content"])))
 
     ;; Merge non-standard params
@@ -506,7 +508,7 @@ STREAMING if non-nil, turn on response streaming."
 (cl-defmethod llm-provider-populate-tool-uses ((_ llm-openai) prompt tool-uses)
   (llm-provider-utils-append-to-prompt prompt tool-uses nil 'assistant))
 
-(cl-defmethod llm-provider-streaming-media-handler ((_ llm-openai) receiver _)
+(cl-defmethod llm-provider-streaming-media-handler ((_ llm-openai-compatible) receiver _)
   (cons 'text/event-stream
         (plz-event-source:text/event-stream
          :events `((message
@@ -532,6 +534,74 @@ STREAMING if non-nil, turn on response streaming."
                                (when (not (eq usage :null))
                                  (funcall receiver
                                           `(:input-tokens ,(assoc-default 'prompt_tokens usage))))))))))))))
+
+(defun llm-openai--handle-response-api-streaming-response (event receiver)
+  "Handle a streaming response from the Open AI Responses API.
+
+EVENT is the event data to process, and RECEIVER is the function to call
+with the processed output."
+  (let* ((data (json-parse-string event :object-type 'alist))
+         (response (assoc-default 'response data))
+         (outputs (assoc-default 'output response))
+         output)
+    (cl-loop for output-item across outputs
+             do
+             ;; We don't reprocess content text, since that's already been handled by deltas.
+             (cl-loop for item across (assoc-default 'content output-item)
+                      if (equal (assoc-default 'type item) "refusal")
+                      do (signal 'llm-request-refusal
+                                 (list (format "Open AI refused to answer: %s"
+                                               (assoc-default 'refusal item)))))
+             (when-let* ((tool-call (assoc-default 'function_call output-item)))
+               `(:tool-uses-raw
+                 (:arguments ,(assoc-default 'arguments tool-call)
+                             :name ,(assoc-default 'name tool-call)
+                             :id ,(assoc-default 'id tool-call)))))
+    (when output
+      (funcall receiver output))))
+
+(cl-defmethod llm-provider-streaming-media-handler ((_ llm-openai) receiver _)
+  (cons 'text/event-stream
+        (plz-event-source:text/event-stream
+         :events `((response.created
+                    .
+                    ,(lambda (event)
+                       (llm-openai--handle-response-api-streaming-response
+                        (plz-event-source-event-data event) receiver)))
+                   (response.completed
+                    .
+                    ,(lambda (event)
+                       (llm-openai--handle-response-api-streaming-response
+                        (plz-event-source-event-data event) receiver)))
+                   (response.output_text.delta
+                    .
+                    ,(lambda (event)
+                       (let* ((data (plz-event-source-event-data event))
+                              (delta-alist (json-parse-string data :object-type 'alist)))
+                         ;; The output text is given according to indexes; i
+                         ;; don't yet really understand what different indexes
+                         ;; mean for streaming, so let's just use index 0 for
+                         ;; now.
+                         (when (= (assoc-default 'content_index delta-alist) 0)
+                           (funcall receiver `(:text ,(assoc-default 'delta delta-alist)))))))
+                   (response.reasoning_summary_text.delta
+                    .
+                    ,(lambda (event)
+                       (let* ((data (plz-event-source-event-data event))
+                              (delta-alist (json-parse-string data :object-type 'alist)))
+                         (when (= (assoc-default 'output_index delta-alist) 0)
+                           (funcall receiver `(:reasoning ,(assoc-default 'delta delta-alist)))))))
+                   (response.output_item.done
+                    .
+                    ,(lambda (event)
+                       (let* ((data (plz-event-source-event-data event))
+                              (done-alist (json-parse-string data :object-type 'alist))
+                              (item (assoc-default 'item done-alist)))
+                         (when (equal (assoc-default 'type item) "reasoning")
+                           (funcall receiver
+                                    `(:multi-turn
+                                      (:openai-reasoning-id ,(assoc-default 'id item)
+                                                            :openai-encrypted-reasoning ,(assoc-default 'encrypted_content item))))))))))))
 
 (cl-defmethod llm-provider-collect-streaming-tool-uses ((_ llm-openai) data)
   (llm-provider-utils-openai-collect-streaming-tool-uses data))
@@ -561,7 +631,9 @@ STREAMING if non-nil, turn on response streaming."
                      (not (equal "unset" (llm-openai-embedding-model provider))))
             '(embeddings embeddings-batch))
           (when-let* ((model (llm-models-match (llm-openai-chat-model provider))))
-            (llm-model-capabilities model))))
+            (llm-model-capabilities (if (listp model)
+                                        (car model)
+                                      model)))))
 
 (cl-defmethod llm-models ((provider llm-openai))
   (mapcar (lambda (model)

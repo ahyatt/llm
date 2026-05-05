@@ -334,13 +334,14 @@ DATA is a vector of lists produced by `llm-provider-streaming-media-handler'."
      (llm-model-capabilities model))))
 
 (cl-defmethod llm-provider-append-to-prompt ((_ llm-claude) prompt result
-                                             &optional tool-use-results)
+                                             &optional tool-use-results multi-turn)
   ;; Claude doesn't have a 'function role, so we just always use assistant here.
   ;; But if it's a function result, it considers that a 'user response, which
   ;; needs to be sent back.
-  (llm-provider-utils-append-to-prompt prompt result tool-use-results (if tool-use-results
-                                                                          'user
-                                                                        'assistant)))
+  (llm-provider-utils-append-to-prompt prompt result tool-use-results multi-turn
+                                       (if tool-use-results
+                                           'user
+                                         'assistant)))
 
 (cl-defmethod llm-models ((provider llm-claude))
   (mapcar (lambda (model)
