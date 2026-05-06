@@ -117,11 +117,15 @@
   `((:name "Simple request"
            :prompt (lambda () (llm-make-chat-prompt "Hello world"))
            :openai-stream (:model "model"
-                                  :messages [(:role "user" :content "Hello world")]
-                                  :stream t :stream_options (:include_usage t))
+                                  :input [(:role "user" :content "Hello world")]
+                                  :include ["reasoning.encrypted_content"]
+                                  :store :false
+                                  :stream t)
            :openai (:model "model"
-                           :messages [(:role "user" :content "Hello world")])
-
+                           :input [(:role "user" :content "Hello world")]
+                           :store :false
+                           :stream :false
+                           :include ["reasoning.encrypted_content"])
            :gemini (:contents [(:role "user" :parts [(:text "Hello world")])])
            :ollama (:model "model"
                            :messages [(:role "user" :content "Hello world")]
@@ -137,8 +141,10 @@
     (:name "Request with temperature"
            :prompt (lambda () (llm-make-chat-prompt "Hello world" :temperature 0.5))
            :openai-stream (:model "model"
-                                  :messages [(:role "user" :content "Hello world")]
-                                  :stream t :stream_options (:include_usage t)
+                                  :input [(:role "user" :content "Hello world")]
+                                  :include ["reasoning.encrypted_content"]
+                                  :store :false
+                                  :stream t
                                   :temperature 1.0)
            :gemini (:contents [(:role "user" :parts [(:text "Hello world")])]
                               :generationConfig (:temperature 1.0))
@@ -157,9 +163,11 @@
                                                     :examples (list (cons "input1" "output1")
                                                                     (cons "input2" "output2"))))
            :openai-stream (:model "model"
-                                  :messages [(:role "system" :content "context\nExamples of how you should respond follow.\nUser: input1\nAssistant: output1\nUser: input2\nAssistant: output2")
-                                             (:role "user" :content "Hello world")]
-                                  :stream t  :stream_options (:include_usage t))
+                                  :instructions "context\nHere are 2 examples of how to respond:\n\nUser: input1\nAssistant: output1\nUser: input2\nAssistant: output2"
+                                  :input [(:role "user" :content "Hello world")]
+                                  :include ["reasoning.encrypted_content"]
+                                  :store :false
+                                  :stream t)
            :gemini (:system_instruction
                     (:parts (:text "context\nExamples of how you should respond follow.\nUser: input1\nAssistant: output1\nUser: input2\nAssistant: output2"))
                     :contents [(:role "user" :parts [(:text "Hello world")])])
@@ -175,9 +183,12 @@
     (:name "Request with conversation"
            :prompt (lambda () (llm-make-chat-prompt '("Hello world" "Hello human" "I am user!")))
            :openai (:model "model"
-                           :messages [(:role "user" :content "Hello world")
-                                      (:role "assistant" :content "Hello human")
-                                      (:role "user" :content "I am user!")])
+                           :input [(:role "user" :content "Hello world")
+                                   (:role "assistant" :content "Hello human")
+                                   (:role "user" :content "I am user!")]
+                           :store :false
+                           :stream :false
+                           :include ["reasoning.encrypted_content"])
            :gemini (:contents [(:role "user" :parts [(:text "Hello world")])
                                (:role "model" :parts [(:text "Hello human")])
                                (:role "user" :parts [(:text "I am user!")])])
@@ -199,8 +210,11 @@
                                              (make-llm-media :mime-type "image/png"
                                                              :data "image data")))))
            :openai (:model "model"
-                           :messages [(:role "user" :content [(:type "text" :text "What is this?")
-                                                              (:type "image_url" :image_url (:url "data:image/png;base64,aW1hZ2UgZGF0YQ=="))])])
+                           :input [(:role "user" :content [(:type "text" :text "What is this?")
+                                                           (:type "image_url" :image_url (:url "data:image/png;base64,aW1hZ2UgZGF0YQ=="))])]
+                           :store :false
+                           :stream :false
+                           :include ["reasoning.encrypted_content"])
            :gemini (:contents
                     [(:role
                       "user"
@@ -232,18 +246,20 @@
                                               :tool-choice "func")))
            :openai
            (:model "model"
-                   :messages [(:role "user" :content "Hello world")]
+                   :input [(:role "user" :content "Hello world")]
                    :tools [(:type "function"
-                                  :function
-                                  (:name "func"
-                                         :description "desc"
-                                         :parameters
-                                         (:type "object"
-                                                :properties
-                                                (:arg1 (:description "desc1" :type "string")
-                                                       :arg2 (:description "desc2" :type "integer"))
-                                                :required ["arg1"])))]
-                   :tool_choice (:function (:name "func") :type "function"))
+                                  :name "func"
+                                  :description "desc"
+                                  :parameters
+                                  (:type "object"
+                                         :properties
+                                         (:arg1 (:description "desc1" :type "string")
+                                                :arg2 (:description "desc2" :type "integer"))
+                                         :required ["arg1"]))]
+                   :tool_choice (:function (:name "func") :type "function")
+                   :store :false
+                   :stream :false
+                   :include ["reasoning.encrypted_content"])
            :gemini
            (:contents [(:role "user" :parts [(:text "Hello world")])]
                       :tools [(:function_declarations
