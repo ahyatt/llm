@@ -46,7 +46,21 @@ This is needed because there is no API support for previous chat conversation."
   :type 'string)
 
 ;; Obsolete, llm-openai-compatible can be used directly instead.
-(cl-defstruct (llm-llamacpp (:include llm-openai-compatible))
+(cl-defstruct (llm-llamacpp
+               (:include llm-openai-compatible)
+               (:constructor make-llm-llamacpp
+                             (&key default-chat-temperature
+                                   default-chat-max-tokens
+                                   default-chat-non-standard-params
+                                   ((:key raw-key))
+                                   (chat-model "unset")
+                                   (embedding-model "unset")
+                                   url
+                                   (scheme "http")
+                                   (host "localhost")
+                                   (port 8080)
+                                   &aux
+                                   (key (llm-provider-utils--wrap-key raw-key)))))
   "A struct representing a llama.cpp instance."
   (scheme "http") (host "localhost") (port 8080))
 

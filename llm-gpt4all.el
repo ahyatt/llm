@@ -34,7 +34,20 @@
 (require 'llm-openai)
 (require 'llm-provider-utils)
 
-(cl-defstruct (llm-gpt4all (:include llm-openai-compatible))
+(cl-defstruct (llm-gpt4all
+               (:include llm-openai-compatible)
+               (:constructor make-llm-gpt4all
+                             (&key default-chat-temperature
+                                   default-chat-max-tokens
+                                   default-chat-non-standard-params
+                                   ((:key raw-key))
+                                   (chat-model "unset")
+                                   (embedding-model "unset")
+                                   url
+                                   host
+                                   port
+                                   &aux
+                                   (key (llm-provider-utils--wrap-key raw-key)))))
   "A structure for holding information needed by GPT4All.
 
 CHAT-MODEL is the model to use for chat queries. It must be set.

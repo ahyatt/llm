@@ -28,8 +28,19 @@
 (require 'llm)
 (require 'llm-azure)
 
-(cl-defstruct (llm-github (:include llm-azure
-                                    (url "https://models.inference.ai.azure.com"))))
+(cl-defstruct (llm-github
+               (:include llm-azure
+                         (url "https://models.inference.ai.azure.com"))
+               (:constructor make-llm-github
+                             (&key default-chat-temperature
+                                   default-chat-max-tokens
+                                   default-chat-non-standard-params
+                                   ((:key raw-key))
+                                   (chat-model "unset")
+                                   (embedding-model "unset")
+                                   (url "https://models.inference.ai.azure.com")
+                                   &aux
+                                   (key (llm-provider-utils--wrap-key raw-key))))))
 
 (cl-defmethod llm-provider-chat-url ((provider llm-github))
   (format "%s/chat/completions" (llm-azure-url provider)))

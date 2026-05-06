@@ -29,7 +29,18 @@
 (require 'llm-openai)
 (require 'cl-lib)
 
-(cl-defstruct (llm-azure (:include llm-openai-compatible)))
+(cl-defstruct (llm-azure
+               (:include llm-openai-compatible)
+               (:constructor make-llm-azure
+                             (&key default-chat-temperature
+                                   default-chat-max-tokens
+                                   default-chat-non-standard-params
+                                   ((:key raw-key))
+                                   (chat-model "unset")
+                                   (embedding-model "unset")
+                                   url
+                                   &aux
+                                   (key (llm-provider-utils--wrap-key raw-key))))))
 
 (cl-defmethod llm-nonfree-message-info ((_ llm-azure))
   "Return Azure's nonfree terms of service."

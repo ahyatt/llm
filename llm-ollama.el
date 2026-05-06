@@ -63,7 +63,20 @@ CHAT-MODEL is the model to use for chat queries.  It is required.
 EMBEDDING-MODEL is the model to use for embeddings.  It is required."
   (scheme "http") (host "localhost") (port 11434) chat-model embedding-model)
 
-(cl-defstruct (llm-ollama-authed (:include llm-ollama))
+(cl-defstruct (llm-ollama-authed
+               (:include llm-ollama)
+               (:constructor make-llm-ollama-authed
+                             (&key default-chat-temperature
+                                   default-chat-max-tokens
+                                   default-chat-non-standard-params
+                                   (scheme "http")
+                                   (host "localhost")
+                                   (port 11434)
+                                   chat-model
+                                   embedding-model
+                                   ((:key raw-key))
+                                   &aux
+                                   (key (llm-provider-utils--wrap-key raw-key)))))
   "Similar to llm-ollama, but also with a key."
   key)
 

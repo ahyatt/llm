@@ -1,6 +1,6 @@
 ;;; llm-openai.el --- llm module for integrating with Open AI -*- lexical-binding: t; package-lint-main-file: "llm.el"; byte-compile-docstring-max-column: 200-*-
 
-;; Copyright (c) 2023-2025  Free Software Foundation, Inc.
+;; Copyright (c) 2023-2026  Free Software Foundation, Inc.
 
 ;; Author: Andrew Hyatt <ahyatt@gmail.com>
 ;; Homepage: https://github.com/ahyatt/llm
@@ -42,7 +42,17 @@
   :type 'string
   :group 'llm-openai)
 
-(cl-defstruct (llm-openai (:include llm-standard-full-provider))
+(cl-defstruct (llm-openai
+               (:include llm-standard-full-provider)
+               (:constructor make-llm-openai
+                             (&key default-chat-temperature
+                                   default-chat-max-tokens
+                                   default-chat-non-standard-params
+                                   ((:key raw-key))
+                                   (chat-model "gpt-5.4-mini")
+                                   (embedding-model "text-embedding-3-small")
+                                   &aux
+                                   (key (llm-provider-utils--wrap-key raw-key)))))
   "A structure for holding information needed by Open AI's API.
 
 KEY is the API key for Open AI, which is required.
@@ -54,9 +64,20 @@ EMBEDDING-MODEL is the model to use for embeddings.  If unset, it
 will use a reasonable default."
   key (chat-model "gpt-5.4-mini") (embedding-model "text-embedding-3-small"))
 
-(cl-defstruct (llm-openai-compatible (:include llm-openai
-                                               (chat-model "unset")
-                                               (embedding-model "unset")))
+(cl-defstruct (llm-openai-compatible
+               (:include llm-openai
+                         (chat-model "unset")
+                         (embedding-model "unset"))
+               (:constructor make-llm-openai-compatible
+                             (&key default-chat-temperature
+                                   default-chat-max-tokens
+                                   default-chat-non-standard-params
+                                   ((:key raw-key))
+                                   (chat-model "unset")
+                                   (embedding-model "unset")
+                                   url
+                                   &aux
+                                   (key (llm-provider-utils--wrap-key raw-key)))))
   "A structure for other APIs that use the Open AI's API.
 
 URL is the URL to use for the API, up to the command.  So, for
@@ -65,12 +86,35 @@ https://api.example.com/v1/chat, then URL should be
 \"https://api.example.com/v1/\"."
   url)
 
-(cl-defstruct (llm-openrouter (:include llm-openai-compatible
-                                        (url "https://openrouter.ai/api/v1/")))
+(cl-defstruct (llm-openrouter
+               (:include llm-openai-compatible
+                         (url "https://openrouter.ai/api/v1/"))
+               (:constructor make-llm-openrouter
+                             (&key default-chat-temperature
+                                   default-chat-max-tokens
+                                   default-chat-non-standard-params
+                                   ((:key raw-key))
+                                   (chat-model "unset")
+                                   (embedding-model "unset")
+                                   (url "https://openrouter.ai/api/v1/")
+                                   &aux
+                                   (key (llm-provider-utils--wrap-key raw-key)))))
   "A structure for Open Router.
 
 This is mostly compatible with Open AI's API but has some minor API
 differences.")
+
+(cl-defgeneric llm-openai-primary-chat-model (provider)
+  "Return the primary chat model for the Open AI PROVIDER.")
+
+(cl-defmethod llm-openai-primary-chat-model ((provider llm-openai))
+  (llm-openai-chat-model provider))
+
+(cl-defmethod llm-openai-primary-chat-model ((provider llm-openrouter))
+  (let ((model-data (llm-openai-chat-model provider)))
+    (if (listp model-data)
+        (car model-data)
+      model-data)))
 
 (cl-defmethod llm-nonfree-message-info ((_ llm-openai))
   "Return Open AI's nonfree terms of service."
@@ -302,9 +346,7 @@ If it cannot be parsed, return nil.  Otherwise, return a cons of (MAJOR
 The Open AI models have inconsistent and confusing support pre-5.2, so
 we need to check for a model post 5.2 (if it supports reasoning at all)."
   (and (member 'reasoning (llm-capabilities provider))
-       (let* ((model (if (listp (llm-openai-chat-model provider))
-                         (car (llm-openai-chat-model provider))
-                       (llm-openai-chat-model provider)))
+       (let* ((model (llm-openai-primary-chat-model provider))
               (major-minor (llm-openai--parse-version model)))
          (or (>= (car major-minor) 6)
              (and
@@ -628,7 +670,7 @@ with the processed output."
       "Open AI Compatible"))
 
 (cl-defmethod llm-chat-token-limit ((provider llm-openai))
-  (llm-provider-utils-model-token-limit (llm-openai-chat-model provider)))
+  (llm-provider-utils-model-token-limit (llm-openai-primary-chat-model provider)))
 
 (cl-defmethod llm-capabilities ((provider llm-openai))
   (seq-uniq
@@ -642,10 +684,9 @@ with the processed output."
           (when (and (llm-openai-embedding-model provider)
                      (not (equal "unset" (llm-openai-embedding-model provider))))
             '(embeddings embeddings-batch))
-          (when-let* ((model (llm-models-match (llm-openai-chat-model provider))))
-            (llm-model-capabilities (if (listp model)
-                                        (car model)
-                                      model)))))
+
+          (when-let* ((model (llm-models-match (llm-openai-primary-chat-model provider))))
+            (llm-model-capabilities model))))
 
 (cl-defmethod llm-models ((provider llm-openai))
   (mapcar (lambda (model)
