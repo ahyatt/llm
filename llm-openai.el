@@ -504,6 +504,11 @@ STREAMING if non-nil, turn on response streaming."
 
 (cl-defmethod llm-provider-extract-token-use ((_ llm-openai) response)
   (let ((usage (assoc-default 'usage response)))
+    `(:input-tokens ,(assoc-default 'input_tokens usage)
+                    :output-tokens ,(assoc-default 'output_tokens usage))))
+
+(cl-defmethod llm-provider-extract-token-use ((_ llm-openai-compatible) response)
+  (let ((usage (assoc-default 'usage response)))
     `(:input-tokens ,(assoc-default 'prompt_tokens usage))))
 
 (cl-defmethod llm-provider-extract-tool-uses ((_ llm-openai) response)
@@ -589,7 +594,16 @@ STREAMING if non-nil, turn on response streaming."
 (cl-defmethod llm-provider-streaming-media-handler ((_ llm-openai) receiver _)
   (cons 'text/event-stream
         (plz-event-source:text/event-stream
-         :events `((response.output_text.delta
+         :events `((response.completed
+                    .
+                    ,(lambda (event)
+                       (when-let* ((data (plz-event-source-event-data event))
+                                   (response-alist (json-parse-string data :object-type 'alist))
+                                   (response (assoc-default 'response response-alist))
+                                   (usage (assoc-default 'usage response)))
+                         (funcall receiver (list :input-tokens (assoc-default 'input_tokens usage)
+                                                 :output-tokens (assoc-default 'output_tokens usage))))))
+                   (response.output_text.delta
                     .
                     ,(lambda (event)
                        (let* ((data (plz-event-source-event-data event))
@@ -605,7 +619,8 @@ STREAMING if non-nil, turn on response streaming."
                     ,(lambda (event)
                        (let* ((data (plz-event-source-event-data event))
                               (delta-alist (json-parse-string data :object-type 'alist)))
-                         (when (= (assoc-default 'output_index delta-alist) 0)
+                         (when (and (= (assoc-default 'output_index delta-alist) 0)
+                                    (> (length (assoc-default 'delta delta-alist)) 0))
                            (funcall receiver `(:reasoning ,(assoc-default 'delta delta-alist)))))))
                    (response.output_item.done
                     .
