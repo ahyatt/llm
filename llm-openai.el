@@ -586,45 +586,10 @@ STREAMING if non-nil, turn on response streaming."
                                  (funcall receiver
                                           `(:input-tokens ,(assoc-default 'prompt_tokens usage))))))))))))))
 
-(defun llm-openai--handle-response-api-streaming-response (event receiver)
-  "Handle a streaming response from the Open AI Responses API.
-
-EVENT is the event data to process, and RECEIVER is the function to call
-with the processed output."
-  (let* ((data (json-parse-string event :object-type 'alist))
-         (response (assoc-default 'response data))
-         (outputs (assoc-default 'output response))
-         output)
-    (cl-loop for output-item across outputs
-             do
-             ;; We don't reprocess content text, since that's already been handled by deltas.
-             (cl-loop for item across (assoc-default 'content output-item)
-                      if (equal (assoc-default 'type item) "refusal")
-                      do (signal 'llm-request-refusal
-                                 (list (format "Open AI refused to answer: %s"
-                                               (assoc-default 'refusal item)))))
-             (when-let* ((tool-call (assoc-default 'function_call output-item)))
-               `(:tool-uses-raw
-                 (:arguments ,(assoc-default 'arguments tool-call)
-                             :name ,(assoc-default 'name tool-call)
-                             :id ,(assoc-default 'id tool-call)))))
-    (when output
-      (funcall receiver output))))
-
 (cl-defmethod llm-provider-streaming-media-handler ((_ llm-openai) receiver _)
   (cons 'text/event-stream
         (plz-event-source:text/event-stream
-         :events `((response.created
-                    .
-                    ,(lambda (event)
-                       (llm-openai--handle-response-api-streaming-response
-                        (plz-event-source-event-data event) receiver)))
-                   (response.completed
-                    .
-                    ,(lambda (event)
-                       (llm-openai--handle-response-api-streaming-response
-                        (plz-event-source-event-data event) receiver)))
-                   (response.output_text.delta
+         :events `((response.output_text.delta
                     .
                     ,(lambda (event)
                        (let* ((data (plz-event-source-event-data event))
@@ -648,14 +613,22 @@ with the processed output."
                        (let* ((data (plz-event-source-event-data event))
                               (done-alist (json-parse-string data :object-type 'alist))
                               (item (assoc-default 'item done-alist)))
-                         (when (equal (assoc-default 'type item) "reasoning")
-                           (funcall receiver
-                                    `(:multi-turn
-                                      (:openai-reasoning-id ,(assoc-default 'id item)
-                                                            :openai-encrypted-reasoning ,(assoc-default 'encrypted_content item))))))))))))
+                         (pcase (assoc-default 'type item)
+                           ("reasoning" (funcall receiver
+                                                 `(:multi-turn
+                                                   (:openai-reasoning-id ,(assoc-default 'id item)
+                                                                         :openai-encrypted-reasoning ,(assoc-default 'encrypted_content item)))))
+                           ("function_call" (funcall receiver
+                                                     (list :tool-uses
+                                                           (list (make-llm-provider-utils-tool-use
+                                                                  :id (assoc-default 'id item)
+                                                                  :name (assoc-default 'name item)
+                                                                  :args (json-parse-string
+                                                                         (assoc-default 'arguments item)
+                                                                         :object-type 'alist))))))))))))))
 
 (cl-defmethod llm-provider-collect-streaming-tool-uses ((_ llm-openai) data)
-  (llm-provider-utils-openai-collect-streaming-tool-uses data))
+  data)
 
 (cl-defmethod llm-provider-collect-streaming-tool-uses ((_ llm-openai-compatible) data)
   (llm-provider-utils-openai-collect-streaming-tool-uses data))

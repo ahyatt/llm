@@ -829,8 +829,6 @@ the client.
 
 PROVIDER is the struct that configures the use of the LLM.
 
-TOOL-USES is a list of tool uses in the result.
-
 PARTIAL-RESULT is the multipart result, without any tool results.
 
 MULTI-OUTPUT is true if multiple outputs are expected to be passed to
