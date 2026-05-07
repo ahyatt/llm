@@ -224,6 +224,18 @@ PROVIDER is the Open AI provider struct."
                                            format)
                                           '(:additionalProperties :false))))))
 
+(defun llm-openai--responses-api-response-format (format)
+  "Return the Open AI response format for FORMAT."
+  (if (eq format 'json) '(:type "json_object")
+    ;; If not JSON, this must be a json response spec.
+    `(:type "json_schema"
+            :name "response"
+            :strict t
+            :schema ,(append
+                      (llm-provider-utils-convert-to-serializable
+                       format)
+                      '(:additionalProperties :false)))))
+
 (cl-defgeneric llm-openai--build-model (provider)
   "Get the model setting for the request for PROVIDER.")
 
@@ -252,12 +264,12 @@ PROVIDER is the Open AI provider struct."
   (when (llm-chat-prompt-max-tokens prompt)
     (list :max_tokens (llm-chat-prompt-max-tokens prompt))))
 
-(defun llm-openai--response-api-build-response-format (prompt)
+(defun llm-openai--responses-api-build-response-format (prompt)
   "Build the response_format field if present in PROMPT."
   (when (llm-chat-prompt-response-format prompt)
     (list :text
           (list :format
-                (llm-openai--response-format (llm-chat-prompt-response-format prompt))))))
+                (llm-openai--responses-api-response-format (llm-chat-prompt-response-format prompt))))))
 
 (defun llm-openai--build-response-format (prompt)
   "Build the response_format field if present in PROMPT."
@@ -271,7 +283,7 @@ PROVIDER is the Open AI provider struct."
     (list :tools (vconcat (mapcar #'llm-provider-utils-openai-tool-spec
                                   (llm-chat-prompt-tools prompt))))))
 
-(defun llm-openai--response-api-build-tools (prompt)
+(defun llm-openai--responses-api-build-tools (prompt)
   "Build the tools field for the Responses API if tools are present in PROMPT."
   (when (llm-chat-prompt-tools prompt)
     (list :tools (vconcat (mapcar (lambda (tool)
@@ -314,6 +326,15 @@ PROVIDER is the Open AI provider struct."
        msg-plist))
    (llm-chat-prompt-interaction-tool-results interaction)))
 
+(defun llm-openai--responses-api-build-tool-interaction (interaction)
+  "Build the tool interaction for INTERACTION for the Response API."
+  (mapcar
+   (lambda (tool-result)
+     (list :call_id (llm-chat-prompt-tool-result-call-id tool-result)
+           :output (format "%s" (llm-chat-prompt-tool-result-result tool-result))
+           :type "function_call_output"))
+   (llm-chat-prompt-interaction-tool-results interaction)))
+
 (defun llm-openai--build-tool-uses (fcs)
   "Convert back from the generic representation to the Open AI.
 
@@ -327,6 +348,19 @@ FCS is a list of `llm-provider-utils-tool-use' structs."
                           :arguments ,(llm-provider-utils-json-serialize
                                        (llm-provider-utils-tool-use-args fc)))))
            fcs)))
+
+(defun llm-openai--responses-api-build-tool-uses (fcs)
+  "Convert back from the generic representation to the Open AI.
+
+FCS is a list of `llm-provider-utils-tool-use' structs."
+  (mapcar (lambda (fc)
+            (list
+             :call_id (llm-provider-utils-tool-use-id fc)
+             :type "function_call"
+             :name (llm-provider-utils-tool-use-name fc)
+             :arguments (llm-provider-utils-json-serialize
+                         (llm-provider-utils-tool-use-args fc))))
+          fcs))
 
 (cl-defgeneric llm-openai--build-reasoning (provider prompt)
   "Build the reasoning field for PROVIDER and PROMPT.")
@@ -368,9 +402,57 @@ we need to check for a model post 5.2 (if it supports reasoning at all)."
                                                (llm-chat-prompt-reasoning prompt))))))))
       '(:reasoning (:summary "auto" :effort "medium")))))
 
-(defun llm-openai--build-messages (prompt responses-api)
-  "Build the :messages field based on interactions in PROMPT.
-RESPONSES-API is non-nil if this is for the Responses API."
+(defun llm-openai--responses-api-build-messages (prompt)
+  "Build the :messages field based on interactions in PROMPT. "
+  (let ((interactions (llm-chat-prompt-interactions prompt)))
+    (list
+     :input
+     (vconcat
+      (mapcan
+       (lambda (interaction)
+         (let ((content (llm-chat-prompt-interaction-content interaction)))
+           (cond
+            ((llm-chat-prompt-interaction-tool-results interaction)
+             (llm-openai--responses-api-build-tool-interaction interaction))
+            ((and (consp content)
+                  (llm-provider-utils-tool-use-p (car content)))
+             (llm-openai--responses-api-build-tool-uses content))
+            ;; Handle regular interactions
+            (t (list
+                (let ((msg-plist
+                       (list :role (symbol-name (llm-chat-prompt-interaction-role interaction)))))
+                  (setq msg-plist
+                        (plist-put msg-plist :content
+                                   (cond
+                                    ((llm-multipart-p content)
+                                     (vconcat
+                                      (mapcar
+                                       (lambda (part)
+                                         (if (llm-media-p part)
+                                             (list :type "image_url"
+                                                   :image_url
+                                                   (list :url
+                                                         (concat
+                                                          "data:"
+                                                          (llm-media-mime-type part)
+                                                          ";base64,"
+                                                          (base64-encode-string
+                                                           (llm-media-data part) t))))
+                                           (list :type "text" :text part)))
+                                       (llm-multipart-parts content))))
+                                    (t content))))
+                  (when-let* ((multi-turn-plist (llm-chat-prompt-interaction-multi-turn-plist interaction))
+                              (reasoning-id (plist-get multi-turn-plist :openai-reasoning-id))
+                              (encrypted-reasoning (plist-get multi-turn-plist :openai-encrypted-reasoning)))
+                    (setq msg-plist
+                          (plist-put msg-plist :reasoning
+                                     (list :id reasoning-id
+                                           :encrypted_content encrypted-reasoning))))
+                  msg-plist))))))
+       interactions)))))
+
+(defun llm-openai--build-messages (prompt)
+  "Build the :messages field based on interactions in PROMPT."
   (let ((interactions (llm-chat-prompt-interactions prompt)))
     (list
      (if responses-api :input :messages)
@@ -378,7 +460,9 @@ RESPONSES-API is non-nil if this is for the Responses API."
       (mapcan
        (lambda (interaction)
          (if (llm-chat-prompt-interaction-tool-results interaction)
-             (llm-openai--build-tool-interaction interaction)
+             (if responses-api
+                 (llm-openai--response-api-build-tool-interaction interaction)
+               (llm-openai--build-tool-interaction interaction))
            ;; Handle regular interactions
            (list
             (let ((msg-plist
@@ -445,10 +529,10 @@ STREAMING if non-nil, turn on response streaming."
            (llm-openai--build-reasoning provider prompt)
            (llm-openai--build-temperature prompt)
            (llm-openai--build-max-tokens prompt)
-           (llm-openai--response-api-build-response-format prompt)
-           (llm-openai--response-api-build-tools prompt)
+           (llm-openai--responses-api-build-response-format prompt)
+           (llm-openai--responses-api-build-tools prompt)
            (llm-openai--build-tool-choice prompt)
-           (llm-openai--build-messages prompt t)
+           (llm-openai--responses-api-build-messages prompt)
            (when-let* ((instructions (llm-provider-utils-get-system-prompt prompt)))
              (when (> (length instructions) 0)
                (list :instructions instructions)))
@@ -481,7 +565,7 @@ STREAMING if non-nil, turn on response streaming."
            (llm-openai--build-response-format prompt)
            (llm-openai--build-tools prompt)
            (llm-openai--build-tool-choice prompt)
-           (llm-openai--build-messages prompt nil)))
+           (llm-openai--build-messages prompt)))
 
     ;; Merge non-standard params
     (setq request-plist (llm-provider-merge-non-standard-params non-standard-params request-plist))
