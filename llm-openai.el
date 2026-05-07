@@ -454,14 +454,12 @@ we need to check for a model post 5.2 (if it supports reasoning at all)."
   "Build the :messages field based on interactions in PROMPT."
   (let ((interactions (llm-chat-prompt-interactions prompt)))
     (list
-     (if responses-api :input :messages)
+     :messages
      (vconcat
       (mapcan
        (lambda (interaction)
          (if (llm-chat-prompt-interaction-tool-results interaction)
-             (if responses-api
-                 (llm-openai--response-api-build-tool-interaction interaction)
-               (llm-openai--build-tool-interaction interaction))
+             (llm-openai--build-tool-interaction interaction)
            ;; Handle regular interactions
            (list
             (let ((msg-plist

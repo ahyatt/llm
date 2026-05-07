@@ -210,8 +210,8 @@
                                              (make-llm-media :mime-type "image/png"
                                                              :data "image data")))))
            :openai (:model "model"
-                           :input [(:role "user" :content [(:type "text" :text "What is this?")
-                                                           (:type "image_url" :image_url (:url "data:image/png;base64,aW1hZ2UgZGF0YQ=="))])]
+                           :input [(:role "user" :content [(:type "input_text" :text "What is this?")
+                                                           (:type "input_image" :image_url "data:image/png;base64,aW1hZ2UgZGF0YQ==")])]
                            :store :false
                            :stream :false
                            :include ["reasoning.encrypted_content"])
