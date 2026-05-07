@@ -429,16 +429,15 @@ we need to check for a model post 5.2 (if it supports reasoning at all)."
                                       (mapcar
                                        (lambda (part)
                                          (if (llm-media-p part)
-                                             (list :type "image_url"
+                                             (list :type "input_image"
                                                    :image_url
-                                                   (list :url
-                                                         (concat
-                                                          "data:"
-                                                          (llm-media-mime-type part)
-                                                          ";base64,"
-                                                          (base64-encode-string
-                                                           (llm-media-data part) t))))
-                                           (list :type "text" :text part)))
+                                                   (concat
+                                                    "data:"
+                                                    (llm-media-mime-type part)
+                                                    ";base64,"
+                                                    (base64-encode-string
+                                                     (llm-media-data part) t)))
+                                           (list :type "input_text" :text part)))
                                        (llm-multipart-parts content))))
                                     (t content))))
                   (when-let* ((multi-turn-plist (llm-chat-prompt-interaction-multi-turn-plist interaction))
