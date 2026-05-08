@@ -1,6 +1,6 @@
 ;;; llm-intgration-test.el --- Integration tests for the llm module -*- lexical-binding: t; package-lint-main-file: "llm.el"; -*-
 
-;; Copyright (c) 2024-2025  Free Software Foundation, Inc.
+;; Copyright (c) 2024-2026  Free Software Foundation, Inc.
 
 ;; Author: Andrew Hyatt <ahyatt@gmail.com>
 ;; SPDX-License-Identifier: GPL-3.0-or-later
@@ -38,6 +38,11 @@
 ;; - AZURE_EMBEDDING_MODEL: The name of the embedding model to test.
 ;; - AZURE_SLEEP: The number of seconds to sleep between tests, to avoid rate
 ;;   limiting.
+;; - OPENROUTER_API_KEY: The key for OpenRouter.
+;; - OPENROUTER_CHAT_MODELS: A comma-separated list of OpenRouter models to test at
+;;   once; the later models will be fallback models.
+;; - OPENROUTER_EMBEDDING_MODEL: The OpenRouter embedding model to test.  Both a
+;;   chat model and embedding model must be set for tests to run.
 ;; - GITHUB_TOKEN: The key for GitHub models. Can either be a GitHub token or
 ;;   an Azure production key.
 ;;
@@ -125,7 +130,7 @@ else.  We really just want to see if it's in the right ballpark."
       (push (make-llm-claude :key (getenv "ANTHROPIC_KEY")) providers))
     (when (getenv "GEMINI_KEY")
       (require 'llm-gemini)
-      (push (make-llm-gemini :key (getenv "GEMINI_KEY")) providers))
+      (push (make-llm-gemini :key (getenv "GEMINI_KEY") :chat-model "gemini-3.1-flash-lite-preview") providers))
     (when (getenv "VERTEX_PROJECT")
       (require 'llm-vertex)
       (push (make-llm-vertex :project (getenv "VERTEX_PROJECT")) providers))
@@ -149,7 +154,14 @@ else.  We really just want to see if it's in the right ballpark."
       ;; This variable is a list of models to test.
       (dolist (model (split-string (getenv "OLLAMA_CHAT_MODELS") ", "))
         (push (make-llm-ollama :chat-model model) providers)))
-    providers))
+    (when-let* ((chat-models (getenv "OPENROUTER_CHAT_MODELS"))
+                (embedding-model (getenv "OPENROUTER_EMBEDDING_MODEL"))
+                (key (getenv "OPENROUTER_API_KEY")))
+      (require 'llm-openai)
+      ;; This variable is a list of models to test
+      (push (make-llm-openrouter :chat-model (split-string chat-models ", ")
+                                 :embedding-model embedding-model
+                                 :key key) providers))))
 
 (defmacro llm-def-integration-test (name arglist &rest body)
   "Define an integration test."

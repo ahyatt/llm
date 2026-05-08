@@ -761,6 +761,11 @@ STREAMING if non-nil, turn on response streaming."
           (when-let* ((model (llm-models-match (llm-openai-primary-chat-model provider))))
             (llm-model-capabilities model))))
 
+(cl-defmethod llm-capabilities ((provider llm-openrouter))
+  (seq-remove
+   (lambda (c) (eq c 'embeddings-batch))
+   (cl-call-next-method)))
+
 (cl-defmethod llm-models ((provider llm-openai))
   (mapcar (lambda (model)
             (plist-get model :id))
