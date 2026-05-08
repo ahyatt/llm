@@ -42,6 +42,7 @@
   :type 'string
   :group 'llm-openai)
 
+;; This uses the Responses API.
 (cl-defstruct (llm-openai
                (:include llm-standard-full-provider)
                (:constructor make-llm-openai
@@ -111,7 +112,7 @@ differences.")
   (llm-openai-chat-model provider))
 
 (cl-defmethod llm-openai-primary-chat-model ((provider llm-openrouter))
-  (let ((model-data (llm-openai-chat-model provider)))
+  (let ((model-data (llm-openai-compatible-chat-model provider)))
     (if (listp model-data)
         (car model-data)
       model-data)))
@@ -243,7 +244,7 @@ PROVIDER is the Open AI provider struct."
   (list :model (llm-openai-chat-model provider)))
 
 (cl-defmethod llm-openai--build-model ((provider llm-openrouter))
-  (let ((model (llm-openai-chat-model provider)))
+  (let ((model (llm-openai-compatible-chat-model provider)))
     (if (listp model)
         (list :models (apply #'vector model))
       (list :model model))))
@@ -382,10 +383,12 @@ we need to check for a model post 5.2 (if it supports reasoning at all)."
   (and (member 'reasoning (llm-capabilities provider))
        (let* ((model (llm-openai-primary-chat-model provider))
               (major-minor (llm-openai--parse-version model)))
-         (or (>= (car major-minor) 6)
-             (and
-              (>= (car major-minor) 5)
-              (>= (cdr major-minor) 2))))))
+         (and major-minor
+              (or (>= (car major-minor) 6)
+                  (and
+                   (>= (car major-minor) 5)
+                   (>= (cdr major-minor) 2)))))))
+
 (cl-defmethod llm-openai--build-reasoning ((provider llm-openai) prompt)
   (when (llm-openai--supports-reasoning provider)
     (if (llm-chat-prompt-reasoning prompt)
@@ -751,8 +754,8 @@ STREAMING if non-nil, turn on response streaming."
 
 (cl-defmethod llm-capabilities ((provider llm-openai-compatible))
   (append '(streaming model-list)
-          (when (and (llm-openai-embedding-model provider)
-                     (not (equal "unset" (llm-openai-embedding-model provider))))
+          (when (and (llm-openai-compatible-embedding-model provider)
+                     (not (equal "unset" (llm-openai-compatible-embedding-model provider))))
             '(embeddings embeddings-batch))
 
           (when-let* ((model (llm-models-match (llm-openai-primary-chat-model provider))))

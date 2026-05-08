@@ -166,7 +166,7 @@ This should only be used if the `image-input' or `audio-input' or
                 ('jpeg "image/jpeg")
                 ('xpm "image/x-xpixmap")
                 ('xbm "image/x-xbitmap"))
-   :data (if-let ((data (image-property image :data))) data
+   :data (if-let* ((data (image-property image :data))) data
            (with-temp-buffer
              (set-buffer-multibyte nil)
              (insert-file-contents-literally (image-property image :file))
