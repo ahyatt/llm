@@ -78,25 +78,38 @@
                    :messages
                    ,(vconcat
                      (mapcar (lambda (interaction)
-                               `(:role  ,(pcase (llm-chat-prompt-interaction-role interaction)
-                                           ('tool_results "user")
-                                           ('tool_use "assistant")
-                                           ('assistant "assistant")
-                                           ('user "user"))
-                                        :content
-                                        ,(cond ((llm-chat-prompt-interaction-tool-results interaction)
-                                                (vconcat (mapcar (lambda (result)
-                                                                   `(:type "tool_result"
-                                                                           :tool_use_id
-                                                                           ,(llm-chat-prompt-tool-result-call-id result)
-                                                                           :content
-                                                                           ,(llm-chat-prompt-tool-result-result result)))
-                                                                 (llm-chat-prompt-interaction-tool-results interaction))))
-                                               ((llm-multipart-p (llm-chat-prompt-interaction-content interaction))
-                                                (llm-claude--multipart-content
-                                                 (llm-chat-prompt-interaction-content interaction)))
-                                               (t
-                                                (llm-chat-prompt-interaction-content interaction)))))
+                               (list :role (pcase (llm-chat-prompt-interaction-role interaction)
+                                             ('tool_results "user")
+                                             ('tool_use "assistant")
+                                             ('assistant "assistant")
+                                             ('user "user"))
+                                     :content
+                                     (vconcat
+                                      (cond ((llm-chat-prompt-interaction-tool-results interaction)
+                                             (vconcat (mapcar (lambda (result)
+                                                                `(:type "tool_result"
+                                                                        :tool_use_id
+                                                                        ,(llm-chat-prompt-tool-result-call-id result)
+                                                                        :content
+                                                                        ,(llm-chat-prompt-tool-result-result result)))
+                                                              (llm-chat-prompt-interaction-tool-results interaction))))
+                                            ((llm-multipart-p (llm-chat-prompt-interaction-content interaction))
+                                             (list (list :type "image"
+                                                         :source (llm-claude--multipart-content
+                                                                  (llm-chat-prompt-interaction-content interaction)))))
+                                            (t
+                                             (list (list :type "text"
+                                                         :text
+                                                         (llm-chat-prompt-interaction-content interaction)))))
+                                      (when-let* ((multi-turn (llm-chat-prompt-interaction-multi-turn-plist interaction))
+                                                  (signature (plist-get multi-turn :claude-reasoning-signature)))
+                                        (list
+                                         (list :signature (plist-get multi-turn :claude-reasoning-signature)
+                                               :type "thinking"
+                                               :thinking (plist-get multi-turn :claude-thinking))))
+                                      (when-let* ((multi-turn (llm-chat-prompt-interaction-multi-turn-plist interaction))
+                                                  (redacted-thinking (plist-get multi-turn :claude-redacted-thinking)))
+                                        `((:type "redacted_thinking" :data ,redacted-thinking))))))
                              (llm-chat-prompt-interactions prompt)))))
         (system (llm-provider-utils-get-system-prompt prompt)))
     (when (llm-chat-prompt-tools prompt)
@@ -205,6 +218,16 @@
     (let ((content (aref (assoc-default 'content response) 0)))
       (assoc-default 'thinking content))))
 
+(cl-defmethod llm-provider-extract-for-multi-turn ((_ llm-claude) response)
+  (when (> (length (assoc-default 'content response)) 0)
+    (let ((content (aref (assoc-default 'content response) 0)))
+      (append
+       (when (assoc-default 'signature content)
+         (list :claude-reasoning-signature (assoc-default 'signature content)
+               :claude-thinking (assoc-default 'thinking content)))
+       (when (assoc-default 'redacted_thinking content)
+         (list :claude-redacted-thinking (assoc-default 'redacted_thinking content)))))))
+
 (cl-defmethod llm-provider-extract-token-use ((_ llm-claude) response)
   (let ((usage (assoc-default 'usage response)))
     `(:input-tokens ,(assoc-default 'input_tokens usage)
@@ -258,6 +281,7 @@
                               (delta (assoc-default 'delta json))
                               (type (assoc-default 'type delta))
                               (index (assoc-default 'index json))
+                              (signature (assoc-default 'signature json))
                               (usage (assoc-default 'usage json)))
                          (cond
                           ((equal type "text_delta")
@@ -270,7 +294,10 @@
                                                ,(vector
                                                  (list
                                                   'input (assoc-default 'partial_json delta)
-                                                  'index index)))))))))))))
+                                                  'index index)))))
+                          ((equal type "signature_delta")
+                           (funcall receiver `(:multi-turn
+                                               '(:claude-reasoning-signature ,signature))))))))))))
 
 (cl-defmethod llm-provider-collect-streaming-tool-uses ((_ llm-claude) data)
   "Transform Claude streaming tool-uses DATA responses into tool use structs.
