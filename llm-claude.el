@@ -205,26 +205,22 @@
                     tool-uses))))
 
 (cl-defmethod llm-provider-chat-extract-result ((_ llm-claude) response)
-  (let ((len (length (assoc-default 'content response))))
-    (cl-loop for i from 0 below len
-             for content = (aref (assoc-default 'content response) i)
-             when (equal "text" (assoc-default 'type content))
-             return (assoc-default 'text content))))
+  (cl-loop for block across (assoc-default 'content response)
+           if (equal (assoc-default 'type block) "text")
+           return (assoc-default 'text block)))
 
 (cl-defmethod llm-provider-extract-reasoning ((_ llm-claude) response)
-  (when (> (length (assoc-default 'content response)) 0)
-    (let ((content (aref (assoc-default 'content response) 0)))
-      (assoc-default 'thinking content))))
+  (cl-loop for block across (assoc-default 'content response)
+           if (equal (assoc-default 'type block) "thinking")
+           return (assoc-default 'thinking block)))
 
 (cl-defmethod llm-provider-extract-for-multi-turn ((_ llm-claude) response)
-  (when (> (length (assoc-default 'content response)) 0)
-    (let ((content (aref (assoc-default 'content response) 0)))
-      (append
-       (when (assoc-default 'signature content)
-         (list :claude-reasoning-signature (assoc-default 'signature content)
-               :claude-thinking (assoc-default 'thinking content)))
-       (when (assoc-default 'redacted_thinking content)
-         (list :claude-redacted-thinking (assoc-default 'redacted_thinking content)))))))
+  (cl-loop for block across (assoc-default 'content response)
+           if (equal (assoc-default 'type block) "thinking")
+           nconc (list :claude-reasoning-signature (assoc-default 'signature block)
+                       :claude-thinking (assoc-default 'thinking block))
+           else if (equal (assoc-default 'type block) "redacted_thinking")
+           nconc (list :claude-redacted-thinking (assoc-default 'data block))))
 
 (cl-defmethod llm-provider-extract-token-use ((_ llm-claude) response)
   (let ((usage (assoc-default 'usage response)))
@@ -286,7 +282,8 @@
                            (funcall receiver `(:text ,(assoc-default 'text delta)
                                                      :usage ,usage)))
                           ((equal type "thinking_delta")
-                           (funcall receiver `(:reasoning ,(assoc-default 'text delta))))
+                           (funcall receiver (list :reasoning (assoc-default 'text delta)
+                                                   :claude-thinking (assoc-default 'text delta))))
                           ((equal type "input_json_delta")
                            (funcall receiver `(:tool-uses-raw
                                                ,(vector
