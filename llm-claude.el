@@ -84,32 +84,30 @@
                                              ('assistant "assistant")
                                              ('user "user"))
                                      :content
-                                     (vconcat
-                                      (cond ((llm-chat-prompt-interaction-tool-results interaction)
-                                             (vconcat (mapcar (lambda (result)
-                                                                `(:type "tool_result"
-                                                                        :tool_use_id
-                                                                        ,(llm-chat-prompt-tool-result-call-id result)
-                                                                        :content
-                                                                        ,(llm-chat-prompt-tool-result-result result)))
-                                                              (llm-chat-prompt-interaction-tool-results interaction))))
-                                            ((llm-multipart-p (llm-chat-prompt-interaction-content interaction))
-                                             (list (list :type "image"
-                                                         :source (llm-claude--multipart-content
-                                                                  (llm-chat-prompt-interaction-content interaction)))))
-                                            (t
-                                             (list (list :type "text"
-                                                         :text
-                                                         (llm-chat-prompt-interaction-content interaction)))))
-                                      (when-let* ((multi-turn (llm-chat-prompt-interaction-multi-turn-plist interaction))
-                                                  (signature (plist-get multi-turn :claude-reasoning-signature)))
-                                        (list
-                                         (list :signature (plist-get multi-turn :claude-reasoning-signature)
-                                               :type "thinking"
-                                               :thinking (plist-get multi-turn :claude-thinking))))
-                                      (when-let* ((multi-turn (llm-chat-prompt-interaction-multi-turn-plist interaction))
-                                                  (redacted-thinking (plist-get multi-turn :claude-redacted-thinking)))
-                                        `((:type "redacted_thinking" :data ,redacted-thinking))))))
+                                     (if (llm-multipart-p (llm-chat-prompt-interaction-content interaction))
+                                         (llm-claude--multipart-content
+                                          (llm-chat-prompt-interaction-content interaction))
+                                       (vconcat
+                                        (if (llm-chat-prompt-interaction-tool-results interaction)
+                                            (vconcat (mapcar (lambda (result)
+                                                               `(:type "tool_result"
+                                                                       :tool_use_id
+                                                                       ,(llm-chat-prompt-tool-result-call-id result)
+                                                                       :content
+                                                                       ,(llm-chat-prompt-tool-result-result result)))
+                                                             (llm-chat-prompt-interaction-tool-results interaction)))
+                                          (list (list :type "text"
+                                                      :text
+                                                      (llm-chat-prompt-interaction-content interaction))))
+                                        (when-let* ((multi-turn (llm-chat-prompt-interaction-multi-turn-plist interaction))
+                                                    (signature (plist-get multi-turn :claude-reasoning-signature)))
+                                          (list
+                                           (list :signature (plist-get multi-turn :claude-reasoning-signature)
+                                                 :type "thinking"
+                                                 :thinking (plist-get multi-turn :claude-thinking))))
+                                        (when-let* ((multi-turn (llm-chat-prompt-interaction-multi-turn-plist interaction))
+                                                    (redacted-thinking (plist-get multi-turn :claude-redacted-thinking)))
+                                          `((:type "redacted_thinking" :data ,redacted-thinking)))))))
                              (llm-chat-prompt-interactions prompt)))))
         (system (llm-provider-utils-get-system-prompt prompt)))
     (when (llm-chat-prompt-tools prompt)

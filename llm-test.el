@@ -132,11 +132,11 @@
                            :stream :false)
            :claude (:model "model"
                            :max_tokens 8192
-                           :messages [(:role "user" :content "Hello world")]
+                           :messages [(:role "user" :content [(:type "text" :text "Hello world")])]
                            :stream :false)
            :claude-stream (:model "model"
                                   :max_tokens 8192
-                                  :messages [(:role "user" :content "Hello world")]
+                                  :messages [(:role "user" :content [(:type "text" :text "Hello world")])]
                                   :stream t))
     (:name "Request with temperature"
            :prompt (lambda () (llm-make-chat-prompt "Hello world" :temperature 0.5))
@@ -154,7 +154,7 @@
                            :stream :false)
            :claude (:model "model"
                            :max_tokens 8192
-                           :messages [(:role "user" :content "Hello world")]
+                           :messages [(:role "user" :content [(:type "text" :text "Hello world")])]
                            :temperature 0.5
                            :stream :false))
     (:name "Request with context and examples"
@@ -177,7 +177,7 @@
                            :stream :false)
            :claude (:model "model"
                            :max_tokens 8192
-                           :messages [(:role "user" :content "Hello world")]
+                           :messages [(:role "user" :content [(:type "text" :text "Hello world")])]
                            :system "context\nHere are 2 examples of how to respond:\n\nUser: input1\nAssistant: output1\nUser: input2\nAssistant: output2"
                            :stream :false))
     (:name "Request with conversation"
@@ -199,9 +199,9 @@
                            :stream :false)
            :claude (:model "model"
                            :max_tokens 8192
-                           :messages [(:role "user" :content "Hello world")
-                                      (:role "assistant" :content "Hello human")
-                                      (:role "user" :content "I am user!")]
+                           :messages [(:role "user" :content [(:type "text" :text "Hello world")])
+                                      (:role "assistant" :content [(:type "text" :text "Hello human")])
+                                      (:role "user" :content [(:type "text" :text "I am user!")])]
                            :stream :false))
     (:name "Request with image"
            :prompt (lambda () (llm-make-chat-prompt
@@ -290,7 +290,7 @@
                            :stream :false)
            :claude (:model "model"
                            :max_tokens 8192
-                           :messages [(:role "user" :content "Hello world")]
+                           :messages [(:role "user" :content [(:type "text" :text "Hello world")])]
                            :tools
                            [(:name "func"
                                    :description "desc"
