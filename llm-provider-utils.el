@@ -259,7 +259,7 @@ This information will be stored in the interaction, to be used to
 annotate this turn in the converation for the processing of future
 turns.")
 
-(cl-defmethod llm-provider-extract-for-multi-turn (provider response)
+(cl-defmethod llm-provider-extract-for-multi-turn ((_ llm-standard-chat-provider) _)
   "By default, the standard provider has no multi-turn extractor."
   nil)
 

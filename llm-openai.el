@@ -406,7 +406,7 @@ we need to check for a model post 5.2 (if it supports reasoning at all)."
       '(:reasoning (:summary "auto" :effort "medium")))))
 
 (defun llm-openai--responses-api-build-messages (prompt)
-  "Build the :messages field based on interactions in PROMPT. "
+  "Build the :messages field based on interactions in PROMPT."
   (let ((interactions (llm-chat-prompt-interactions prompt)))
     (list
      :input
@@ -761,7 +761,7 @@ STREAMING if non-nil, turn on response streaming."
           (when-let* ((model (llm-models-match (llm-openai-primary-chat-model provider))))
             (llm-model-capabilities model))))
 
-(cl-defmethod llm-capabilities ((provider llm-openrouter))
+(cl-defmethod llm-capabilities ((_ llm-openrouter))
   (seq-remove
    (lambda (c) (eq c 'embeddings-batch))
    (cl-call-next-method)))
