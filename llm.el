@@ -95,8 +95,12 @@ string, an `llm-multipart' object or a list of function calls.
 TOOL-RESULTS is a list of structs of type
 `llm-chat-prompt-tool-result', which is only populated
 if `role' is `tool-results'.  It stores the results of the function
-calls."
-  role content tool-results)
+calls.
+
+MULTI-TURN-PLIST is a plist of model-specific information about
+multi-turn interactions.  Because it model-specific, all keys are
+assumed to be unique to the provider or model."
+  role content tool-results multi-turn-plist)
 
 (cl-defstruct llm-chat-prompt-tool-result
   "This defines the result from a tool use.
@@ -162,7 +166,7 @@ This should only be used if the `image-input' or `audio-input' or
                 ('jpeg "image/jpeg")
                 ('xpm "image/x-xpixmap")
                 ('xbm "image/x-xbitmap"))
-   :data (if-let ((data (image-property image :data))) data
+   :data (if-let* ((data (image-property image :data))) data
            (with-temp-buffer
              (set-buffer-multibyte nil)
              (insert-file-contents-literally (image-property image :file))
@@ -403,7 +407,7 @@ LLM), `output-tokens' (the number of tokens in the output of the LLM),
 
 (cl-defmethod llm-chat :before (provider _ &optional _)
   "Issue a warning if the LLM is non-free."
-  (when-let (info (llm-nonfree-message-info provider))
+  (when-let* ((info (llm-nonfree-message-info provider)))
     (llm--warn-on-nonfree (llm-name provider) info)))
 
 (cl-defmethod llm-chat :around (provider prompt &optional _)
@@ -521,7 +525,7 @@ be passed to `llm-cancel-request'."
 
 (cl-defmethod llm-chat-streaming :before (provider _ _ _ _ &optional _)
   "Issue a warning if the LLM is non-free."
-  (when-let (info (llm-nonfree-message-info provider))
+  (when-let* ((info (llm-nonfree-message-info provider)))
     (llm--warn-on-nonfree (llm-name provider) info)))
 
 (cl-defmethod llm-chat-streaming :around (provider prompt partial-callback response-callback error-callback &optional multi-output)
@@ -594,7 +598,7 @@ be passed to `llm-cancel-request'."
 
 (cl-defmethod llm-chat-async :before (provider _ _ _ &optional _)
   "Issue a warning if the LLM is non-free."
-  (when-let (info (llm-nonfree-message-info provider))
+  (when-let* ((info (llm-nonfree-message-info provider)))
     (llm--warn-on-nonfree (llm-name provider) info)))
 
 (cl-defgeneric llm-capabilities (provider)
@@ -656,7 +660,7 @@ call."
 
 (cl-defmethod llm-embedding :before (provider _)
   "Issue a warning if the LLM is non-free."
-  (when-let (info (llm-nonfree-message-info provider))
+  (when-let* ((info (llm-nonfree-message-info provider)))
     (llm--warn-on-nonfree (llm-name provider) info)))
 
 (cl-defgeneric llm-embedding-async (provider string vector-callback error-callback)
@@ -677,7 +681,7 @@ be passed to `llm-cancel-request'."
 
 (cl-defmethod llm-embedding-async :before (provider _ _ _)
   "Issue a warning if the LLM is non-free."
-  (when-let (info (llm-nonfree-message-info provider))
+  (when-let* ((info (llm-nonfree-message-info provider)))
     (llm--warn-on-nonfree (llm-name provider) info)))
 
 (cl-defmethod llm-batch-embeddings (provider string-list)
@@ -697,7 +701,7 @@ PROVIDER is the provider struct that will be used for an LLM call."
 
 (cl-defmethod llm-batch-embeddings :before (provider _)
   "Issue a warning if the LLM is non-free."
-  (when-let (info (llm-nonfree-message-info provider))
+  (when-let* ((info (llm-nonfree-message-info provider)))
     (llm--warn-on-nonfree (llm-name provider) info)))
 
 (cl-defmethod llm-batch-embeddings-async (provider string-list vector-callback error-callback)
@@ -717,7 +721,7 @@ and a string message."
 
 (cl-defmethod llm-batch-embeddings-async :before (provider _ _ _)
   "Issue a warning if the LLM is non-free."
-  (when-let (info (llm-nonfree-message-info provider))
+  (when-let* ((info (llm-nonfree-message-info provider)))
     (llm--warn-on-nonfree (llm-name provider) info)))
 
 (cl-defgeneric llm-count-tokens (provider string)
@@ -838,7 +842,8 @@ This should only be used for logging or debugging."
  'llm-request-authentication-error "LLM request authentication failed" 'llm-request-error)
 (define-error
  'llm-request-bad-request "LLM request was invalid" 'llm-request-error)
-
+(define-error
+ 'llm-request-refusal "LLM provider refused the request" 'llm-request-error)
 (define-error
  'llm-tool-call-error "An error occurred when calling an LLM tool" 'llm-error)
 (define-error

@@ -27,6 +27,11 @@
 (require 'seq)
 (require 'compat)
 
+(defconst llm-provider-utils--supported-multi-output-keys
+  '(:text :tool-uses :tool-results :reasoning
+          :input-tokens :output-tokens)
+  "List of multi-output keys that may be returned.")
+
 (cl-defstruct llm-standard-provider
   "A struct indicating that this is a standard provider.
 This is for dispatch purposes, so this contains no actual data.
@@ -195,17 +200,20 @@ STREAMING is true if this is a streaming request.")
 (cl-defgeneric llm-provider-chat-extract-result (provider response)
   "Return the result from RESPONSE for the PROVIDER.")
 
-(cl-defgeneric llm-provider-append-to-prompt (provider prompt result &optional tool-results)
+(cl-defgeneric llm-provider-append-to-prompt (provider prompt result &optional tool-results multi-turn)
   "Append RESULT to PROMPT for the PROVIDER.
 
 PROMPT is the prompt that was already sent to the provider.
 
-TOOL-RESULTS is a list of function results, if any.")
+TOOL-RESULTS is a list of function results, if any.
+
+MULTI-TURN is a list of extra data needed to annotate the prompt for
+future turns in a conversation, if any.")
 
 (cl-defmethod llm-provider-append-to-prompt ((_ llm-standard-chat-provider) prompt
-                                             result &optional tool-results)
+                                             result &optional tool-results multi-turn)
   ;; By default, we just append to the prompt.
-  (llm-provider-utils-append-to-prompt prompt result tool-results))
+  (llm-provider-utils-append-to-prompt prompt result tool-results multi-turn))
 
 (cl-defgeneric llm-provider-streaming-media-handler (provider receiver err-receiver)
   "Define how to handle streaming media for the PROVIDER.
@@ -239,6 +247,20 @@ list of `llm-provider-utils-tool-use'.")
 
 (cl-defmethod llm-provider-extract-reasoning ((_ llm-standard-chat-provider) _)
   "By default, the standard provider has no reasoning extractor."
+  nil)
+
+(cl-defgeneric llm-provider-extract-for-multi-turn (provider response)
+  "Return a plist of data needed for multi-turn conversation.
+
+PROVIDER is the LLM provider, and RESPONSE is the response from the
+provider.
+
+This information will be stored in the interaction, to be used to
+annotate this turn in the converation for the processing of future
+turns.")
+
+(cl-defmethod llm-provider-extract-for-multi-turn ((_ llm-standard-chat-provider) _)
+  "By default, the standard provider has no multi-turn extractor."
   nil)
 
 (cl-defgeneric llm-provider-extract-token-use (provider response)
@@ -275,7 +297,7 @@ return a list of `llm-chat-prompt-tool-use' structs.")
                    :timeout (llm-provider-chat-timeout provider)
                    :headers (llm-provider-headers provider)
                    :data (llm-provider-embedding-request provider string))))
-    (if-let ((err-msg (llm-provider-embedding-extract-error provider response)))
+    (if-let* ((err-msg (llm-provider-embedding-extract-error provider response)))
         (error err-msg)
       (llm-provider-embedding-extract-result provider response))))
 
@@ -287,7 +309,7 @@ return a list of `llm-chat-prompt-tool-use' structs.")
      :headers (llm-provider-headers provider)
      :data (llm-provider-embedding-request provider string)
      :on-success (lambda (data)
-                   (if-let ((err-msg (llm-provider-embedding-extract-error provider data)))
+                   (if-let* ((err-msg (llm-provider-embedding-extract-error provider data)))
                        (llm-provider-utils-callback-in-buffer
                         buf error-callback 'error
                         err-msg)
@@ -310,7 +332,7 @@ return a list of `llm-chat-prompt-tool-use' structs.")
                    :timeout (llm-provider-chat-timeout provider)
                    :headers (llm-provider-headers provider)
                    :data (llm-provider-batch-embeddings-request provider string-list))))
-    (if-let ((err-msg (llm-provider-embedding-extract-error provider response)))
+    (if-let* ((err-msg (llm-provider-embedding-extract-error provider response)))
         (error err-msg)
       (llm-provider-batch-embeddings-extract-result provider response))))
 
@@ -322,7 +344,7 @@ return a list of `llm-chat-prompt-tool-use' structs.")
      :headers (llm-provider-headers provider)
      :data (llm-provider-batch-embeddings-request provider string-list)
      :on-success (lambda (data)
-                   (if-let ((err-msg (llm-provider-embedding-extract-error provider data)))
+                   (if-let* ((err-msg (llm-provider-embedding-extract-error provider data)))
                        (llm-provider-utils-callback-in-buffer
                         buf error-callback 'error
                         err-msg)
@@ -347,10 +369,12 @@ return a list of `llm-chat-prompt-tool-use' structs.")
         (reasoning (llm-provider-extract-reasoning
                     provider response))
         (token-use-plist (llm-provider-extract-token-use
-                          provider response)))
+                          provider response))
+        (multi-turn (llm-provider-extract-for-multi-turn provider response)))
     (append (when text `(:text ,text))
             (when tool-uses `(:tool-uses ,tool-uses))
             (when reasoning `(:reasoning ,reasoning))
+            (when multi-turn `(:multi-turn ,multi-turn))
             token-use-plist)))
 
 (cl-defmethod llm-chat ((provider llm-standard-chat-provider) prompt &optional multi-output)
@@ -359,7 +383,7 @@ return a list of `llm-chat-prompt-tool-use' structs.")
                                         :headers (llm-provider-headers provider)
                                         :data (llm-provider-chat-request provider prompt nil)))
         (final-result nil))
-    (if-let ((err-msg (llm-provider-chat-extract-error provider response)))
+    (if-let* ((err-msg (llm-provider-chat-extract-error provider response)))
         (error err-msg)
       (llm-provider-utils-process-result provider prompt
                                          (llm-provider-utils-extract-all
@@ -388,7 +412,7 @@ return a list of `llm-chat-prompt-tool-use' structs.")
                    (with-current-buffer (if (buffer-live-p buf)
                                             buf
                                           (generate-new-buffer " *llm-temp*" t))
-                     (if-let ((err-msg (llm-provider-chat-extract-error provider data)))
+                     (if-let* ((err-msg (llm-provider-chat-extract-error provider data)))
                          (llm-provider-utils-callback-in-buffer
                           buf error-callback 'error
                           err-msg)
@@ -484,8 +508,8 @@ Any strings will be concatenated, integers will be added, etc."
           provider prompt
           (llm-provider-utils-streaming-accumulate
            current-result
-           (when-let ((tool-uses-raw (plist-get current-result
-                                                :tool-uses-raw)))
+           (when-let* ((tool-uses-raw (plist-get current-result
+                                                 :tool-uses-raw)))
              `(:tool-uses ,(llm-provider-collect-streaming-tool-uses
                             provider tool-uses-raw))))
           multi-output
@@ -760,12 +784,15 @@ Signal `llm-tool-call-error' when ARGUMENTS is not valid JSON."
              finally return (when (> (length cvec) 0)
                               (append cvec nil)))))
 
-(defun llm-provider-utils-append-to-prompt (prompt output &optional tool-results role)
+(defun llm-provider-utils-append-to-prompt (prompt output &optional tool-results multi-turn role)
   "Append OUTPUT to PROMPT as an assistant interaction.
 
 OUTPUT can be a string or a structure in the case of tool uses.
 
 TOOL-RESULTS is a list of results from the LLM output, if any.
+
+MULTI-TURN is a list of data needed to annotate the prompt for future
+turns in a conversation, if any.
 
 ROLE will be `assistant' by default, but can be passed in for other roles."
   (setf (llm-chat-prompt-interactions prompt)
@@ -790,7 +817,8 @@ ROLE will be `assistant' by default, but can be passed in for other roles."
                                                (llm-chat-prompt-tool-result-result r)
                                                :false))
                                         r)
-                                      tool-results))))))
+                                      tool-results)
+                       :multi-turn-plist multi-turn)))))
 
 (defun llm-provider-utils-process-result (provider prompt partial-result multi-output success-callback
                                                    error-callback)
@@ -800,8 +828,6 @@ appending to the prompt, and returns an appropriate response for
 the client.
 
 PROVIDER is the struct that configures the use of the LLM.
-
-TOOL-USES is a list of tool uses in the result.
 
 PARTIAL-RESULT is the multipart result, without any tool results.
 
@@ -814,8 +840,9 @@ complete.
 ERROR-CALLBACK is the callback that will be run on error."
   (when (and (plist-get partial-result :text)
              (> (length (plist-get partial-result :text)) 0))
-    (llm-provider-append-to-prompt provider prompt (plist-get partial-result :text)))
-  (if-let ((tool-uses (plist-get partial-result :tool-uses)))
+    (llm-provider-append-to-prompt provider prompt (plist-get partial-result :text)
+                                   nil (plist-get partial-result :multi-turn)))
+  (if-let* ((tool-uses (plist-get partial-result :tool-uses)))
       ;; If we have tool uses, execute them, and on the callback, we will
       ;; populate the results.  We don't execute the callback here because it
       ;; will be done inside `llm-provider-utils-execute-tool-uses'.
@@ -823,7 +850,7 @@ ERROR-CALLBACK is the callback that will be run on error."
        provider prompt tool-uses multi-output
        partial-result success-callback error-callback)
     (funcall success-callback
-             (if multi-output partial-result
+             (if multi-output (llm-provider-utils--sanitize-result partial-result)
                (plist-get partial-result :text)))))
 
 (defun llm-provider-utils-populate-tool-uses (provider prompt results-alist)
@@ -853,8 +880,7 @@ This transforms the plist so that:
   (cl-loop for (key value) on tool-results
            by 'cddr
            if (and (not (and (eq key :text) (equal value "")))
-                   (member key '(:text :tool-uses :tool-results :reasoning
-                                       :input-tokens :output-tokens)))
+                   (member key llm-provider-utils--supported-multi-output-keys))
            nconc (list key
                        (if (eq key :tool-uses)
                            (mapcar (lambda (tool-use)
@@ -891,6 +917,14 @@ This will convert all :json-false and :false values to FALSE-VAL."
                 (when (or (consp val) (vectorp val))
                   (push val stack))))))))
       args)))
+
+(defun llm-provider-utils--sanitize-result (result)
+  "Sanitize RESULT for returning to the user."
+  (let (cleaned)
+    (dolist (key llm-provider-utils--supported-multi-output-keys)
+      (when-let* ((val (plist-get result key)))
+        (setq cleaned (plist-put cleaned key val))))
+    cleaned))
 
 (defun llm-provider-utils-execute-tool-uses (provider prompt tool-uses multi-output
                                                       partial-result success-callback

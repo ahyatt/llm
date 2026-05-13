@@ -39,7 +39,7 @@
                                    default-chat-max-tokens
                                    default-chat-non-standard-params
                                    ((:key raw-key))
-                                   (embedding-model "embedding-001")
+                                   (embedding-model "gemini-embedding-001")
                                    (chat-model "gemini-3.1-pro-preview")
                                    &aux
                                    (key (llm-provider-utils--wrap-key raw-key)))))

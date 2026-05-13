@@ -42,6 +42,7 @@
   :type 'string
   :group 'llm-openai)
 
+;; This uses the Responses API.
 (cl-defstruct (llm-openai
                (:include llm-standard-full-provider)
                (:constructor make-llm-openai
@@ -111,7 +112,7 @@ differences.")
   (llm-openai-chat-model provider))
 
 (cl-defmethod llm-openai-primary-chat-model ((provider llm-openrouter))
-  (let ((model-data (llm-openai-chat-model provider)))
+  (let ((model-data (llm-openai-compatible-chat-model provider)))
     (if (listp model-data)
         (car model-data)
       model-data)))
@@ -191,6 +192,9 @@ PROVIDER is the Open AI provider struct."
   (llm-openai--url provider "embeddings"))
 
 (cl-defmethod llm-provider-chat-url ((provider llm-openai))
+  (llm-openai--url provider "responses"))
+
+(cl-defmethod llm-provider-chat-url ((provider llm-openai-compatible))
   (llm-openai--url provider "chat/completions"))
 
 (cl-defmethod llm-openai--url ((provider llm-openai-compatible) command)
@@ -221,6 +225,18 @@ PROVIDER is the Open AI provider struct."
                                            format)
                                           '(:additionalProperties :false))))))
 
+(defun llm-openai--responses-api-response-format (format)
+  "Return the Open AI response format for FORMAT."
+  (if (eq format 'json) '(:type "json_object")
+    ;; If not JSON, this must be a json response spec.
+    `(:type "json_schema"
+            :name "response"
+            :strict t
+            :schema ,(append
+                      (llm-provider-utils-convert-to-serializable
+                       format)
+                      '(:additionalProperties :false)))))
+
 (cl-defgeneric llm-openai--build-model (provider)
   "Get the model setting for the request for PROVIDER.")
 
@@ -228,7 +244,7 @@ PROVIDER is the Open AI provider struct."
   (list :model (llm-openai-chat-model provider)))
 
 (cl-defmethod llm-openai--build-model ((provider llm-openrouter))
-  (let ((model (llm-openai-chat-model provider)))
+  (let ((model (llm-openai-compatible-chat-model provider)))
     (if (listp model)
         (list :models (apply #'vector model))
       (list :model model))))
@@ -249,6 +265,13 @@ PROVIDER is the Open AI provider struct."
   (when (llm-chat-prompt-max-tokens prompt)
     (list :max_tokens (llm-chat-prompt-max-tokens prompt))))
 
+(defun llm-openai--responses-api-build-response-format (prompt)
+  "Build the response_format field if present in PROMPT."
+  (when (llm-chat-prompt-response-format prompt)
+    (list :text
+          (list :format
+                (llm-openai--responses-api-response-format (llm-chat-prompt-response-format prompt))))))
+
 (defun llm-openai--build-response-format (prompt)
   "Build the response_format field if present in PROMPT."
   (when (llm-chat-prompt-response-format prompt)
@@ -259,6 +282,17 @@ PROVIDER is the Open AI provider struct."
   "Build the tools field if tools are present in PROMPT."
   (when (llm-chat-prompt-tools prompt)
     (list :tools (vconcat (mapcar #'llm-provider-utils-openai-tool-spec
+                                  (llm-chat-prompt-tools prompt))))))
+
+(defun llm-openai--responses-api-build-tools (prompt)
+  "Build the tools field for the Responses API if tools are present in PROMPT."
+  (when (llm-chat-prompt-tools prompt)
+    (list :tools (vconcat (mapcar (lambda (tool)
+                                    (list :type "function"
+                                          :name (llm-tool-name tool)
+                                          :description (llm-tool-description tool)
+                                          :parameters (llm-provider-utils-openai-arguments
+                                                       (llm-tool-args tool))))
                                   (llm-chat-prompt-tools prompt))))))
 
 (defun llm-openai--build-tool-choice (prompt)
@@ -293,6 +327,15 @@ PROVIDER is the Open AI provider struct."
        msg-plist))
    (llm-chat-prompt-interaction-tool-results interaction)))
 
+(defun llm-openai--responses-api-build-tool-interaction (interaction)
+  "Build the tool interaction for INTERACTION for the Response API."
+  (mapcar
+   (lambda (tool-result)
+     (list :call_id (llm-chat-prompt-tool-result-call-id tool-result)
+           :output (format "%s" (llm-chat-prompt-tool-result-result tool-result))
+           :type "function_call_output"))
+   (llm-chat-prompt-interaction-tool-results interaction)))
+
 (defun llm-openai--build-tool-uses (fcs)
   "Convert back from the generic representation to the Open AI.
 
@@ -306,6 +349,19 @@ FCS is a list of `llm-provider-utils-tool-use' structs."
                           :arguments ,(llm-provider-utils-json-serialize
                                        (llm-provider-utils-tool-use-args fc)))))
            fcs)))
+
+(defun llm-openai--responses-api-build-tool-uses (fcs)
+  "Convert back from the generic representation to the Open AI.
+
+FCS is a list of `llm-provider-utils-tool-use' structs."
+  (mapcar (lambda (fc)
+            (list
+             :call_id (llm-provider-utils-tool-use-id fc)
+             :type "function_call"
+             :name (llm-provider-utils-tool-use-name fc)
+             :arguments (llm-provider-utils-json-serialize
+                         (llm-provider-utils-tool-use-args fc))))
+          fcs))
 
 (cl-defgeneric llm-openai--build-reasoning (provider prompt)
   "Build the reasoning field for PROVIDER and PROMPT.")
@@ -327,23 +383,75 @@ we need to check for a model post 5.2 (if it supports reasoning at all)."
   (and (member 'reasoning (llm-capabilities provider))
        (let* ((model (llm-openai-primary-chat-model provider))
               (major-minor (llm-openai--parse-version model)))
-         (or (>= (car major-minor) 6)
-             (and
-              (>= (car major-minor) 5)
-              (>= (cdr major-minor) 2))))))
+         (and major-minor
+              (or (>= (car major-minor) 6)
+                  (and
+                   (>= (car major-minor) 5)
+                   (>= (cdr major-minor) 2)))))))
 
 (cl-defmethod llm-openai--build-reasoning ((provider llm-openai) prompt)
-  (when (and (llm-chat-prompt-reasoning prompt)
-             (llm-openai--supports-reasoning provider))
-    (list :reasoning_effort
-          (pcase (llm-chat-prompt-reasoning prompt)
-            ('none "none")
-            ('light "low")
-            ('medium "medium")
-            ('maximum "xhigh")
-            (_ (signal 'llm-not-supported
-                       (list (format "Unknown reasoning effort option: %s"
-                                     (llm-chat-prompt-reasoning prompt)))))))))
+  (when (llm-openai--supports-reasoning provider)
+    (if (llm-chat-prompt-reasoning prompt)
+        (list :reasoning
+              (list :summary "auto"
+                    :effort
+                    (pcase (llm-chat-prompt-reasoning prompt)
+                      ('none "none")
+                      ('light "low")
+                      ('medium "medium")
+                      ('maximum "xhigh")
+                      (_ (signal 'llm-not-supported
+                                 (list (format "Unknown reasoning effort option: %s"
+                                               (llm-chat-prompt-reasoning prompt))))))))
+      '(:reasoning (:summary "auto" :effort "medium")))))
+
+(defun llm-openai--responses-api-build-messages (prompt)
+  "Build the :messages field based on interactions in PROMPT."
+  (let ((interactions (llm-chat-prompt-interactions prompt)))
+    (list
+     :input
+     (vconcat
+      (mapcan
+       (lambda (interaction)
+         (let ((content (llm-chat-prompt-interaction-content interaction)))
+           (cond
+            ((llm-chat-prompt-interaction-tool-results interaction)
+             (llm-openai--responses-api-build-tool-interaction interaction))
+            ((and (consp content)
+                  (llm-provider-utils-tool-use-p (car content)))
+             (llm-openai--responses-api-build-tool-uses content))
+            ;; Handle regular interactions
+            (t (list
+                (let ((msg-plist
+                       (list :role (symbol-name (llm-chat-prompt-interaction-role interaction)))))
+                  (setq msg-plist
+                        (plist-put msg-plist :content
+                                   (cond
+                                    ((llm-multipart-p content)
+                                     (vconcat
+                                      (mapcar
+                                       (lambda (part)
+                                         (if (llm-media-p part)
+                                             (list :type "input_image"
+                                                   :image_url
+                                                   (concat
+                                                    "data:"
+                                                    (llm-media-mime-type part)
+                                                    ";base64,"
+                                                    (base64-encode-string
+                                                     (llm-media-data part) t)))
+                                           (list :type "input_text" :text part)))
+                                       (llm-multipart-parts content))))
+                                    (t content))))
+                  (when-let* ((multi-turn-plist (llm-chat-prompt-interaction-multi-turn-plist interaction))
+                              (reasoning-id (plist-get multi-turn-plist :openai-reasoning-id))
+                              (encrypted-reasoning (plist-get multi-turn-plist :openai-encrypted-reasoning)))
+                    (setq msg-plist
+                          (plist-put msg-plist :reasoning
+                                     (list :id reasoning-id
+                                           :encrypted_content encrypted-reasoning))))
+                  msg-plist))))))
+       interactions)))))
 
 (defun llm-openai--build-messages (prompt)
   "Build the :messages field based on interactions in PROMPT."
@@ -385,6 +493,13 @@ we need to check for a model post 5.2 (if it supports reasoning at all)."
                                            (list :type "text" :text part)))
                                        (llm-multipart-parts content))))
                                     (t content))))))
+              (when-let* ((multi-turn-plist (llm-chat-prompt-interaction-multi-turn-plist interaction))
+                          (reasoning-id (plist-get multi-turn-plist :openai-reasoning-id))
+                          (encrypted-reasoning (plist-get multi-turn-plist :openai-encrypted-reasoning)))
+                (setq msg-plist
+                      (plist-put msg-plist :reasoning
+                                 (list :id reasoning-id
+                                       :encrypted_content encrypted-reasoning))))
               msg-plist))))
        interactions)))))
 
@@ -401,6 +516,37 @@ we need to check for a model post 5.2 (if it supports reasoning at all)."
                        val)))))
 
 (cl-defmethod llm-provider-chat-request ((provider llm-openai) prompt streaming)
+  "From PROMPT, create the chat request data to send.
+PROVIDER is the Open AI provider.
+STREAMING if non-nil, turn on response streaming."
+  (let ((non-standard-params (llm-chat-prompt-non-standard-params prompt))
+        request-plist)
+
+    ;; Combine all the parts
+    (setq request-plist
+          (append
+           (llm-openai--build-model provider)
+           (llm-openai--build-reasoning provider prompt)
+           (llm-openai--build-temperature prompt)
+           (llm-openai--build-max-tokens prompt)
+           (llm-openai--responses-api-build-response-format prompt)
+           (llm-openai--responses-api-build-tools prompt)
+           (llm-openai--build-tool-choice prompt)
+           (llm-openai--responses-api-build-messages prompt)
+           (when-let* ((instructions (llm-provider-utils-get-system-prompt prompt)))
+             (when (> (length instructions) 0)
+               (list :instructions instructions)))
+           (list :store :false)
+           (list :stream (if streaming t :false))
+           '(:include ["reasoning.encrypted_content"])))
+
+    ;; Merge non-standard params
+    (setq request-plist (llm-provider-merge-non-standard-params non-standard-params request-plist))
+
+    ;; Return the final request plist
+    request-plist))
+
+(cl-defmethod llm-provider-chat-request ((provider llm-openai-compatible) prompt streaming)
   "From PROMPT, create the chat request data to send.
 PROVIDER is the Open AI provider.
 STREAMING if non-nil, turn on response streaming."
@@ -428,14 +574,39 @@ STREAMING if non-nil, turn on response streaming."
     request-plist))
 
 (cl-defmethod llm-provider-chat-extract-result ((_ llm-openai) response)
+  (when-let* ((output (assoc-default 'output response))
+              (content (assoc-default 'content (seq-find (lambda (item) (equal (assoc-default 'type item)
+                                                                               "message"))
+                                                         output)))
+              (output-text (assoc-default 'text
+                                          (seq-find (lambda (item) (equal (assoc-default 'type item) "output_text"))
+                                                    content))))
+    output-text))
+
+(cl-defmethod llm-provider-chat-extract-result ((_ llm-openai-compatible) response)
   (assoc-default 'content
                  (assoc-default 'message (aref (cdr (assoc 'choices response)) 0))))
 
 (cl-defmethod llm-provider-extract-token-use ((_ llm-openai) response)
   (let ((usage (assoc-default 'usage response)))
+    `(:input-tokens ,(assoc-default 'input_tokens usage)
+                    :output-tokens ,(assoc-default 'output_tokens usage))))
+
+(cl-defmethod llm-provider-extract-token-use ((_ llm-openai-compatible) response)
+  (let ((usage (assoc-default 'usage response)))
     `(:input-tokens ,(assoc-default 'prompt_tokens usage))))
 
 (cl-defmethod llm-provider-extract-tool-uses ((_ llm-openai) response)
+  (mapcar (lambda (call)
+            (make-llm-provider-utils-tool-use
+             :id (assoc-default 'id call)
+             :name (assoc-default 'name call)
+             :args (llm-provider-utils-parse-openai-tool-arguments
+                    (assoc-default 'arguments call))))
+          (seq-filter (lambda (item) (equal (assoc-default 'type item) "function_call"))
+                      (assoc-default 'output response))))
+
+(cl-defmethod llm-provider-extract-tool-uses ((_ llm-openai-compatible) response)
   (mapcar (lambda (call)
             (let ((tool (assoc-default 'function call)))
               (make-llm-provider-utils-tool-use
@@ -446,6 +617,25 @@ STREAMING if non-nil, turn on response streaming."
           (assoc-default 'tool_calls
                          (assoc-default 'message
                                         (aref (assoc-default 'choices response) 0)))))
+
+(cl-defmethod llm-provider-extract-reasoning ((_ llm-openai) response)
+  (when-let* ((output (assoc-default 'output response))
+              (content (assoc-default 'summary
+                                      (seq-find (lambda (item) (equal (assoc-default 'type item) "reasoning"))
+                                                output))))
+    (mapconcat #'identity
+               (cl-loop for item across content
+                        when (equal (assoc-default 'type item) "summary_text")
+                        collect (assoc-default 'text item))
+               " ")))
+
+(cl-defmethod llm-provider-extract-for-multi-turn ((_ llm-openai) response)
+  (when-let* ((reasoning (seq-find (lambda (item) (equal (assoc-default 'type item) "reasoning"))
+                                   (assoc-default 'output response)))
+              (id (assoc-default 'id reasoning))
+              (encrypted-reasoning (assoc-default 'encrypted_content reasoning)))
+    `(:openai-encrypted-reasoning ,encrypted-reasoning
+                                  :openai-reasoning-id ,id)))
 
 ;; Several Open AI compatible providers such as oMLX include a
 ;; "reasoning_content" field in the response.
@@ -459,7 +649,7 @@ STREAMING if non-nil, turn on response streaming."
 (cl-defmethod llm-provider-populate-tool-uses ((_ llm-openai) prompt tool-uses)
   (llm-provider-utils-append-to-prompt prompt tool-uses nil 'assistant))
 
-(cl-defmethod llm-provider-streaming-media-handler ((_ llm-openai) receiver _)
+(cl-defmethod llm-provider-streaming-media-handler ((_ llm-openai-compatible) receiver _)
   (cons 'text/event-stream
         (plz-event-source:text/event-stream
          :events `((message
@@ -486,7 +676,61 @@ STREAMING if non-nil, turn on response streaming."
                                  (funcall receiver
                                           `(:input-tokens ,(assoc-default 'prompt_tokens usage))))))))))))))
 
+(cl-defmethod llm-provider-streaming-media-handler ((_ llm-openai) receiver _)
+  (cons 'text/event-stream
+        (plz-event-source:text/event-stream
+         :events `((response.completed
+                    .
+                    ,(lambda (event)
+                       (when-let* ((data (plz-event-source-event-data event))
+                                   (response-alist (json-parse-string data :object-type 'alist))
+                                   (response (assoc-default 'response response-alist))
+                                   (usage (assoc-default 'usage response)))
+                         (funcall receiver (list :input-tokens (assoc-default 'input_tokens usage)
+                                                 :output-tokens (assoc-default 'output_tokens usage))))))
+                   (response.output_text.delta
+                    .
+                    ,(lambda (event)
+                       (let* ((data (plz-event-source-event-data event))
+                              (delta-alist (json-parse-string data :object-type 'alist)))
+                         ;; The output text is given according to indexes; i
+                         ;; don't yet really understand what different indexes
+                         ;; mean for streaming, so let's just use index 0 for
+                         ;; now.
+                         (when (= (assoc-default 'content_index delta-alist) 0)
+                           (funcall receiver `(:text ,(assoc-default 'delta delta-alist)))))))
+                   (response.reasoning_summary_text.delta
+                    .
+                    ,(lambda (event)
+                       (let* ((data (plz-event-source-event-data event))
+                              (delta-alist (json-parse-string data :object-type 'alist)))
+                         (when (and (= (assoc-default 'output_index delta-alist) 0)
+                                    (> (length (assoc-default 'delta delta-alist)) 0))
+                           (funcall receiver `(:reasoning ,(assoc-default 'delta delta-alist)))))))
+                   (response.output_item.done
+                    .
+                    ,(lambda (event)
+                       (let* ((data (plz-event-source-event-data event))
+                              (done-alist (json-parse-string data :object-type 'alist))
+                              (item (assoc-default 'item done-alist)))
+                         (pcase (assoc-default 'type item)
+                           ("reasoning" (funcall receiver
+                                                 `(:multi-turn
+                                                   (:openai-reasoning-id ,(assoc-default 'id item)
+                                                                         :openai-encrypted-reasoning ,(assoc-default 'encrypted_content item)))))
+                           ("function_call" (funcall receiver
+                                                     (list :tool-uses
+                                                           (list (make-llm-provider-utils-tool-use
+                                                                  :id (assoc-default 'id item)
+                                                                  :name (assoc-default 'name item)
+                                                                  :args (json-parse-string
+                                                                         (assoc-default 'arguments item)
+                                                                         :object-type 'alist))))))))))))))
+
 (cl-defmethod llm-provider-collect-streaming-tool-uses ((_ llm-openai) data)
+  data)
+
+(cl-defmethod llm-provider-collect-streaming-tool-uses ((_ llm-openai-compatible) data)
   (llm-provider-utils-openai-collect-streaming-tool-uses data))
 
 (cl-defmethod llm-name ((_ llm-openai))
@@ -510,11 +754,17 @@ STREAMING if non-nil, turn on response streaming."
 
 (cl-defmethod llm-capabilities ((provider llm-openai-compatible))
   (append '(streaming model-list)
-          (when (and (llm-openai-embedding-model provider)
-                     (not (equal "unset" (llm-openai-embedding-model provider))))
+          (when (and (llm-openai-compatible-embedding-model provider)
+                     (not (equal "unset" (llm-openai-compatible-embedding-model provider))))
             '(embeddings embeddings-batch))
+
           (when-let* ((model (llm-models-match (llm-openai-primary-chat-model provider))))
             (llm-model-capabilities model))))
+
+(cl-defmethod llm-capabilities ((_ llm-openrouter))
+  (seq-remove
+   (lambda (c) (eq c 'embeddings-batch))
+   (cl-call-next-method)))
 
 (cl-defmethod llm-models ((provider llm-openai))
   (mapcar (lambda (model)
