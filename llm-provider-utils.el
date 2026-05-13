@@ -957,6 +957,7 @@ have returned results."
             (arguments
              (llm-provider-utils--normalize-args
               (llm-provider-utils-tool-use-args tool-use)))
+            (failed nil)
             (tool (or
                    (seq-find
                     (lambda (f) (equal name (llm-tool-name f)))
@@ -964,6 +965,7 @@ have returned results."
                    (progn
                      (funcall error-callback 'llm-tool-unknown-tool
                               (format "Unknown tool '%s' called" name))
+                     (setq failed t)
                      nil)))
             (call-args (when tool
                          (cl-loop for arg in (llm-tool-args tool)
@@ -979,7 +981,8 @@ have returned results."
                                                     (funcall error-callback 'llm-tool-missing-argument
                                                              (format "Missing required argument '%s' for tool '%s'"
                                                                      (plist-get arg :name)
-                                                                     name)))
+                                                                     name))
+                                                    (setq failed t))
                                                   nil))))))
             (end-func (when (and tool tool-uses)
                         (lambda (result)
@@ -999,8 +1002,7 @@ have returned results."
                                          (llm-provider-utils-final-multi-output-result
                                           (append partial-result
                                                   `(:tool-results ,tool-use-and-results)))
-                                       tool-use-and-results))))))
-            (failed nil))
+                                       tool-use-and-results)))))))
        (when end-func
          ;; Check to see that there were no unknown args.
          (dolist (arg-key (map-keys arguments))
@@ -1013,7 +1015,6 @@ have returned results."
                               (symbol-name arg-key)
                               name))
              (setf failed t)))
-
          (unless failed
            (if (llm-tool-async tool)
                (apply (llm-tool-function tool)

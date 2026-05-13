@@ -77,7 +77,7 @@ This is Google's AI model.  You can get an API key via their [[https://makersuit
 Set this up with ~make-llm-gemini~, with the following parameters:
 - ~:key~, the Google AI key that you get from Google AI Studio.
 - ~:chat-model~, the model name, from the [[https://ai.google.dev/models][list]] of models.  This is optional and will default to the text Gemini model.
-- ~:embedding-model~: the model name, currently must be "embedding-001".  This is optional and will default to "embedding-001".
+- ~:embedding-model~: the model name, which is optional, and will default to a reasonable embedding model.
 ** Vertex (Gemini via Google Cloud)
 This is mostly for those who want to use Google Cloud specifically, most users should use Gemini instead, which is easier to set up.
 
@@ -98,7 +98,7 @@ In addition to the provider, which you may want multiple of (for example, to cha
 [[https://docs.anthropic.com/claude/docs/intro-to-claude][Claude]] is Anthropic's large language model.  It does not support embeddings.  You can set it up with the following parameters:
 
 =:key=: The API key you get from [[https://console.anthropic.com/settings/keys][Claude's settings page]].  This is required.
-=:chat-model=: One of the [[https://docs.anthropic.com/claude/docs/models-overview][Claude models]].  Defaults to "claude-3-opus-20240229", the most powerful model.
+=:chat-model=: One of the [[https://docs.anthropic.com/claude/docs/models-overview][Claude models]].
 ** Ollama
 [[https://ollama.ai/][Ollama]] is a way to run large language models locally. There are [[https://ollama.ai/library][many different models]] you can use with it, and some of them [[https://ollama.com/search?c=tools][support tool use]]. You set it up with the following parameters:
 - ~:scheme~: The scheme (http/https) for the connection to ollama.  This default to "http".
@@ -170,8 +170,8 @@ For all callbacks, the callback will be executed in the buffer the function was 
 - ~llm-chat-streaming provider prompt partial-callback response-callback error-callback multi-output~:  Similar to ~llm-chat-async~, but request a streaming response.  As the response is built up, ~partial-callback~ is called with the all the text retrieved up to the current point.  Finally, ~reponse-callback~ is called with the complete text.
 - ~llm-embedding provider string~: With the user-chosen ~provider~, send a string and get an embedding, which is a large vector of floating point values.  The embedding represents the semantic meaning of the string, and the vector can be compared against other vectors, where smaller distances between the vectors represent greater semantic similarity.
 - ~llm-embedding-async provider string vector-callback error-callback~: Same as ~llm-embedding~ but this is processed asynchronously. ~vector-callback~ is called with the vector embedding, and, in case of error, ~error-callback~ is called with the same arguments as in ~llm-chat-async~.
-- ~llm-batch-embedding provider strings~: same as ~llm-embedding~, but takes in a list of strings, and returns a list of vectors whose order corresponds to the ordering of the strings.
-- ~llm-batch-embedding-async provider strings vectors-callback error-callback~: same as ~llm-embedding-async~, but takes in a list of strings, and returns a list of vectors whose order corresponds to the ordering of the strings.
+- ~llm-batch-embeddings provider strings~: same as ~llm-embedding~, but takes in a list of strings, and returns a list of vectors whose order corresponds to the ordering of the strings.
+- ~llm-batch-embeddings-async provider strings vectors-callback error-callback~: same as ~llm-embedding-async~, but takes in a list of strings, and returns a list of vectors whose order corresponds to the ordering of the strings.
 - ~llm-count-tokens provider string~: Count how many tokens are in ~string~.  This may vary by ~provider~, because some provideres implement an API for this, but typically is always about the same.  This gives an estimate if the provider has no API support.
 - ~llm-cancel-request request~ Cancels the given request, if possible.  The ~request~ object is the return value of async and streaming functions.
 - ~llm-name provider~.  Provides a short name of the model or provider, suitable for showing to users.
