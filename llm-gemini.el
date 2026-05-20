@@ -47,7 +47,7 @@
 
 KEY is the API key for the client.
 You can get this at https://makersuite.google.com/app/apikey."
-  key (embedding-model "embedding-001") (chat-model "gemini-3.1-pro-preview"))
+  key embedding-model chat-model)
 
 (cl-defmethod llm-nonfree-message-info ((_ llm-gemini))
   "Return nonfree terms of service for Gemini."
