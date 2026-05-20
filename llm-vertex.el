@@ -130,11 +130,11 @@ information than standard tool use."
 (cl-defmethod llm-provider-chat-extract-error ((provider llm-google) err-response)
   (if (vectorp err-response)
       (llm-provider-chat-extract-error provider (aref err-response 0))
-    (if-let ((err (assoc-default 'error err-response)))
+    (if-let* ((err (assoc-default 'error err-response)))
         (format "Problem calling GCloud Vertex AI: status: %s message: %s"
                 (assoc-default 'code err)
                 (assoc-default 'message err))
-      (if-let ((candidates (assoc-default 'candidates err-response)))
+      (if-let* ((candidates (assoc-default 'candidates err-response)))
           (when (and (vectorp candidates)
                      (> (length candidates) 0)
                      (equal "SAFETY"
@@ -200,7 +200,7 @@ information than standard tool use."
                                         ;; See https://ai.google.dev/gemini-api/docs/gemini-3
                                         "context_engineering_is_the_way_to_go")))
               (mapcan (lambda (maybe-call)
-                        (when-let ((fc (assoc-default 'functionCall maybe-call)))
+                        (when-let* ((fc (assoc-default 'functionCall maybe-call)))
                           (list (cons fc
                                       (assoc-default 'thoughtSignature maybe-call)))))
                       (assoc-default
@@ -325,7 +325,7 @@ which is necessary to properly set some paremeters."
     (when (llm-chat-prompt-max-tokens prompt)
       (setq params-plist (plist-put params-plist :maxOutputTokens
                                     (llm-chat-prompt-max-tokens prompt))))
-    (when-let ((format (llm-chat-prompt-response-format prompt)))
+    (when-let* ((format (llm-chat-prompt-response-format prompt)))
       (setq params-plist (plist-put params-plist :response_mime_type
                                     "application/json"))
       (unless (eq 'json format)
@@ -336,8 +336,8 @@ which is necessary to properly set some paremeters."
            (model-data (llm-models-by-symbol model)))
       (when (and model-data (member 'reasoning (llm-model-capabilities model-data)))
         (setq thinking-plist '(:includeThoughts t))
-        (when-let ((budget (llm-chat-prompt-reasoning prompt))
-                   (max-budget (if (eq model 'gemini-2.5-pro) 32768 24576)))
+        (when-let* ((budget (llm-chat-prompt-reasoning prompt))
+                    (max-budget (if (eq model 'gemini-2.5-pro) 32768 24576)))
           (if (and (or (eq model 'gemini-2.5-pro)
                        (eq model 'gemini-3-pro))
                    (eq budget 'none))
@@ -375,7 +375,7 @@ which is necessary to properly set some paremeters."
         (plz-media-type:application/json-array
          :handler
          (lambda (element)
-           (when-let ((err-response (llm-provider-chat-extract-error provider element)))
+           (when-let* ((err-response (llm-provider-chat-extract-error provider element)))
              (funcall err-receiver err-response))
            (if-let* ((response (llm-provider-chat-extract-result provider element))
                      (usage (llm-provider-extract-token-use provider element)))
@@ -413,8 +413,8 @@ If STREAMING is non-nil, use the URL for the streaming API."
 (cl-defmethod llm-capabilities ((provider llm-vertex))
   (append
    (list 'streaming 'embeddings 'json-response)
-   (when-let ((model (llm-models-match (llm-vertex-chat-model provider)))
-              (capabilities (llm-model-capabilities model)))
+   (when-let* ((model (llm-models-match (llm-vertex-chat-model provider)))
+               (capabilities (llm-model-capabilities model)))
      (append
       (when (member 'tool-use capabilities) '(tool-uses streaming-tool-uses))
       (seq-intersection capabilities '(image-input audio-input video-input))))))
