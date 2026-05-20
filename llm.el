@@ -804,7 +804,7 @@ This should only be used for logging or debugging."
                                           content-raw))
                                (tool-results (format "%S" tool-result-raw)))
                           (concat (if content (format "Content: %s" content) "")
-                                  (if tool-results-raw
+                                  (if tool-results
                                       (format " Tool results: %s" tool-results))))))
               (llm-chat-prompt-interactions prompt) "\n")
    "\n"
