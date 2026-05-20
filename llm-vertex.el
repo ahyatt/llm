@@ -285,12 +285,6 @@ information than standard tool use."
                `(:allowedFunctionNames [,(llm-tool-options-tool-choice options)]))))))))
    (llm-vertex--chat-parameters prompt model)))
 
-;; TODO: remove after September 2025, this is only here so people can upgrade to
-;; a new version of their llm library without the old llm-google specializer
-;; sticking around.
-(cl-defmethod llm-provider-chat-request ((_ llm-google) _ _)
-  (cl-call-next-method))
-
 (defun llm-vertex-transform-response-format (format)
   "Transform FORMAT plist into the appropriate Vertex response schema."
   (let (result)

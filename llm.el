@@ -802,16 +802,9 @@ This should only be used for logging or debugging."
                                                                      part))
                                                     (llm-multipart-parts content-raw))
                                           content-raw))
-                               (tool-results (when tool-result-raw
-                                               (mapconcat
-                                                (lambda (tr)
-                                                  (format "[Tool: %s, Result: %s]"
-                                                          (llm-chat-prompt-tool-result-tool-name tr)
-                                                          (llm-chat-prompt-tool-result-result tr)))
-                                                tool-result-raw
-                                                ", "))))
+                               (tool-results (format "%S" tool-result-raw)))
                           (concat (if content (format "Content: %s" content) "")
-                                  (if tool-results
+                                  (if tool-results-raw
                                       (format " Tool results: %s" tool-results))))))
               (llm-chat-prompt-interactions prompt) "\n")
    "\n"
