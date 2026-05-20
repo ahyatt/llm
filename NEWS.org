@@ -1,8 +1,9 @@
 * Version 0.31.0
 - Switch Open AI to Responses API, for more functionality
 - Keep reasoning information between turns for improved performance in tool calling for Open AI and Claude (Gemini does this already).
-- Added Gemini 3.5
+- Fix error with logged tool calls
 - Fix behavior when tool calling has an error; we no longer call the success result as well
+- Added Gemini 3.5
 * Version 0.30.3
 - Fix for OpenRouter breakage
 * Version 0.30.2
