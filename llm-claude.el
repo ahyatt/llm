@@ -49,7 +49,7 @@
   "Return Claude's nonfree ToS."
   "https://www.anthropic.com/legal/consumer-terms")
 
-(cl-defmethod llm-provider-prelude ((provider llm-claude))
+(cl-defmethod llm-provider-request-prelude ((provider llm-claude))
   (unless (llm-claude-key provider)
     (signal 'llm-provider-unconfigured '("No API key provided for Claude"))))
 
