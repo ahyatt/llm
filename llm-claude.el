@@ -88,17 +88,30 @@
                                          (llm-claude--multipart-content
                                           (llm-chat-prompt-interaction-content interaction))
                                        (vconcat
-                                        (if (llm-chat-prompt-interaction-tool-results interaction)
-                                            (vconcat (mapcar (lambda (result)
-                                                               `(:type "tool_result"
-                                                                       :tool_use_id
-                                                                       ,(llm-chat-prompt-tool-result-call-id result)
-                                                                       :content
-                                                                       ,(llm-chat-prompt-tool-result-result result)))
-                                                             (llm-chat-prompt-interaction-tool-results interaction)))
+                                        (cond
+                                         ((and
+                                           (listp (llm-chat-prompt-interaction-content interaction))
+                                           (llm-provider-utils-tool-use-p (car (llm-chat-prompt-interaction-content interaction))))
+                                          (vconcat (mapcar (lambda (tool-use)
+                                                             (list
+                                                              :type "tool_use"
+                                                              :id (llm-provider-utils-tool-use-id tool-use)
+                                                              :name (llm-provider-utils-tool-use-name tool-use)
+                                                              :input (llm-provider-utils-tool-use-args tool-use)))
+                                                           (llm-chat-prompt-interaction-content interaction))))
+                                         ((llm-chat-prompt-interaction-tool-results interaction)
+                                          (vconcat (mapcar (lambda (result)
+                                                             `(:type "tool_result"
+                                                                     :tool_use_id
+                                                                     ,(llm-chat-prompt-tool-result-call-id result)
+                                                                     :content
+                                                                     ,(llm-chat-prompt-tool-result-result result)))
+                                                           (llm-chat-prompt-interaction-tool-results interaction))))
+                                         (t
                                           (list (list :type "text"
                                                       :text
-                                                      (llm-chat-prompt-interaction-content interaction))))
+                                                      (llm-chat-prompt-interaction-content interaction)))))
+
                                         (when-let* ((multi-turn (llm-chat-prompt-interaction-multi-turn-plist interaction))
                                                     (signature (plist-get multi-turn :claude-reasoning-signature)))
                                           (list
@@ -195,14 +208,7 @@
                       :args (assoc-default 'input item)))))
 
 (cl-defmethod llm-provider-populate-tool-uses ((_ llm-claude) prompt tool-uses)
-  (llm-provider-utils-append-to-prompt
-   prompt
-   (vconcat (mapcar (lambda (call)
-                      `(:type "tool_use"
-                              :id ,(llm-provider-utils-tool-use-id call)
-                              :name ,(llm-provider-utils-tool-use-name call)
-                              :input ,(llm-provider-utils-tool-use-args call)))
-                    tool-uses))))
+  (llm-provider-utils-append-to-prompt prompt tool-uses nil 'assistant))
 
 (cl-defmethod llm-provider-chat-extract-result ((_ llm-claude) response)
   (cl-loop for block across (assoc-default 'content response)

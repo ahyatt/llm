@@ -127,7 +127,7 @@ else.  We really just want to see if it's in the right ballpark."
       (push (make-llm-openai :key (getenv "OPENAI_KEY")) providers))
     (when (getenv "ANTHROPIC_KEY")
       (require 'llm-claude)
-      (push (make-llm-claude :key (getenv "ANTHROPIC_KEY")) providers))
+      (push (make-llm-claude :key (getenv "ANTHROPIC_KEY") :chat-model "claude-haiku-4-5") providers))
     (when (getenv "GEMINI_KEY")
       (require 'llm-gemini)
       (push (make-llm-gemini :key (getenv "GEMINI_KEY") :chat-model "gemini-3.1-flash-lite-preview") providers))
