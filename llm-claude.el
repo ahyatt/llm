@@ -208,7 +208,7 @@
                       :args (assoc-default 'input item)))))
 
 (cl-defmethod llm-provider-populate-tool-uses ((_ llm-claude) prompt tool-uses)
-  (llm-provider-utils-append-to-prompt prompt tool-uses nil 'assistant))
+  (llm-provider-utils-append-to-prompt prompt tool-uses nil nil 'assistant))
 
 (cl-defmethod llm-provider-chat-extract-result ((_ llm-claude) response)
   (cl-loop for block across (assoc-default 'content response)
