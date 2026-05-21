@@ -105,9 +105,9 @@ TIMEOUT is the number of seconds to wait for a response."
                               (car curl-error)
                               (cdr curl-error))))))
         ((plz-error-response error)
-         (when-let ((response (plz-error-response error))
-                    (status (plz-response-status response))
-                    (body (plz-response-body response)))
+         (when-let* ((response (plz-error-response error))
+                     (status (plz-response-status response))
+                     (body (plz-response-body response)))
            (cond
             ((or (eq status 401) (eq status 403))
              (funcall on-error 'llm-request-authentication-error body))

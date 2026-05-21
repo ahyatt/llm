@@ -339,7 +339,7 @@ DATA is a vector of lists produced by `llm-provider-streaming-media-handler'."
      '(("anthropic-beta" . "structured-outputs-2025-11-13")))))
 
 (cl-defmethod llm-provider-chat-extract-error ((_ llm-claude) response)
-  (when-let ((err (assoc-default 'error response)))
+  (when-let* ((err (assoc-default 'error response)))
     (format "Error %s: '%s'" (assoc-default 'type err)
             (assoc-default 'message err))))
 
