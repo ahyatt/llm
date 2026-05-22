@@ -4,6 +4,8 @@
 - Fix error with logged tool calls
 - Fix behavior when tool calling has an error; we no longer call the success result as well
 - Fix error with Claude tool use requests
+- Fix error with Claude 4.5 Haiku and reasoning support
+- Tweaked Claude name and capabilities to not always support reasoning
 - Added Gemini 3.5
 * Version 0.30.3
 - Fix for OpenRouter breakage

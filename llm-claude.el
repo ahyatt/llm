@@ -168,14 +168,16 @@
         (setq request (plist-put request :thinking `(:type
                                                      ,(if (eq 'none (llm-chat-prompt-reasoning prompt))
                                                           "disabled"
-                                                        "adaptive"))))))
-    (when (and (llm-chat-prompt-reasoning prompt)
-               (not (eq 'none (llm-chat-prompt-reasoning prompt))))
-      (setq request (plist-put request :output_config `(:effort
-                                                        ,(pcase (llm-chat-prompt-reasoning prompt)
-                                                           ('light "low")
-                                                           ('medium "medium")
-                                                           ('maximum "max"))))))
+                                                        "adaptive")))))
+      (when (and (llm-chat-prompt-reasoning prompt)
+                 (not (eq 'none (llm-chat-prompt-reasoning prompt)))
+                 ;; Effort is only supported on later models
+                 (member 'reasoning (llm-capabilities provider)))
+        (setq request (plist-put request :output_config `(:effort
+                                                          ,(pcase (llm-chat-prompt-reasoning prompt)
+                                                             ('light "low")
+                                                             ('medium "medium")
+                                                             ('maximum "max")))))))
     (append request (llm-provider-utils-non-standard-params-plist prompt))))
 
 (defun llm-claude--multipart-content (content)
@@ -360,13 +362,15 @@ DATA is a vector of lists produced by `llm-provider-streaming-media-handler'."
 (cl-defmethod llm-chat-token-limit ((provider llm-claude))
   (llm-provider-utils-model-token-limit (llm-claude-chat-model provider)))
 
-(cl-defmethod llm-name ((_ llm-claude))
+(cl-defmethod llm-name ((provider llm-claude))
   "Return the name of the provider."
-  "Claude")
+  (if-let* ((model (llm-models-match (llm-claude-chat-model provider))))
+      (llm-model-name model)
+    "Claude"))
 
 (cl-defmethod llm-capabilities ((provider llm-claude))
   (seq-union
-   '(streaming tool-use streaming-tool-use image-input pdf-input reasoning)
+   '(streaming tool-use streaming-tool-use image-input pdf-input)
    (when-let* ((model (llm-models-match (llm-claude-chat-model provider))))
      (llm-model-capabilities model))))
 
