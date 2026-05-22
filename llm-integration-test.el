@@ -124,10 +124,10 @@ else.  We really just want to see if it's in the right ballpark."
   (let ((providers))
     (when (getenv "OPENAI_KEY")
       (require 'llm-openai)
-      (push (make-llm-openai :key (getenv "OPENAI_KEY")) providers))
+      (push (make-llm-openai :key (getenv "OPENAI_KEY") :chat-model "gpt-5.4-nano") providers))
     (when (getenv "ANTHROPIC_KEY")
       (require 'llm-claude)
-      (push (make-llm-claude :key (getenv "ANTHROPIC_KEY")) providers))
+      (push (make-llm-claude :key (getenv "ANTHROPIC_KEY") :chat-model "claude-haiku-4-5") providers))
     (when (getenv "GEMINI_KEY")
       (require 'llm-gemini)
       (push (make-llm-gemini :key (getenv "GEMINI_KEY") :chat-model "gemini-3.1-flash-lite-preview") providers))
@@ -162,6 +162,19 @@ else.  We really just want to see if it's in the right ballpark."
       (push (make-llm-openrouter :chat-model (split-string chat-models ", ")
                                  :embedding-model embedding-model
                                  :key key) providers))))
+
+(defun llm-integration-test--verify-prompt (prompt)
+  "Make sure PROMPT is valid after a round trip through the provider."
+  (cl-loop for interaction in (llm-chat-prompt-interactions prompt)
+           for role = (llm-chat-prompt-interaction-role interaction)
+           for multi-turn-plist = (llm-chat-prompt-interaction-multi-turn-plist interaction)
+           if (not (member role '(user assistant tool-results)))
+           do (error "Invalid role %s in prompt" role)
+           if (and multi-turn-plist (not (plistp multi-turn-plist)))
+           do (error "Multi-turn plist is not a plist: %S" multi-turn-plist)
+           if (and (not (llm-chat-prompt-interaction-content interaction))
+                   (not (llm-chat-prompt-interaction-tool-results interaction)))
+           do (error "Interaction has neither content nor tool results: %S" interaction)))
 
 (defmacro llm-def-integration-test (name arglist &rest body)
   "Define an integration test."
@@ -345,6 +358,7 @@ else.  We really just want to see if it's in the right ballpark."
       (should (equal
                (llm-chat provider prompt)
                llm-integration-test-fc-answer))
+      (llm-integration-test--verify-prompt prompt)
       ;; Test that we can send the function back to the provider without error.
       (llm-chat provider prompt))))
 
@@ -382,6 +396,7 @@ else.  We really just want to see if it's in the right ballpark."
       (should (plist-get result :tool-uses))
       (if (plist-get result :text)
           (should (> (length (plist-get result :text)) 0)))
+      (llm-integration-test--verify-prompt prompt)
       ;; Test that we can send the function back to the provider without error.
       (llm-chat provider prompt t))))
 
@@ -396,6 +411,7 @@ else.  We really just want to see if it's in the right ballpark."
                (plist-get result :tool-results)
                llm-integration-test-fc-answer))
       (should (plist-get result :tool-uses))
+      (llm-integration-test--verify-prompt prompt)
       (if (plist-get result :text)
           (should (> (length (plist-get result :text)) 0))))))
 
@@ -405,6 +421,7 @@ else.  We really just want to see if it's in the right ballpark."
       ;; Sending back multiple answers often doesn't happen, so we can't reliably
       ;; check for this yet.
       (llm-chat provider prompt)
+      (llm-integration-test--verify-prompt prompt)
       ;; Test that we can send the function back to the provider without error.
       (llm-chat provider prompt))))
 
@@ -413,11 +430,13 @@ else.  We really just want to see if it's in the right ballpark."
   ;; output of reasoning.  These should probably be split in the future, but for
   ;; now, Open AI is the only provider that does reasoning and doesn't also
   ;; output the reasoning, so we just ignore Open AI here.
+  (message "Provider %s capabilities: %s" (llm-name provider) (llm-capabilities provider))
   (when (and (member 'reasoning (llm-capabilities provider))
              (or (not (llm-openai-p provider))
                  (llm-openai-compatible-p provider)))
     (let ((prompt (llm-make-chat-prompt "Will interest rates fall in the next year?" :reasoning 'medium)))
-      (should (plist-get (llm-chat provider prompt t) :reasoning)))))
+      (should (plist-get (llm-chat provider prompt t) :reasoning))
+      (llm-integration-test--verify-prompt prompt))))
 
 (llm-def-integration-test llm-reasoning-streaming (provider)
   (when (member 'streaming-reasoning (llm-capabilities provider))
@@ -428,7 +447,8 @@ else.  We really just want to see if it's in the right ballpark."
                           (lambda (_ err) (error err)) t)
       (while (null result)
         (sleep-for 0.1))
-      (should (plist-get result :reasoning)))))
+      (should (plist-get result :reasoning))
+      (llm-integration-test--verify-prompt prompt))))
 
 (llm-def-integration-test llm-image-chat (provider)
   ;; On github, the emacs we use doesn't have image support, so we can't use

@@ -367,7 +367,7 @@ which is necessary to properly set some paremeters."
       `(:generationConfig ,params-plist))))
 
 (cl-defmethod llm-provider-populate-tool-uses ((_ llm-google) prompt tool-uses)
-  (llm-provider-utils-append-to-prompt prompt tool-uses nil 'assistant))
+  (llm-provider-utils-append-to-prompt prompt tool-uses nil nil 'assistant))
 
 (cl-defmethod llm-provider-streaming-media-handler ((provider llm-google)
                                                     receiver err-receiver)

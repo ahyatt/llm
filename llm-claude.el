@@ -88,17 +88,30 @@
                                          (llm-claude--multipart-content
                                           (llm-chat-prompt-interaction-content interaction))
                                        (vconcat
-                                        (if (llm-chat-prompt-interaction-tool-results interaction)
-                                            (vconcat (mapcar (lambda (result)
-                                                               `(:type "tool_result"
-                                                                       :tool_use_id
-                                                                       ,(llm-chat-prompt-tool-result-call-id result)
-                                                                       :content
-                                                                       ,(llm-chat-prompt-tool-result-result result)))
-                                                             (llm-chat-prompt-interaction-tool-results interaction)))
+                                        (cond
+                                         ((and
+                                           (listp (llm-chat-prompt-interaction-content interaction))
+                                           (llm-provider-utils-tool-use-p (car (llm-chat-prompt-interaction-content interaction))))
+                                          (vconcat (mapcar (lambda (tool-use)
+                                                             (list
+                                                              :type "tool_use"
+                                                              :id (llm-provider-utils-tool-use-id tool-use)
+                                                              :name (llm-provider-utils-tool-use-name tool-use)
+                                                              :input (llm-provider-utils-tool-use-args tool-use)))
+                                                           (llm-chat-prompt-interaction-content interaction))))
+                                         ((llm-chat-prompt-interaction-tool-results interaction)
+                                          (vconcat (mapcar (lambda (result)
+                                                             `(:type "tool_result"
+                                                                     :tool_use_id
+                                                                     ,(llm-chat-prompt-tool-result-call-id result)
+                                                                     :content
+                                                                     ,(llm-chat-prompt-tool-result-result result)))
+                                                           (llm-chat-prompt-interaction-tool-results interaction))))
+                                         (t
                                           (list (list :type "text"
                                                       :text
-                                                      (llm-chat-prompt-interaction-content interaction))))
+                                                      (llm-chat-prompt-interaction-content interaction)))))
+
                                         (when-let* ((multi-turn (llm-chat-prompt-interaction-multi-turn-plist interaction))
                                                     (signature (plist-get multi-turn :claude-reasoning-signature)))
                                           (list
@@ -155,14 +168,16 @@
         (setq request (plist-put request :thinking `(:type
                                                      ,(if (eq 'none (llm-chat-prompt-reasoning prompt))
                                                           "disabled"
-                                                        "adaptive"))))))
-    (when (and (llm-chat-prompt-reasoning prompt)
-               (not (eq 'none (llm-chat-prompt-reasoning prompt))))
-      (setq request (plist-put request :output_config `(:effort
-                                                        ,(pcase (llm-chat-prompt-reasoning prompt)
-                                                           ('light "low")
-                                                           ('medium "medium")
-                                                           ('maximum "max"))))))
+                                                        "adaptive")))))
+      (when (and (llm-chat-prompt-reasoning prompt)
+                 (not (eq 'none (llm-chat-prompt-reasoning prompt)))
+                 ;; Effort is only supported on later models
+                 (member 'reasoning (llm-capabilities provider)))
+        (setq request (plist-put request :output_config `(:effort
+                                                          ,(pcase (llm-chat-prompt-reasoning prompt)
+                                                             ('light "low")
+                                                             ('medium "medium")
+                                                             ('maximum "max")))))))
     (append request (llm-provider-utils-non-standard-params-plist prompt))))
 
 (defun llm-claude--multipart-content (content)
@@ -195,14 +210,7 @@
                       :args (assoc-default 'input item)))))
 
 (cl-defmethod llm-provider-populate-tool-uses ((_ llm-claude) prompt tool-uses)
-  (llm-provider-utils-append-to-prompt
-   prompt
-   (vconcat (mapcar (lambda (call)
-                      `(:type "tool_use"
-                              :id ,(llm-provider-utils-tool-use-id call)
-                              :name ,(llm-provider-utils-tool-use-name call)
-                              :input ,(llm-provider-utils-tool-use-args call)))
-                    tool-uses))))
+  (llm-provider-utils-append-to-prompt prompt tool-uses nil nil 'assistant))
 
 (cl-defmethod llm-provider-chat-extract-result ((_ llm-claude) response)
   (cl-loop for block across (assoc-default 'content response)
@@ -354,13 +362,15 @@ DATA is a vector of lists produced by `llm-provider-streaming-media-handler'."
 (cl-defmethod llm-chat-token-limit ((provider llm-claude))
   (llm-provider-utils-model-token-limit (llm-claude-chat-model provider)))
 
-(cl-defmethod llm-name ((_ llm-claude))
-  "Return the name of the provider."
-  "Claude")
+(cl-defmethod llm-name ((provider llm-claude))
+  "Return the name of PROVIDER, based on the model."
+  (if-let* ((model (llm-models-match (llm-claude-chat-model provider))))
+      (llm-model-name model)
+    "Claude"))
 
 (cl-defmethod llm-capabilities ((provider llm-claude))
   (seq-union
-   '(streaming tool-use streaming-tool-use image-input pdf-input reasoning)
+   '(streaming tool-use streaming-tool-use image-input pdf-input)
    (when-let* ((model (llm-models-match (llm-claude-chat-model provider))))
      (llm-model-capabilities model))))
 

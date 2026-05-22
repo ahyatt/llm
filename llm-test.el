@@ -41,7 +41,7 @@
   ;; TODO: Test signals that are not errors, which ert doesn't seem to catch.
   (should-error (llm-embedding (make-llm-fake
                                 :embedding-action-func
-                                (lambda () (cons 'error "my message")))
+                                (lambda () (cons 'error '("my message"))))
                                "Test"))
   (should (equal
            [0.1 0.2 0.3]
@@ -53,7 +53,7 @@
   (should-error (llm-chat-async nil "Test"))
   (should-error (llm-chat
                  (make-llm-fake
-                  :chat-action-func (lambda () (cons 'error "my message")))
+                  :chat-action-func (lambda () (cons 'error '("my message"))))
                  (make-llm-chat-prompt)))
   (should (equal
            "Response"

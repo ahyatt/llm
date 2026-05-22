@@ -647,7 +647,7 @@ STREAMING if non-nil, turn on response streaming."
 
 
 (cl-defmethod llm-provider-populate-tool-uses ((_ llm-openai) prompt tool-uses)
-  (llm-provider-utils-append-to-prompt prompt tool-uses nil 'assistant))
+  (llm-provider-utils-append-to-prompt prompt tool-uses nil nil 'assistant))
 
 (cl-defmethod llm-provider-streaming-media-handler ((_ llm-openai-compatible) receiver _)
   (cons 'text/event-stream
