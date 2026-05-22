@@ -363,7 +363,7 @@ DATA is a vector of lists produced by `llm-provider-streaming-media-handler'."
   (llm-provider-utils-model-token-limit (llm-claude-chat-model provider)))
 
 (cl-defmethod llm-name ((provider llm-claude))
-  "Return the name of the provider."
+  "Return the name of PROVIDER, based on the model."
   (if-let* ((model (llm-models-match (llm-claude-chat-model provider))))
       (llm-model-name model)
     "Claude"))
