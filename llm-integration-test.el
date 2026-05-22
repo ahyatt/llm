@@ -430,7 +430,6 @@ else.  We really just want to see if it's in the right ballpark."
   ;; output of reasoning.  These should probably be split in the future, but for
   ;; now, Open AI is the only provider that does reasoning and doesn't also
   ;; output the reasoning, so we just ignore Open AI here.
-  (message "Provider %s capabilities: %s" (llm-name provider) (llm-capabilities provider))
   (when (and (member 'reasoning (llm-capabilities provider))
              (or (not (llm-openai-p provider))
                  (llm-openai-compatible-p provider)))
