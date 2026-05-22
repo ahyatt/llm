@@ -6,7 +6,7 @@
 - Fix error with Claude tool use requests
 - Fix error with Claude 4.5 Haiku and reasoning support
 - Tweaked Claude name and capabilities to not always support reasoning
-- Added Gemini 3.5
+- Added Gemini 3.5, Qwen 3.7
 * Version 0.30.3
 - Fix for OpenRouter breakage
 * Version 0.30.2
