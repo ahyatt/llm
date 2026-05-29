@@ -1,3 +1,5 @@
+* Version 0.31.1
+- Added Claude Opus 4.8, StepFun 3.7 Flash
 * Version 0.31.0
 - Switch Open AI to Responses API, for more functionality
 - Keep reasoning information between turns for improved performance in tool calling for Open AI and Claude (Gemini does this already).
