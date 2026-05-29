@@ -192,6 +192,11 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 200000
     :regex "claude-opus-4-1")
    (make-llm-model
+    :name "Claude 4.8 Opus" :symbol 'claude-4-8-opus
+    :capabilities '(generation tool-use image-input pdf-input caching json-response reasoning)
+    :context-length 1000000
+    :regex "claude-opus-4-8")
+   (make-llm-model
     :name "Claude 4 Opus" :symbol 'claude-4-opus
     :capabilities '(generation tool-use image-input pdf-input caching)
     :context-length 200000
@@ -496,6 +501,11 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :capabilities '(generation free-software reasoning tool-use) ; Modified MIT license
     :context-length 256000
     :regex "kimi-k2\\.6")
+   (make-llm-model
+    :name "StepFun 3.7 Flash" :symbol 'stepfun-3.7-flash
+    :capabilities '(generation reasoning tool-use)
+    :context-length 256000
+    :regex "step-3.7-flash")
    (make-llm-model
     :name "StepFun 3.5 Flash" :symbol 'stepfun-3.5-flash
     :capabilities '(generation reasoning tool-use)
