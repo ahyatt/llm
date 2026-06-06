@@ -481,15 +481,7 @@ we need to check for a model post 5.2 (if it supports reasoning at all)."
                                       (mapcar
                                        (lambda (part)
                                          (if (llm-media-p part)
-                                             (list :type "image_url"
-                                                   :image_url
-                                                   (list :url
-                                                         (concat
-                                                          "data:"
-                                                          (llm-media-mime-type part)
-                                                          ";base64,"
-                                                          (base64-encode-string
-                                                           (llm-media-data part) t))))
+                                             (llm-openai--chat-completions-media-part part)
                                            (list :type "text" :text part)))
                                        (llm-multipart-parts content))))
                                     (t content))))))
@@ -502,6 +494,25 @@ we need to check for a model post 5.2 (if it supports reasoning at all)."
                                        :encrypted_content encrypted-reasoning))))
               msg-plist))))
        interactions)))))
+
+(defun llm-openai--chat-completions-media-part (media)
+  "Convert MEDIA to an OpenAI Chat Completions content part."
+  (let ((mime-type (llm-media-mime-type media))
+        (data (base64-encode-string (llm-media-data media) t)))
+    (cond
+     ((string-prefix-p "image/" mime-type)
+      (list :type "image_url"
+            :image_url
+            (list :url (concat "data:" mime-type ";base64," data))))
+     ((member mime-type '("audio/wav" "audio/x-wav" "audio/mpeg"))
+      (list :type "input_audio"
+            :input_audio
+            (list :data data
+                  :format (if (equal mime-type "audio/mpeg") "mp3" "wav"))))
+     (t
+      (signal 'llm-not-supported
+              (list (format "Unsupported OpenAI Chat Completions media type: %s"
+                            mime-type)))))))
 
 (defun llm-provider-merge-non-standard-params (non-standard-params request-plist)
   "Merge NON-STANDARD-PARAMS (alist) into REQUEST-PLIST."

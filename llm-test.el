@@ -339,6 +339,37 @@
   (should (member 'tool-use (llm-capabilities (make-llm-openai-compatible :chat-model "llama-3.1"))))
   (should-not (member 'embeddings (llm-capabilities (make-llm-openai-compatible :chat-model "llama-3")))))
 
+(ert-deftest llm-test-openai-compatible-audio-input ()
+  (let ((request
+         (llm-provider-chat-request
+          (make-llm-openai-compatible :chat-model "model")
+          (llm-make-chat-prompt
+           (llm-make-multipart
+            "Transcribe this."
+            (make-llm-media :mime-type "audio/wav"
+                            :data "audio data")))
+          nil)))
+    (should
+     (equal
+      (plist-get request :messages)
+      [(:role "user"
+              :content
+              [(:type "text" :text "Transcribe this.")
+               (:type "input_audio"
+                      :input_audio
+                      (:data "YXVkaW8gZGF0YQ==" :format "wav"))])]))))
+
+(ert-deftest llm-test-openai-compatible-rejects-unsupported-audio-input ()
+  (should-error
+   (llm-provider-chat-request
+    (make-llm-openai-compatible :chat-model "model")
+    (llm-make-chat-prompt
+     (llm-make-multipart
+      "Transcribe this."
+      (make-llm-media :mime-type "audio/flac" :data "audio data")))
+    nil)
+   :type 'llm-not-supported))
+
 (ert-deftest llm-test-chat-token-limit-gemini ()
   (should (= 1048576 (llm-chat-token-limit (make-llm-gemini))))
   (should (= 1048576 (llm-chat-token-limit
