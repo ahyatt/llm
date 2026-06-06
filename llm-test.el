@@ -416,6 +416,45 @@
     (should-not (has-fc "llama"))
     (should-not (has-fc "unknown"))))
 
+(ert-deftest llm-test-ollama-audio-input-capabilities ()
+  (should (member 'audio-input
+                  (llm-capabilities
+                   (make-llm-ollama :chat-model "gemma4:e4b"))))
+  (should-not (member 'audio-input
+                      (llm-capabilities
+                       (make-llm-ollama :chat-model "gemma3:latest")))))
+
+(ert-deftest llm-test-ollama-audio-input ()
+  (let ((request
+         (llm-provider-chat-request
+          (make-llm-ollama :chat-model "gemma4:e4b")
+          (llm-make-chat-prompt
+           (llm-make-multipart
+            "Transcribe this."
+            (make-llm-media :mime-type "audio/wav"
+                            :data "audio data")))
+          nil)))
+    (should
+     (equal
+      request
+      '(:messages
+        [(:role "user"
+                :content "Transcribe this."
+                :images ["YXVkaW8gZGF0YQ=="])]
+        :model "gemma4:e4b"
+        :stream :false)))))
+
+(ert-deftest llm-test-ollama-rejects-unsupported-audio-input ()
+  (should-error
+   (llm-provider-chat-request
+    (make-llm-ollama :chat-model "gemma4:e4b")
+    (llm-make-chat-prompt
+     (llm-make-multipart
+      "Transcribe this."
+      (make-llm-media :mime-type "audio/mpeg" :data "audio data")))
+    nil)
+   :type 'llm-not-supported))
+
 (ert-deftest llm-test-ollama-embedding-capabilities ()
   ;; tests subject to change as models may get function calling
   (cl-flet ((has-emb (model)
