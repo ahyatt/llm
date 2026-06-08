@@ -31,6 +31,12 @@
 ;; - GEMINI_KEY: A Gemini API key.
 ;; - VERTEX_PROJECT: A Google Cloud Vertex project.
 ;; - OLLAMA_CHAT_MODELS: A list of Ollama models to test.
+;; - OLLAMA_AUDIO_MODELS: A comma-separated list of Ollama models to test with
+;;   audio input.
+;; - OPENAI_COMPATIBLE_URL: The base URL of an OpenAI-compatible API.
+;; - OPENAI_COMPATIBLE_KEY: The optional key for an OpenAI-compatible API.
+;; - OPENAI_COMPATIBLE_AUDIO_MODELS: A comma-separated list of
+;;   OpenAI-compatible models to test with audio input.
 ;; - DEEPSEEK_KEY: A DeepSeek API key.
 ;; - AZURE_URL: The URL of the Azure API.
 ;; - AZURE_KEY: The key for the Azure API.
@@ -162,6 +168,32 @@ else.  We really just want to see if it's in the right ballpark."
       (push (make-llm-openrouter :chat-model (split-string chat-models ", ")
                                  :embedding-model embedding-model
                                  :key key) providers))))
+
+(defun llm-integration-test-audio-providers ()
+  "Return providers explicitly configured for audio integration tests."
+  (let (providers)
+    (when (getenv "GEMINI_KEY")
+      (require 'llm-gemini)
+      (push (make-llm-gemini :key (getenv "GEMINI_KEY")
+                             :chat-model "gemini-3.1-flash-lite-preview")
+            providers))
+    (when (getenv "VERTEX_PROJECT")
+      (require 'llm-vertex)
+      (push (make-llm-vertex :project (getenv "VERTEX_PROJECT")) providers))
+    (when-let* ((models (getenv "OLLAMA_AUDIO_MODELS")))
+      (require 'llm-ollama)
+      (dolist (model (split-string models ", " t))
+        (push (make-llm-ollama :chat-model model) providers)))
+    (when-let* ((url (getenv "OPENAI_COMPATIBLE_URL"))
+                (models (getenv "OPENAI_COMPATIBLE_AUDIO_MODELS")))
+      (require 'llm-openai)
+      (dolist (model (split-string models ", " t))
+        (push (make-llm-openai-compatible
+               :url url
+               :key (getenv "OPENAI_COMPATIBLE_KEY")
+               :chat-model model)
+              providers)))
+    providers))
 
 (defun llm-integration-test--verify-prompt (prompt)
   "Make sure PROMPT is valid after a round trip through the provider."
@@ -466,6 +498,28 @@ else.  We really just want to see if it's in the right ballpark."
                       (make-llm-media :mime-type "image/jpeg" :data image-bytes))))))
       (should (stringp result))
       (should (llm-integration-test-string-eq "owl" (string-trim (downcase result)))))))
+
+(ert-deftest llm-audio-chat ()
+  (let ((audio-data
+         (with-temp-buffer
+           (set-buffer-multibyte nil)
+           (insert-file-contents-literally
+            (expand-file-name "test.wav" llm-integration-current-directory))
+           (buffer-string)))
+        (llm-warn-on-nonfree nil))
+    (dolist (provider (llm-integration-test-audio-providers))
+      (llm-integration-test-rate-limit provider)
+      (ert-info ((format "Using provider %s" (llm-name provider)))
+        (let ((result
+               (llm-chat
+                provider
+                (llm-make-chat-prompt
+                 (llm-make-multipart
+                  "Transcribe the single city name in this audio. Answer with one word."
+                  (make-llm-media :mime-type "audio/wav" :data audio-data))))))
+          (should (stringp result))
+          (should (llm-integration-test-string-eq
+                   "Paris" (string-trim result))))))))
 
 (llm-def-integration-test
   llm-pdf-chat (provider)

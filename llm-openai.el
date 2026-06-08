@@ -764,7 +764,7 @@ STREAMING if non-nil, turn on response streaming."
                                '(image-input reasoning))))))
 
 (cl-defmethod llm-capabilities ((provider llm-openai-compatible))
-  (append '(streaming model-list)
+  (append '(streaming model-list audio-input)
           (when (and (llm-openai-compatible-embedding-model provider)
                      (not (equal "unset" (llm-openai-compatible-embedding-model provider))))
             '(embeddings embeddings-batch))

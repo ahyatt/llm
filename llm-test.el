@@ -234,6 +234,23 @@
                                              [(:type "text" :text "What is this?")
                                               (:type "image" :source (:type "base64" :media_type "image/png" :data "aW1hZ2UgZGF0YQ=="))])]
                            :stream :false))
+    (:name "Request with audio"
+           :prompt (lambda () (llm-make-chat-prompt
+                               (llm-make-multipart
+                                "Transcribe this."
+                                (make-llm-media :mime-type "audio/wav"
+                                                :data "audio data"))))
+           :gemini (:contents
+                    [(:role
+                      "user"
+                      :parts [(:text "Transcribe this.")
+                              (:inline_data (:mime_type "audio/wav"
+                                                        :data "YXVkaW8gZGF0YQ=="))])])
+           :ollama (:model "model"
+                           :messages [(:role "user"
+                                             :content "Transcribe this."
+                                             :images ["YXVkaW8gZGF0YQ=="])]
+                           :stream :false))
     (:name "Request with tools"
            :prompt (lambda () (llm-make-chat-prompt
                                "Hello world"
@@ -337,7 +354,10 @@
 (ert-deftest llm-test-capabilities-openai-compatible ()
   (should-not (member 'tool-use (llm-capabilities (make-llm-openai-compatible :chat-model "llama-3"))))
   (should (member 'tool-use (llm-capabilities (make-llm-openai-compatible :chat-model "llama-3.1"))))
-  (should-not (member 'embeddings (llm-capabilities (make-llm-openai-compatible :chat-model "llama-3")))))
+  (should-not (member 'embeddings (llm-capabilities (make-llm-openai-compatible :chat-model "llama-3"))))
+  (should (member 'audio-input
+                  (llm-capabilities
+                   (make-llm-openai-compatible :chat-model "unknown")))))
 
 (ert-deftest llm-test-openai-compatible-audio-input ()
   (let ((request
@@ -419,10 +439,7 @@
 (ert-deftest llm-test-ollama-audio-input-capabilities ()
   (should (member 'audio-input
                   (llm-capabilities
-                   (make-llm-ollama :chat-model "gemma4:e4b"))))
-  (should-not (member 'audio-input
-                      (llm-capabilities
-                       (make-llm-ollama :chat-model "gemma3:latest")))))
+                   (make-llm-ollama :chat-model "unknown")))))
 
 (ert-deftest llm-test-ollama-audio-input ()
   (let ((request
