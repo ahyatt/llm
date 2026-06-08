@@ -461,16 +461,19 @@
         :model "gemma4:e4b"
         :stream :false)))))
 
-(ert-deftest llm-test-ollama-rejects-unsupported-audio-input ()
-  (should-error
-   (llm-provider-chat-request
-    (make-llm-ollama :chat-model "gemma4:e4b")
-    (llm-make-chat-prompt
-     (llm-make-multipart
-      "Transcribe this."
-      (make-llm-media :mime-type "audio/mpeg" :data "audio data")))
-    nil)
-   :type 'llm-not-supported))
+(ert-deftest llm-test-ollama-does-not-restrict-media-format ()
+  (let ((request
+         (llm-provider-chat-request
+          (make-llm-ollama :chat-model "gemma4:e4b")
+          (llm-make-chat-prompt
+           (llm-make-multipart
+            "Transcribe this."
+            (make-llm-media :mime-type "audio/mpeg" :data "audio data")))
+          nil)))
+    (should
+     (equal
+      (plist-get (aref (plist-get request :messages) 0) :images)
+      ["YXVkaW8gZGF0YQ=="]))))
 
 (ert-deftest llm-test-ollama-embedding-capabilities ()
   ;; tests subject to change as models may get function calling

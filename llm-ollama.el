@@ -150,12 +150,7 @@ PROVIDER is the llm-ollama provider."
 
 (defun llm-ollama--media-data (media)
   "Return base64-encoded MEDIA for an Ollama multimodal request."
-  (let ((mime-type (llm-media-mime-type media)))
-    (unless (or (string-prefix-p "image/" mime-type)
-                (member mime-type '("audio/wav" "audio/x-wav")))
-      (signal 'llm-not-supported
-              (list (format "Unsupported Ollama media type: %s" mime-type))))
-    (base64-encode-string (llm-media-data media) t)))
+  (base64-encode-string (llm-media-data media) t))
 
 (cl-defmethod llm-provider-chat-request ((provider llm-ollama) prompt streaming)
   (llm-provider-utils-combine-to-system-prompt prompt llm-ollama-example-prelude)
