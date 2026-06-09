@@ -357,7 +357,16 @@
   (should-not (member 'embeddings (llm-capabilities (make-llm-openai-compatible :chat-model "llama-3"))))
   (should (member 'audio-input
                   (llm-capabilities
-                   (make-llm-openai-compatible :chat-model "unknown")))))
+                   (make-llm-openai-compatible
+                    :chat-model "gemma-4-E4B-it-MLX-8bit"))))
+  (should (member 'audio-input
+                  (llm-capabilities
+                   (make-llm-openai-compatible
+                    :chat-model "gemma-4-12B-it-8bit"))))
+  (should-not (member 'audio-input
+                      (llm-capabilities
+                       (make-llm-openai-compatible
+                        :chat-model "gemma-4-26b-a4b-it-4bit")))))
 
 (ert-deftest llm-test-openai-compatible-audio-input ()
   (let ((request
@@ -389,6 +398,27 @@
       (make-llm-media :mime-type "audio/flac" :data "audio data")))
     nil)
    :type 'llm-not-supported))
+
+(ert-deftest llm-test-openai-compatible-streaming-content-and-reasoning ()
+  (let* (outputs
+         (handler
+          (cdr
+           (llm-provider-streaming-media-handler
+            (make-llm-openai-compatible :chat-model "model")
+            (lambda (output) (push output outputs))
+            #'ignore)))
+         (message-handler (alist-get 'message
+                                     (oref handler events))))
+    (funcall message-handler
+             (plz-event-source-event
+              :data "{\"choices\":[{\"delta\":{\"reasoning_content\":\"Think\"}}]}"))
+    (funcall message-handler
+             (plz-event-source-event
+              :data "{\"choices\":[{\"delta\":{\"content\":\"Answer\"}}]}"))
+    (should
+     (equal (nreverse outputs)
+            '((:reasoning "Think")
+              (:text "Answer"))))))
 
 (ert-deftest llm-test-chat-token-limit-gemini ()
   (should (= 1048576 (llm-chat-token-limit (make-llm-gemini))))
@@ -439,7 +469,13 @@
 (ert-deftest llm-test-ollama-audio-input-capabilities ()
   (should (member 'audio-input
                   (llm-capabilities
-                   (make-llm-ollama :chat-model "unknown")))))
+                   (make-llm-ollama :chat-model "gemma4:e4b"))))
+  (should (member 'audio-input
+                  (llm-capabilities
+                   (make-llm-ollama :chat-model "gemma4:12b"))))
+  (should-not (member 'audio-input
+                      (llm-capabilities
+                       (make-llm-ollama :chat-model "gemma4:26b")))))
 
 (ert-deftest llm-test-ollama-audio-input ()
   (let ((request

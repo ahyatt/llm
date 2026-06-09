@@ -357,8 +357,14 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 128000
     :regex "gemma-?3")
    (make-llm-model
+    :name "Gemma 4 Audio" :symbol 'gemma-4-audio
+    :capabilities '(generation free-software tool-use audio-input video-input
+                               reasoning)  ;; Apache license
+    :context-length 128000
+    :regex (rx "gemma" (opt "-") "4" (* nonl) (or "e2b" "e4b" "12b")))
+   (make-llm-model
     :name "Gemma 4" :symbol 'gemma-4
-    :capabilities '(generation free-software tool-use audio-input video-input reasoning)  ;; Apache license
+    :capabilities '(generation free-software tool-use video-input reasoning)  ;; Apache license
     :context-length 128000
     :regex "gemma-?4")
    (make-llm-model

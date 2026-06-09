@@ -305,7 +305,7 @@ PROVIDER is the llm-ollama provider."
                                         2048))
 
 (cl-defmethod llm-capabilities ((provider llm-ollama))
-  (append '(streaming json-response model-list audio-input)
+  (append '(streaming json-response model-list)
           (when (and (llm-ollama-embedding-model provider)
                      (let ((embedding-model (llm-models-match
                                              (llm-ollama-embedding-model provider))))
@@ -317,7 +317,7 @@ PROVIDER is the llm-ollama provider."
                       (capabilities (llm-model-capabilities chat-model)))
             (append
              (when (member 'tool-use capabilities) '(tool-use streaming-tool-use))
-             (seq-intersection capabilities '(image-input))))))
+             (seq-intersection capabilities '(image-input audio-input))))))
 
 (cl-defmethod llm-models ((provider llm-ollama))
   (mapcar (lambda (model-data)

@@ -678,9 +678,9 @@ STREAMING if non-nil, turn on response streaming."
 												 (or (assoc-default 'reasoning delta)
 													 (assoc-default 'reasoning_content delta)))))
 								 (when-let* ((output (append
-													  (unless (string-empty-p reasoning) `(:text ,text))
+													  (when text `(:text ,text))
 													  (when tool-calls `(:tool-uses-raw ,tool-calls))
-													  (unless (string-empty-p reasoning) `(:reasoning ,reasoning)))))
+													  (when reasoning `(:reasoning ,reasoning)))))
 								   (funcall receiver output))))
                              (when-let* ((usage (assoc-default 'usage response-alist)))
                                (when (not (eq usage :null))
@@ -764,7 +764,7 @@ STREAMING if non-nil, turn on response streaming."
                                '(image-input reasoning))))))
 
 (cl-defmethod llm-capabilities ((provider llm-openai-compatible))
-  (append '(streaming model-list audio-input)
+  (append '(streaming model-list)
           (when (and (llm-openai-compatible-embedding-model provider)
                      (not (equal "unset" (llm-openai-compatible-embedding-model provider))))
             '(embeddings embeddings-batch))
