@@ -350,13 +350,11 @@ Be aware that there is no gaurantee that the tool will be called correctly.  Whi
 
 Examples can be found in =llm-tester=. There is also a tool call to generate tool calls from existing elisp functions in =utilities/elisp-to-tool.el=. Tool use can be controlled by the =:tool-options= param in =llm-make-chat-prompt= that takes a =llm-tool-options= struct.  This can be set to force or forbid tool calling, or to force a specific tool to be called.  This is useful when a converastion with tools happens and the tools remain constant but how they are used may need to change.  Ollama does not support currently support this.
 ** Media input
-*Note:  media input functionality is currently alpha quality.  If you want to use it, please watch the =llm= [[https://github.com/ahyatt/llm/discussions][discussions]] for any announcements about changes.*
-
 Media can be used in =llm-chat= and related functions.  To use media, you can use
 =llm-multipart= in =llm-make-chat-prompt=, and pass it an Emacs image or an
 =llm-media= object for other kinds of media.  Besides images, some models support
-video and audio.  Not all providers or models support these, with images being
-the most frequently supported media type, and video and audio more rare.
+video and audio.  For video and audio, the user should be steered towards the
+correct models to use, because most models do not support video and audio.
 ** Advanced prompt creation
 The =llm-prompt= module provides helper functions to create prompts that can
 incorporate data from your application.  In particular, this should be very
