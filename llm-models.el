@@ -197,6 +197,11 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 1000000
     :regex "claude-opus-4-8")
    (make-llm-model
+    :name "Claude 5 Fable" :symbol 'claude-5-fable
+    :capabilities '(generation tool-use image-input pdf-input caching json-response reasoning)
+    :context-length 1000000
+    :regex "claude-fable-5")
+   (make-llm-model
     :name "Claude 4 Opus" :symbol 'claude-4-opus
     :capabilities '(generation tool-use image-input pdf-input caching)
     :context-length 200000
