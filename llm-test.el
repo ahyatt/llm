@@ -370,14 +370,14 @@
 
 (ert-deftest llm-test-openai-compatible-audio-input ()
   (let ((request
-         (llm-provider-chat-request
-          (make-llm-openai-compatible :chat-model "model")
-          (llm-make-chat-prompt
-           (llm-make-multipart
-            "Transcribe this."
-            (make-llm-media :mime-type "audio/wav"
-                            :data "audio data")))
-          nil)))
+          (llm-provider-chat-request
+           (make-llm-openai-compatible :chat-model "model")
+           (llm-make-chat-prompt
+            (llm-make-multipart
+             "Transcribe this."
+             (make-llm-media :mime-type "audio/wav"
+                             :data "audio data")))
+           nil)))
     (should
      (equal
       (plist-get request :messages)
@@ -479,33 +479,34 @@
 
 (ert-deftest llm-test-ollama-audio-input ()
   (let ((request
-         (llm-provider-chat-request
-          (make-llm-ollama :chat-model "gemma4:e4b")
-          (llm-make-chat-prompt
-           (llm-make-multipart
-            "Transcribe this."
-            (make-llm-media :mime-type "audio/wav"
-                            :data "audio data")))
-          nil)))
+          (llm-provider-chat-request
+           (make-llm-ollama :chat-model "gemma4:e4b")
+           (llm-make-chat-prompt
+            (llm-make-multipart
+             "Transcribe this."
+             (make-llm-media :mime-type "audio/wav"
+                             :data "audio data")))
+           nil)))
     (should
      (equal
       request
       '(:messages
         [(:role "user"
                 :content "Transcribe this."
+                ;; This really is how Ollama expects audio data to be sent.
                 :images ["YXVkaW8gZGF0YQ=="])]
         :model "gemma4:e4b"
         :stream :false)))))
 
 (ert-deftest llm-test-ollama-does-not-restrict-media-format ()
   (let ((request
-         (llm-provider-chat-request
-          (make-llm-ollama :chat-model "gemma4:e4b")
-          (llm-make-chat-prompt
-           (llm-make-multipart
-            "Transcribe this."
-            (make-llm-media :mime-type "audio/mpeg" :data "audio data")))
-          nil)))
+          (llm-provider-chat-request
+           (make-llm-ollama :chat-model "gemma4:e4b")
+           (llm-make-chat-prompt
+            (llm-make-multipart
+             "Transcribe this."
+             (make-llm-media :mime-type "audio/mpeg" :data "audio data")))
+           nil)))
     (should
      (equal
       (plist-get (aref (plist-get request :messages) 0) :images)

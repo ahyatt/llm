@@ -156,6 +156,10 @@ else.  We really just want to see if it's in the right ballpark."
       ;; This variable is a list of models to test.
       (dolist (model (split-string (getenv "OLLAMA_CHAT_MODELS") ", "))
         (push (make-llm-ollama :chat-model model) providers)))
+    (when-let* ((url (getenv "OPENAI_COMPATIBLE_URL")))
+      (require 'llm-openai)
+      (push (make-llm-openai-compatible
+             :url url :key (getenv "OPENAI_COMPATIBLE_KEY"))))
     (when-let* ((chat-models (getenv "OPENROUTER_CHAT_MODELS"))
                 (embedding-model (getenv "OPENROUTER_EMBEDDING_MODEL"))
                 (key (getenv "OPENROUTER_API_KEY")))

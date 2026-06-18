@@ -199,6 +199,7 @@ PROVIDER is the llm-ollama provider."
                                                         part)))
                                             (t (llm-provider-utils-json-serialize content))))
                                         (when media
+                                          ;; For now, Ollama expects all media in the `:images' field.
                                           `(:images
                                             ,(vconcat
                                               (mapcar #'llm-ollama--media-data
