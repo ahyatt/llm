@@ -159,7 +159,7 @@ else.  We really just want to see if it's in the right ballpark."
     (when-let* ((url (getenv "OPENAI_COMPATIBLE_URL")))
       (require 'llm-openai)
       (push (make-llm-openai-compatible
-             :url url :key (getenv "OPENAI_COMPATIBLE_KEY"))))
+             :url url :key (getenv "OPENAI_COMPATIBLE_KEY")) providers))
     (when-let* ((chat-models (getenv "OPENROUTER_CHAT_MODELS"))
                 (embedding-model (getenv "OPENROUTER_EMBEDDING_MODEL"))
                 (key (getenv "OPENROUTER_API_KEY")))
