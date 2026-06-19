@@ -234,6 +234,23 @@
                                              [(:type "text" :text "What is this?")
                                               (:type "image" :source (:type "base64" :media_type "image/png" :data "aW1hZ2UgZGF0YQ=="))])]
                            :stream :false))
+    (:name "Request with audio"
+           :prompt (lambda () (llm-make-chat-prompt
+                               (llm-make-multipart
+                                "Transcribe this."
+                                (make-llm-media :mime-type "audio/wav"
+                                                :data "audio data"))))
+           :gemini (:contents
+                    [(:role
+                      "user"
+                      :parts [(:text "Transcribe this.")
+                              (:inline_data (:mime_type "audio/wav"
+                                                        :data "YXVkaW8gZGF0YQ=="))])])
+           :ollama (:model "model"
+                           :messages [(:role "user"
+                                             :content "Transcribe this."
+                                             :images ["YXVkaW8gZGF0YQ=="])]
+                           :stream :false))
     (:name "Request with tools"
            :prompt (lambda () (llm-make-chat-prompt
                                "Hello world"
@@ -337,7 +354,71 @@
 (ert-deftest llm-test-capabilities-openai-compatible ()
   (should-not (member 'tool-use (llm-capabilities (make-llm-openai-compatible :chat-model "llama-3"))))
   (should (member 'tool-use (llm-capabilities (make-llm-openai-compatible :chat-model "llama-3.1"))))
-  (should-not (member 'embeddings (llm-capabilities (make-llm-openai-compatible :chat-model "llama-3")))))
+  (should-not (member 'embeddings (llm-capabilities (make-llm-openai-compatible :chat-model "llama-3"))))
+  (should (member 'audio-input
+                  (llm-capabilities
+                   (make-llm-openai-compatible
+                    :chat-model "gemma-4-E4B-it-MLX-8bit"))))
+  (should (member 'audio-input
+                  (llm-capabilities
+                   (make-llm-openai-compatible
+                    :chat-model "gemma-4-12B-it-8bit"))))
+  (should-not (member 'audio-input
+                      (llm-capabilities
+                       (make-llm-openai-compatible
+                        :chat-model "gemma-4-26b-a4b-it-4bit")))))
+
+(ert-deftest llm-test-openai-compatible-audio-input ()
+  (let ((request
+          (llm-provider-chat-request
+           (make-llm-openai-compatible :chat-model "model")
+           (llm-make-chat-prompt
+            (llm-make-multipart
+             "Transcribe this."
+             (make-llm-media :mime-type "audio/wav"
+                             :data "audio data")))
+           nil)))
+    (should
+     (equal
+      (plist-get request :messages)
+      [(:role "user"
+              :content
+              [(:type "text" :text "Transcribe this.")
+               (:type "input_audio"
+                      :input_audio
+                      (:data "YXVkaW8gZGF0YQ==" :format "wav"))])]))))
+
+(ert-deftest llm-test-openai-compatible-rejects-unsupported-audio-input ()
+  (should-error
+   (llm-provider-chat-request
+    (make-llm-openai-compatible :chat-model "model")
+    (llm-make-chat-prompt
+     (llm-make-multipart
+      "Transcribe this."
+      (make-llm-media :mime-type "audio/flac" :data "audio data")))
+    nil)
+   :type 'llm-not-supported))
+
+(ert-deftest llm-test-openai-compatible-streaming-content-and-reasoning ()
+  (let* (outputs
+         (handler
+          (cdr
+           (llm-provider-streaming-media-handler
+            (make-llm-openai-compatible :chat-model "model")
+            (lambda (output) (push output outputs))
+            #'ignore)))
+         (message-handler (alist-get 'message
+                                     (oref handler events))))
+    (funcall message-handler
+             (plz-event-source-event
+              :data "{\"choices\":[{\"delta\":{\"reasoning_content\":\"Think\"}}]}"))
+    (funcall message-handler
+             (plz-event-source-event
+              :data "{\"choices\":[{\"delta\":{\"content\":\"Answer\"}}]}"))
+    (should
+     (equal (nreverse outputs)
+            '((:reasoning "Think")
+              (:text "Answer"))))))
 
 (ert-deftest llm-test-chat-token-limit-gemini ()
   (should (= 1048576 (llm-chat-token-limit (make-llm-gemini))))
@@ -384,6 +465,52 @@
     (should-not (has-fc "llama2"))
     (should-not (has-fc "llama"))
     (should-not (has-fc "unknown"))))
+
+(ert-deftest llm-test-ollama-audio-input-capabilities ()
+  (should (member 'audio-input
+                  (llm-capabilities
+                   (make-llm-ollama :chat-model "gemma4:e4b"))))
+  (should (member 'audio-input
+                  (llm-capabilities
+                   (make-llm-ollama :chat-model "gemma4:12b"))))
+  (should-not (member 'audio-input
+                      (llm-capabilities
+                       (make-llm-ollama :chat-model "gemma4:26b")))))
+
+(ert-deftest llm-test-ollama-audio-input ()
+  (let ((request
+          (llm-provider-chat-request
+           (make-llm-ollama :chat-model "gemma4:e4b")
+           (llm-make-chat-prompt
+            (llm-make-multipart
+             "Transcribe this."
+             (make-llm-media :mime-type "audio/wav"
+                             :data "audio data")))
+           nil)))
+    (should
+     (equal
+      request
+      '(:messages
+        [(:role "user"
+                :content "Transcribe this."
+                ;; This really is how Ollama expects audio data to be sent.
+                :images ["YXVkaW8gZGF0YQ=="])]
+        :model "gemma4:e4b"
+        :stream :false)))))
+
+(ert-deftest llm-test-ollama-does-not-restrict-media-format ()
+  (let ((request
+          (llm-provider-chat-request
+           (make-llm-ollama :chat-model "gemma4:e4b")
+           (llm-make-chat-prompt
+            (llm-make-multipart
+             "Transcribe this."
+             (make-llm-media :mime-type "audio/mpeg" :data "audio data")))
+           nil)))
+    (should
+     (equal
+      (plist-get (aref (plist-get request :messages) 0) :images)
+      ["YXVkaW8gZGF0YQ=="]))))
 
 (ert-deftest llm-test-ollama-embedding-capabilities ()
   ;; tests subject to change as models may get function calling

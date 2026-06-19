@@ -148,6 +148,10 @@ PROVIDER is the llm-ollama provider."
       :json
     (llm-provider-utils-convert-to-serializable format)))
 
+(defun llm-ollama--media-data (media)
+  "Return base64-encoded MEDIA for an Ollama multimodal request."
+  (base64-encode-string (llm-media-data media) t))
+
 (cl-defmethod llm-provider-chat-request ((provider llm-ollama) prompt streaming)
   (llm-provider-utils-combine-to-system-prompt prompt llm-ollama-example-prelude)
   (let (request-plist messages options)
@@ -158,7 +162,7 @@ PROVIDER is the llm-ollama provider."
                                     (tool-results (llm-chat-prompt-interaction-tool-results interaction))
                                     (tool-call-p (and (listp content)
                                                       (llm-provider-utils-tool-use-p (car content))))
-                                    (images nil))
+                                    (media nil))
                                ;; Tool results expand to one tool line per
                                ;; result, so multiple lines per this
                                ;; interaction.
@@ -188,16 +192,18 @@ PROVIDER is the llm-ollama provider."
                                             ((llm-multipart-p content)
                                              (cl-loop for part in (llm-multipart-parts content) do
                                                       (when (llm-media-p part)
-                                                        (setq images (append images (list part))))
+                                                        (setq media (append media (list part))))
                                                       concat
                                                       (if (llm-media-p part)
                                                           ""
                                                         part)))
                                             (t (llm-provider-utils-json-serialize content))))
-                                        (when images
+                                        (when media
+                                          ;; For now, Ollama expects all media in the `:images' field.
                                           `(:images
-                                            ,(vconcat (mapcar (lambda (img) (base64-encode-string (llm-media-data img) t))
-                                                              images)))))))))
+                                            ,(vconcat
+                                              (mapcar #'llm-ollama--media-data
+                                                      media)))))))))
                            (llm-chat-prompt-interactions prompt))))
     (setq request-plist (plist-put request-plist :messages messages))
     (setq request-plist (plist-put request-plist :model (llm-ollama-chat-model provider)))
@@ -312,7 +318,7 @@ PROVIDER is the llm-ollama provider."
                       (capabilities (llm-model-capabilities chat-model)))
             (append
              (when (member 'tool-use capabilities) '(tool-use streaming-tool-use))
-             (seq-intersection capabilities '(image-input))))))
+             (seq-intersection capabilities '(image-input audio-input))))))
 
 (cl-defmethod llm-models ((provider llm-ollama))
   (mapcar (lambda (model-data)
