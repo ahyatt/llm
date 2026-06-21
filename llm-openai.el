@@ -265,9 +265,11 @@ PROVIDER is the Open AI provider struct."
   (when (llm-chat-prompt-max-tokens prompt)
     (list :max_tokens (llm-chat-prompt-max-tokens prompt))))
 
-(defun llm-openai--responses-api-build-response-format (prompt)
+(defun llm-openai--responses-api-build-response-format (provider prompt)
   "Build the response_format field if present in PROMPT."
-  (when (llm-chat-prompt-response-format prompt)
+  (when (and
+         (member 'json-response (llm-capabilities provider))
+         (llm-chat-prompt-response-format prompt))
     (list :text
           (list :format
                 (llm-openai--responses-api-response-format (llm-chat-prompt-response-format prompt))))))

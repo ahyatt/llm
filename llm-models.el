@@ -31,7 +31,7 @@ NAME is the name of the model, appropriate for showing a user.
 CAPABILITIES is a list of symbols representing the capabilities of the
 model, one of `embedding', `generation', `tool-use',
 `image-input', `image-output', `audio-input', `video-input', 'pdf-input',
-`caching' and `free-software'.
+`json-response', `caching' and `free-software'.
 
 REGEX is a regular expression that can be used to identify the model, uniquely (it shouldn't conflict with any other model)"
   name
@@ -399,12 +399,12 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :regex "deepseek-v4-flash")
    (make-llm-model
     :name "Mistral" :symbol 'mistral
-    :capabilities '(generation tool-use free-software)  ;; Apache license
+    :capabilities '(generation tool-use json-response free-software)  ;; Apache license
     :context-length 8192
     :regex "mistral")
    (make-llm-model
     :name "Mistral Medium 3.5" :symbol 'mistral-medium-3.5
-    :capabilities '(generation tool-use free-software image-input reasoning)  ;; Modified MIT license
+    :capabilities '(generation tool-use json-response free-software image-input reasoning)  ;; Modified MIT license
     :context-length 256000
     :regex "mistral-medium-3\\.5")
    (make-llm-model
@@ -459,37 +459,37 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :regex "lfm2")
    (make-llm-model
     :name "Nemotron 3 Ultra" :symbol 'nemotron-3-ultra
-    :capabilities '(generation tool-use free-software image-input audio-input reasoning)  ;; Apache license
+    :capabilities '(generation tool-use json-response free-software image-input audio-input reasoning)  ;; Apache license
     :context-length 1000000
     :regex "nemotron-3-ultra")
    (make-llm-model
     :name "Qwen 2.5" :symbol 'qwen-2.5
-    :capabilities '(generation tool-use)  ;; Apache license for some variations only
+    :capabilities '(generation tool-use json-response)  ;; Apache license for some variations only
     :context-length 128000
     :regex "qwen-?2\\.5")
    (make-llm-model
     :name "Qwen 3.5" :symbol 'qwen-3.5
-    :capabilities '(generation tool-use free-software reasoning)  ;; Apache 2 license
+    :capabilities '(generation tool-use json-response free-software reasoning)  ;; Apache 2 license
     :context-length 256000
     :regex "qwen-?3\\.5")
    (make-llm-model
     :name "Qwen 3.6" :symbol 'qwen-3.6
-    :capabilities '(generation tool-use free-software image-input reasoning) ;; Apache 2 license
+    :capabilities '(generation tool-use json-response free-software image-input reasoning) ;; Apache 2 license
     :context-length 1000000
     :regex "qwen-?3\\.6")
    (make-llm-model
     :name "Qwen 3.7" :symbol 'qwen-3.7
-    :capabilities '(generation tool-use free-software image-input reasoning) ;; Apache 2 license
+    :capabilities '(generation tool-use json-response free-software image-input reasoning) ;; Apache 2 license
     :context-length 1000000
     :regex "qwen-?3\\.7")
    (make-llm-model
     :name "Qwen 3 Coder Next" :symbol 'qwen-3-coder-next
-    :capabilities '(generation tool-use free-software)  ;; Apache 2 license
+    :capabilities '(generation tool-use json-response free-software)  ;; Apache 2 license
     :context-length 256000
     :regex "qwen-?3-coder-next")
    (make-llm-model
     :name "Qwen 3" :symbol 'qwen-3
-    :capabilities '(generation tool-use)  ;; Apache license for some variations only
+    :capabilities '(generation tool-use json-response)  ;; Apache license for some variations only
     :context-length 32000
     :regex "qwen-?3")
    (make-llm-model
@@ -504,22 +504,22 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :regex "bge-m3")
    (make-llm-model
     :name "gpt-oss" :symbol 'gpt-oss
-    :capabilities '(generation free-software reasoning tool-use) ; Apache license
+    :capabilities '(generation free-software reasoning tool-use json-response) ;; Apache license
     :context-length 128000
     :regex "gpt-oss")
    (make-llm-model
     :name "Kimi K2.5" :symbol 'kimi-k2.5
-    :capabilities '(generation free-software reasoning tool-use) ; Modified MIT license
+    :capabilities '(generation free-software reasoning tool-use json-response) ;; Modified MIT license
     :context-length 256000
     :regex "kimi-k2\\.5")
    (make-llm-model
     :name "Kimi K2.6" :symbol 'kimi-k2.6
-    :capabilities '(generation free-software reasoning tool-use) ; Modified MIT license
+    :capabilities '(generation free-software reasoning tool-use json-response) ;; Modified MIT license
     :context-length 256000
     :regex "kimi-k2\\.6")
    (make-llm-model
     :name "StepFun 3.7 Flash" :symbol 'stepfun-3.7-flash
-    :capabilities '(generation reasoning tool-use)
+    :capabilities '(generation reasoning tool-use json-response)
     :context-length 256000
     :regex "step-3.7-flash")
    (make-llm-model
@@ -529,7 +529,7 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :regex "step-3.5-flash")
    (make-llm-model
     :name "glm-5" :symbol 'glm-5
-    :capabilities '(generation free-software reasoning tool-use) ; Apache license
+    :capabilities '(generation free-software reasoning tool-use json-response) ;; Apache license
     :context-length 200000
     :regex "glm-5")))
 
