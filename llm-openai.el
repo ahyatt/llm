@@ -267,14 +267,19 @@ PROVIDER is the Open AI provider struct."
 
 (defun llm-openai--responses-api-build-response-format (prompt)
   "Build the response_format field if present in PROMPT."
-  (when (llm-chat-prompt-response-format prompt)
+  (when (and
+         (llm-chat-prompt-response-format prompt))
     (list :text
           (list :format
                 (llm-openai--responses-api-response-format (llm-chat-prompt-response-format prompt))))))
 
-(defun llm-openai--build-response-format (prompt)
-  "Build the response_format field if present in PROMPT."
-  (when (llm-chat-prompt-response-format prompt)
+(defun llm-openai--build-response-format (provider prompt)
+  "Build the response_format field if present in PROMPT.
+
+PROVIDER is the provider, which, if the model doesn't support this, will
+not add any configuration."
+  (when (and (member 'json-response (llm-capabilities provider))
+             (llm-chat-prompt-response-format prompt))
     (list :response_format
           (llm-openai--response-format (llm-chat-prompt-response-format prompt)))))
 
@@ -573,7 +578,7 @@ STREAMING if non-nil, turn on response streaming."
            (llm-openai--build-reasoning provider prompt)
            (llm-openai--build-temperature prompt)
            (llm-openai--build-max-tokens prompt)
-           (llm-openai--build-response-format prompt)
+           (llm-openai--build-response-format provider prompt)
            (llm-openai--build-tools prompt)
            (llm-openai--build-tool-choice prompt)
            (llm-openai--build-messages prompt)))
