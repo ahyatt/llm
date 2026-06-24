@@ -2,6 +2,7 @@
 - Fixed Audio API support for Open AI-compatible providers and Ollama providers by [[https://github.com/s-kostyaev][Sergey Kostyaev]]. 
 - Added Claude Opus 4.8, StepFun 3.7 Flash, and Claude Fable 5
 - Don't send json format when unsupported; add =json-response= to more models that support it.
+- Fix OpenAI compatible names
 * Version 0.31.0
 - Switch Open AI to Responses API, for more functionality
 - Keep reasoning information between turns for improved performance in tool calling for Open AI and Claude (Gemini does this already).

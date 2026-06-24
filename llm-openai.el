@@ -755,7 +755,9 @@ STREAMING if non-nil, turn on response streaming."
 
 (cl-defmethod llm-name ((provider llm-openai-compatible))
   "Return the name of the `llm-openai-compatible' PROVIDER."
-  (or (llm-openai-compatible-chat-model provider)
+  (or (when-let* ((model-id (llm-openai-primary-chat-model provider))
+                  (model (llm-models-match model-id)))
+        (llm-model-name model))
       "Open AI Compatible"))
 
 (cl-defmethod llm-chat-token-limit ((provider llm-openai))
