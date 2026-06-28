@@ -62,11 +62,14 @@ RESPONSE can be nil if the response is complete."
            (usage (assoc-default 'usage response))
            (delta (when (> (length choices) 0)
                     (assoc-default 'delta (aref choices 0))))
+           (tool-calls (llm-provider-utils-json-val
+                        (assoc-default 'tool_calls delta)))
            (content (llm-provider-utils-json-val
                      (assoc-default 'content delta)))
            (reasoning (llm-provider-utils-json-val
                        (assoc-default 'reasoning_content delta))))
       (append (when content (list :text content))
+              (when tool-calls `(:tool-uses-raw ,tool-calls))
               (when reasoning (list :reasoning reasoning))
               (when (and usage (not (eq usage :null)))
                 (list :input-tokens (assoc-default 'prompt_tokens usage)
