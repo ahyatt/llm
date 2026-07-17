@@ -518,6 +518,11 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 256000
     :regex "kimi-k2\\.6")
    (make-llm-model
+    :name "Kimi K3" :symbol 'kimi-k3
+    :capabilities '(generation free-software reasoning tool-use json-response) ;; Modified MIT license
+    :context-length 1000000
+    :regex "kimi-k3")
+   (make-llm-model
     :name "StepFun 3.7 Flash" :symbol 'stepfun-3.7-flash
     :capabilities '(generation reasoning tool-use json-response)
     :context-length 256000

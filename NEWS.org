@@ -1,3 +1,5 @@
+* Version 0.31.3
+- Added Kimi K3.
 * Version 0.31.2
 - Fixed Deepseek streaming tool calling, by [[https://github.com/isamert][İsa Mert Gürbüz]].
 * Version 0.31.1
