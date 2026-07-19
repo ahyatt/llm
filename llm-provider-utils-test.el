@@ -337,5 +337,28 @@
      (should (equal type 'llm-tool-missing-argument))
      (should (stringp msg)))))
 
+(ert-deftest llm-provider-utils-execute-tool-uses--missing-optional-arg ()
+  (llm-provider-utils-execute-tool-uses
+   (make-llm-testing-provider)
+   (llm-make-chat-prompt
+    ""
+    :tools (list
+            (llm-make-tool
+             :name "tool-a"
+             :description "Tool A"
+             :function (lambda (&rest args) "Result A")
+             :args '((:name "arg1" :type string :description "Argument 1" :optional t)))))
+   (list
+    (make-llm-provider-utils-tool-use
+     :id "1"
+     :name "tool-a"
+     :args '()))
+   nil
+   nil
+   #'ignore
+   (lambda (type msg)
+     (ert-fail (format "Should not error: %s %s" type msg)))))
+
+
 (provide 'llm-provider-utils-test)
 ;;; llm-provider-utils-test.el ends here
