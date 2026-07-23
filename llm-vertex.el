@@ -315,8 +315,8 @@ information than standard tool use."
 
 (defun llm-vertex--supports-temperature (model)
   "Return non-nil if MODEL symbol supports temperature parameter."
-  (member model '(gemini-3-5-flash-lite
-                  gemini-3-6-flash)))
+  (not (member model '(gemini-3-5-flash-lite
+                       gemini-3-6-flash))))
 
 (defun llm-vertex--chat-parameters (prompt model)
   "From PROMPT, create the parameters section.
