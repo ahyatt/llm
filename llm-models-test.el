@@ -27,9 +27,10 @@
   ;; It shouldn't be the case that things match because they are first.  So we
   ;; will test various model names against the models and reverse the order of
   ;; the models to ensure that the first match is the unique match.
-  (let ((models-names-to-test '("gpt-4" "gpt-4o" "gpt-5" "gpt-5-chat"
-                                "gemini-1.5-flash" "llama-3" "llama-3.1"
-                                "llama3" "llama3.1" "gemini-2.0-flash-thinking")))
+  (let ((models-names-to-test '("llama3" "gemini-3.5-flash"
+                                "gemma3" "qwen-3.7" "kimi-k3"
+                                "gpt-5.5" "claude-opus-4-8"
+                                "claude-fable-5" "deepseek-r1")))
     (dolist (model-name models-names-to-test)
       (let ((model-forward (llm-models-match model-name))
             (model-reverse (let ((llm-models (reverse llm-models)))

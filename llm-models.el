@@ -287,7 +287,7 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :capabilities '(generation tool-use image-input audio-input video-input json-response
                                pdf-input caching reasoning)
     :context-length 1048576
-    :regex "gemini-3\\.5-flash")
+    :regex "gemini-3\\.5-flash$")
    (make-llm-model
     :name "Gemini 3.6 Flash"
     :capabilities '(generation tool-use image-input audio-input video-input json-response
@@ -482,7 +482,7 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :name "Qwen 3" :symbol 'qwen-3
     :capabilities '(generation tool-use json-response)  ;; Apache license for some variations only
     :context-length 32000
-    :regex "qwen-?3")
+    :regex "qwen-?3$")
    (make-llm-model
     :name "Nemotron Mini" :symbol 'nemotron-mini
     :capabilities '(generation tool-use)
