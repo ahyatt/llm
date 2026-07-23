@@ -313,6 +313,11 @@ information than standard tool use."
                                            (llm-model-symbol model)
                                          'unknown))))
 
+(defun llm-vertex--supports-temperature (model)
+  "Return non-nil if MODEL symbol supports temperature parameter."
+  (member model '(gemini-3-5-flash-lite
+                  gemini-3-6-flash)))
+
 (defun llm-vertex--chat-parameters (prompt model)
   "From PROMPT, create the parameters section.
 Return value is a cons for adding to an alist, unless there is nothing
@@ -320,8 +325,10 @@ to add, in which case it is nil.  MODEL is the symbol of the model used,
 which is necessary to properly set some paremeters."
   (let ((params-plist (llm-provider-utils-non-standard-params-plist prompt)))
     (when (llm-chat-prompt-temperature prompt)
-      (setq params-plist (plist-put params-plist :temperature
-                                    (* (llm-chat-prompt-temperature prompt) 2.0))))
+      (if (llm-vertex--supports-temperature model)
+          (setq params-plist (plist-put params-plist :temperature
+                                        (* (llm-chat-prompt-temperature prompt) 2.0)))
+        (lwarn 'llm :warning "Temperature parameter is not supported for model %s.  Ignoring temperature setting." model)))
     (when (llm-chat-prompt-max-tokens prompt)
       (setq params-plist (plist-put params-plist :maxOutputTokens
                                     (llm-chat-prompt-max-tokens prompt))))
