@@ -1,6 +1,6 @@
 ;;; llm-claude.el --- llm module for integrating with Claude -*- lexical-binding: t; package-lint-main-file: "llm.el"; -*-
 
-;; Copyright (c) 2024-2025  Free Software Foundation, Inc.
+;; Copyright (c) 2024-2026  Free Software Foundation, Inc.
 
 ;; Author: Andrew Hyatt <ahyatt@gmail.com>
 ;; Homepage: https://github.com/ahyatt/llm
@@ -39,7 +39,7 @@
                                    default-chat-max-tokens
                                    default-chat-non-standard-params
                                    ((:key raw-key))
-                                   (chat-model "claude-sonnet-4-6")
+                                   (chat-model "claude-sonnet-5")
                                    &aux
                                    (key (llm-provider-utils--wrap-key raw-key)))))
   (key nil :read-only t)

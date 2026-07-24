@@ -167,6 +167,16 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 200000
     :regex "claude-haiku-4-5")
    (make-llm-model
+    :name "Claude 5 Opus" :symbol 'claude-5-opus
+    :capabilities '(generation tool-use image-input pdf-input caching json-response reasoning)
+    :context-length 1000000
+    :regex "claude-opus-5")
+   (make-llm-model
+    :name "Claude 5 Sonnet" :symbol 'claude-5-sonnet
+    :capabilities '(generation tool-use image-input pdf-input caching json-response reasoning)
+    :context-length 1000000
+    :regex "claude-sonnet-5")
+   (make-llm-model
     :name "Claude 4.5 Opus" :symbol 'claude-4-5-opus
     :capabilities '(generation tool-use image-input pdf-input caching json-response reasoning)
     :context-length 200000
@@ -211,31 +221,6 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :capabilities '(generation tool-use image-input pdf-input caching)
     :context-length 200000
     :regex "claude-sonnet-4-0")
-   (make-llm-model
-    :name "Claude 3.7 Sonnet" :symbol 'claude-3.7-sonnet
-    :capabilities '(generation tool-use image-input pdf-input caching)
-    :context-length 200000
-    :regex "claude-3-7-sonnet")
-   (make-llm-model
-    :name "Claude 3.5 Sonnet" :symbol 'claude-3.5-sonnet
-    :capabilities '(generation tool-use image-input pdf-input caching)
-    :context-length 200000
-    :regex "claude-3-5-sonnet")
-   (make-llm-model
-    :name "Claude 3 Opus" :symbol 'claude-3-opus
-    :capabilities '(generation tool-use image-input caching)
-    :context-length 200000
-    :regex "claude-3-opus")
-   (make-llm-model
-    :name "Claude 3 Sonnet" :symbol 'claude-3-sonnet
-    :capabilities '(generation tool-use image-input caching)
-    :context-length 200000
-    :regex "claude-3-sonnet")
-   (make-llm-model
-    :name "Claude 3 Haiku" :symbol 'claude-3-haiku
-    :capabilities '(generation tool-use image-input)
-    :context-length 200000
-    :regex "claude-3-haiku")
    ;; https://ai.google.dev/gemini-api/docs/models/gemini
    (make-llm-model
     :name "Gemini 2.0 Flash" :symbol 'gemini-2.0-flash

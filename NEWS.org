@@ -1,6 +1,7 @@
 * Version 0.31.4
 - Fix missing symbol for Gemini 3.6 Flash
 - Default to Gemini 3.6 Flash for Gemini
+- Added Claude 5 Opus and Sonnet, defaulted Claude to Claude 5 Sonnet
 * Version 0.31.3
 - Added Kimi K3.
 - Added Gemini 3.6 Flash and 3.5 Flash Lite, and removed temperature settings for these models.
