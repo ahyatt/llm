@@ -39,3 +39,14 @@
           (should (eq model-forward model-reverse))
           ;; Also, we expect to actually find these
           (should model-forward))))))
+
+(ert-deftest llm-models-ensure-data ()
+  (dolist (model llm-models)
+    (ert-info ((format "Testing model %s" (llm-model-name model)))
+      (should (and
+               (llm-model-symbol model)
+               (symbolp (llm-model-symbol model))))
+      (should (stringp (llm-model-regex model)))
+      (should (listp (llm-model-capabilities model)))
+      (should (integerp (llm-model-context-length model)))
+      (should (stringp (llm-model-name model))))))

@@ -289,7 +289,7 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 1048576
     :regex "gemini-3\\.5-flash$")
    (make-llm-model
-    :name "Gemini 3.6 Flash"
+    :name "Gemini 3.6 Flash" :symbol 'gemini-3-6-flash
     :capabilities '(generation tool-use image-input audio-input video-input json-response
                                pdf-input caching reasoning)
     :context-length 1048576
