@@ -467,7 +467,9 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :name "Qwen 3" :symbol 'qwen-3
     :capabilities '(generation tool-use json-response)  ;; Apache license for some variations only
     :context-length 32000
-    :regex "qwen-?3$")
+    ;; This should match just Qwen 3, but for models like ollama uses, this is
+    ;; often followed by a size specifier, such as "qwen-3:27b", which we should allow.
+    :regex "qwen-?3[^\\.\\-]?")
    (make-llm-model
     :name "Nemotron Mini" :symbol 'nemotron-mini
     :capabilities '(generation tool-use)
