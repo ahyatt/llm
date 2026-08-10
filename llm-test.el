@@ -466,6 +466,23 @@
     (should-not (has-fc "llama"))
     (should-not (has-fc "unknown"))))
 
+(ert-deftest llm-test-ollama-preserves-tool-call-id ()
+  (let* ((tool-call
+          '((id . "call_abc123")
+            (function . ((name . "get_weather")
+                         (arguments . ((city . "Paris")))))))
+         (provider (make-llm-ollama :chat-model "llama3.1"))
+         (response `((message . ((tool_calls . ,(vector tool-call))))))
+         (complete
+          (car (llm-provider-extract-tool-uses provider response)))
+         (streaming
+          (car (llm-provider-collect-streaming-tool-uses
+                provider tool-call))))
+    (should (equal "call_abc123"
+                   (llm-provider-utils-tool-use-id complete)))
+    (should (equal "call_abc123"
+                   (llm-provider-utils-tool-use-id streaming)))))
+
 (ert-deftest llm-test-ollama-audio-input-capabilities ()
   (should (member 'audio-input
                   (llm-capabilities

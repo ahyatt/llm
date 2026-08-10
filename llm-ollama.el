@@ -247,8 +247,9 @@ PROVIDER is the llm-ollama provider."
 
 (cl-defmethod llm-provider-extract-tool-uses ((_ llm-ollama) response)
   (mapcar (lambda (call)
-            (let ((function (cdadr call)))
+            (let ((function (assoc-default 'function call)))
               (make-llm-provider-utils-tool-use
+               :id (assoc-default 'id call)
                :name (assoc-default 'name function)
                :args (assoc-default 'arguments function))))
           (assoc-default 'tool_calls (assoc-default 'message response))))
@@ -292,8 +293,9 @@ PROVIDER is the llm-ollama provider."
 
 (cl-defmethod llm-provider-collect-streaming-tool-uses ((_ llm-ollama) data)
   ;; Ollama only supports one tool used at a time.
-  (when-let* ((f-alist (cdadr data)))
+  (when-let* ((f-alist (assoc-default 'function data)))
     (list (make-llm-provider-utils-tool-use
+           :id (assoc-default 'id data)
            :name (assoc-default 'name f-alist)
            :args (assoc-default 'arguments f-alist)))))
 
