@@ -1,3 +1,5 @@
+* Version 0.32.0
+- Use success callback when there is partial tool call success, with multi-output =:errors= key
 * Version 0.31.4
 - Fix missing symbol for Gemini 3.6 Flash
 - Default to Gemini 3.6 Flash for Gemini

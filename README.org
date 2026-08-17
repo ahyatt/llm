@@ -164,6 +164,8 @@ To build upon the example from before:
 Client applications should require the =llm= package, and code against it.  Most functions are generic, and take a struct representing a provider as the first argument. The client code, or the user themselves can then require the specific module, such as =llm-openai=, and create a provider with a function such as ~(make-llm-openai :key user-api-key)~.  The client application will use this provider to call all the generic functions.
 
 For all callbacks, the callback will be executed in the buffer the function was first called from.  If the buffer has been killed, it will be executed in a temporary buffer instead.
+
+The error callback is called when something goes wrong, either something like an incorrect model, or a quality issue like an incorrect tool being called.  Sometimes, there may be both errors and successes, such as if there are two tools called, one of which is correct and the other incorrect.  In those cases, this will count as a success, and if =multi-output= is on, you can get a list of errors with the =:errors= key.
 ** Main functions
 - ~llm-chat provider prompt multi-output~:  With user-chosen ~provider~ , and a ~llm-chat-prompt~ structure (created by ~llm-make-chat-prompt~), send that prompt to the LLM and wait for the string output.
 - ~llm-chat-async provider prompt response-callback error-callback multi-output~: Same as ~llm-chat~, but executes in the background.  Takes a ~response-callback~ which will be called with the text response.  The ~error-callback~ will be called in case of error, with the error symbol and an error message.
@@ -190,6 +192,7 @@ Models can potentially return many types of information, though, so the ~multi-o
 
 The possible plist keys are:
    - ~:text~ , for the main textual output.
+   - ~:errors~, a list of errors that happened during processing along with relevant error data.  If this is returned it means not everything failed, otherwise the error callback would be called.
    - ~:reasoning~, for reasoning output, when the model provides it.
    - ~:tool-uses~, the tools that the llm identified to be called, as a list of plists, with ~:name~ and ~:args~ values.
    - ~:tool-results~, the results of calling the tools.

@@ -29,7 +29,7 @@
 
 (defconst llm-provider-utils--supported-multi-output-keys
   '(:text :tool-uses :tool-results :reasoning
-          :input-tokens :output-tokens)
+          :input-tokens :output-tokens :errors)
   "List of multi-output keys that may be returned.")
 
 (cl-defstruct llm-standard-provider
@@ -945,83 +945,104 @@ SUCCESS-CALLBACK.
 PARTIAL-RESULT is the result to return to the user, without the tool
 call results.
 
-SUCCESS-CALLBACK is the callback that will be run when all functions
-have returned results."
+SUCCESS-CALLBACK is the callback that will be run when at least one
+function has returned results."
   (llm-provider-populate-tool-uses provider prompt tool-uses)
-  (let (results tool-use-and-results)
-    (cl-loop
-     for tool-use in tool-uses do
-     (let* ((name (llm-provider-utils-tool-use-name tool-use))
-            ;; Need this otherwise closures will capture the loop variable and all end up with the same value.
-            (tool-use tool-use)
-            (arguments
-             (llm-provider-utils--normalize-args
-              (llm-provider-utils-tool-use-args tool-use)))
-            (failed nil)
-            (tool (or
-                   (seq-find
-                    (lambda (f) (equal name (llm-tool-name f)))
-                    (llm-chat-prompt-tools prompt))
-                   (progn
-                     (funcall error-callback 'llm-tool-unknown-tool
-                              (format "Unknown tool '%s' called" name))
-                     (setq failed t)
-                     nil)))
-            (call-args (when tool
-                         (cl-loop for arg in (llm-tool-args tool)
-                                  collect (cdr (or
-                                                (seq-find (lambda (a)
-                                                            (eq (intern (plist-get arg :name))
-                                                                (car a)))
-                                                          arguments)
-                                                ;; Arg wasn't found, if it wasn't
-                                                ;; optional, signal an error.
-                                                (progn
-                                                  (unless (plist-get arg :optional)
-                                                    (funcall error-callback 'llm-tool-missing-argument
-                                                             (format "Missing required argument '%s' for tool '%s'"
-                                                                     (plist-get arg :name)
-                                                                     name))
-                                                    (setq failed t))
-                                                  nil))))))
-            (end-func (when (and tool tool-uses)
-                        (lambda (result)
-                          (llm--log
-                           'api-funcall
-                           :provider provider
-                           :msg (format "%s --> %s"
-                                        (format "%S" (cons name call-args))
-                                        (format "%s" result)))
-                          (push (cons name result) tool-use-and-results)
-                          (push (cons tool-use result) results)
-                          (when (= (length results) (length tool-uses))
-                            (llm-provider-utils-populate-tool-uses
-                             provider prompt results)
-                            (funcall success-callback
-                                     (if multi-output
-                                         (llm-provider-utils-final-multi-output-result
-                                          (append partial-result
-                                                  `(:tool-results ,tool-use-and-results)))
-                                       tool-use-and-results)))))))
-       (when end-func
-         ;; Check to see that there were no unknown args.
-         (dolist (arg-key (map-keys arguments))
-           (unless (seq-find
-                    (lambda (a) (eq (intern (plist-get a :name))
-                                    arg-key))
-                    (llm-tool-args tool))
-             (funcall error-callback 'llm-tool-unknown-argument
-                      (format "Unknown argument '%s' for tool '%s'"
-                              (symbol-name arg-key)
-                              name))
-             (setf failed t)))
-         (unless failed
+  (let (results
+        tool-use-and-results
+        failed
+        callback-executed
+        (successes 0))
+    (cl-flet ((maybe-call-success ()
+                (when (and (= (+ (length results) (length failed)) (length tool-uses))
+                           (> (length results) 0))
+                  (llm-provider-utils-populate-tool-uses provider prompt results)
+                  (funcall success-callback
+                           (if multi-output
+                               (llm-provider-utils-final-multi-output-result
+                                (append partial-result
+                                        `(:tool-results ,tool-use-and-results)
+                                        (when failed
+                                          (list :errors failed))))
+                             tool-use-and-results))
+                  (setq callback-executed t))))
+      (cl-loop
+       for tool-use in tool-uses do
+       (let* ((name (llm-provider-utils-tool-use-name tool-use))
+              ;; Need this otherwise closures will capture the loop variable and all end up with the same value.
+              (tool-use tool-use)
+              failure
+              (arguments
+               (llm-provider-utils--normalize-args
+                (llm-provider-utils-tool-use-args tool-use)))
+              (tool (or
+                     (seq-find
+                      (lambda (f) (equal name (llm-tool-name f)))
+                      (llm-chat-prompt-tools prompt))
+                     (progn
+                       (setq failure (cons 'llm-tool-unknown-tool (list :tool name)))
+                       nil)))
+              (call-args (when tool
+                           (cl-loop for arg in (llm-tool-args tool)
+                                    collect (cdr (or
+                                                  (seq-find (lambda (a)
+                                                              (eq (intern (plist-get arg :name))
+                                                                  (car a)))
+                                                            arguments)
+                                                  ;; Arg wasn't found, if it wasn't
+                                                  ;; optional, signal an error.
+                                                  (progn
+                                                    (unless (plist-get arg :optional)
+                                                      (setq failure (cons 'llm-tool-missing-argument
+                                                                          (list
+                                                                           :tool name
+                                                                           :arg arg))))
+                                                    nil))))))
+              (end-func (when (and tool tool-uses)
+                          (lambda (result)
+                            (llm--log
+                             'api-funcall
+                             :provider provider
+                             :msg (format "%s --> %s"
+                                          (format "%S" (cons name call-args))
+                                          (format "%s" result)))
+                            (push (cons name result) tool-use-and-results)
+                            (push (cons tool-use result) results)
+                            ;; This is called async possibly, and it might be the
+                            ;; last async callback, so if it is the last (we've
+                            ;; processed tool uses and either got results or
+                            ;; classified them as failures), we need to do the
+                            ;; success callback and storage.
+                            (maybe-call-success)))))
+         ;; Check to see that there were no unknown args. Can only happen if
+         ;; there really is a tool to check on.
+         (when tool
+           (dolist (arg-key (map-keys arguments))
+             (unless (seq-find
+                      (lambda (a) (eq (intern (plist-get a :name))
+                                      arg-key))
+                      (llm-tool-args tool))
+               (setq failure (cons 'llm-tool-unknown-argument
+                                   (list :tool name
+                                         :arg (symbol-name arg-key)))))))
+         (if failure
+             (push failure failed)
+           (incf successes)
            (if (llm-tool-async tool)
                (apply (llm-tool-function tool)
                       (append (list end-func) call-args))
              (funcall end-func (apply (llm-tool-function tool)
-                                      (llm-provider-utils--normalize-args call-args))))))))))
+                                      (llm-provider-utils--normalize-args call-args)))))))
 
+      ;; We may have failed at the end, meaning we never realized we had to
+      ;; execute the success callback. Let's give ourselves a chance to do that
+      ;; now.
+      (unless callback-executed (maybe-call-success))
+      ;; Nothing was callable, and something failed, so we call the error
+      ;; callback. We may have several errors, but we'll just report the last
+      ;; one.
+      (when (and (= 0 successes) failed)
+        (funcall error-callback (caar failed) (cdar failed))))))
 
 ;; This is a useful method for getting out of the request buffer when it's time
 ;; to make callbacks.
