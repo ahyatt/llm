@@ -280,6 +280,12 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 1048576
     :regex "gemini-3\\.6-flash")
    (make-llm-model
+    :name "Gemini 3.7 Flash" :symbol 'gemini-3-7-flash
+    :capabilities '(generation tool-use image-input audio-input video-input json-response
+                               pdf-input caching reasoning)
+    :context-length 1048576
+    :regex "gemini-3\\.7-flash")
+   (make-llm-model
     :name "Gemini 3 Pro" :symbol 'gemini-3-pro
     :capabilities '(generation tool-use image-input audio-input video-input json-response
                                pdf-input caching reasoning)
@@ -459,6 +465,11 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 1000000
     :regex "qwen-?3\\.7")
    (make-llm-model
+    :name "Qwen 3.8" :symbol 'qwen-3.8
+    :capabilities '(generation tool-use json-response free-software image-input reasoning) ;; Apache 2 license
+    :context-length 1000000
+    :regex "qwen-?3\\.8")
+   (make-llm-model
     :name "Qwen 3 Coder Next" :symbol 'qwen-3-coder-next
     :capabilities '(generation tool-use json-response free-software)  ;; Apache 2 license
     :context-length 256000
@@ -514,7 +525,12 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :name "glm-5" :symbol 'glm-5
     :capabilities '(generation free-software reasoning tool-use json-response) ;; Apache license
     :context-length 200000
-    :regex "glm-5")))
+    :regex "glm-5")
+   (make-llm-model
+    :name "glm-5.3" :symbol 'glm-5.3
+    :capabilities '(generation free-software reasoning tool-use json-response) ;; Apache license
+    :context-length 1000000
+    :regex "glm-5\\.3")))
 
 (defun llm-models-by-symbol (symbol)
   "Return the model with SYMBOL."

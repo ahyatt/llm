@@ -40,7 +40,7 @@
                                    default-chat-non-standard-params
                                    ((:key raw-key))
                                    (embedding-model "gemini-embedding-001")
-                                   (chat-model "gemini-3.6-flash")
+                                   (chat-model "gemini-3.7-flash")
                                    &aux
                                    (key (llm-provider-utils--wrap-key raw-key)))))
   "A struct representing a Gemini client.

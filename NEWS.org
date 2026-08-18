@@ -1,6 +1,7 @@
 * Version 0.32.0
 - Use success callback when there is partial tool call success, with multi-output =:errors= key
 - Always add errors to the prompt after tool calling
+- Add Qwen 3.8, GLM 5.3 and Gemini 3.7 Flash (now the default)
 * Version 0.31.4
 - Fix missing symbol for Gemini 3.6 Flash
 - Default to Gemini 3.6 Flash for Gemini
