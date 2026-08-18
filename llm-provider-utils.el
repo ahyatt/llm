@@ -951,21 +951,24 @@ function has returned results."
   (let (results
         tool-use-and-results
         failed
+        failed-results  ;; Similar to results but for errors, for populating in prompt.
         callback-executed
         (successes 0))
-    (cl-flet ((maybe-call-success ()
-                (when (and (= (+ (length results) (length failed)) (length tool-uses))
-                           (> (length results) 0))
-                  (llm-provider-utils-populate-tool-uses provider prompt results)
-                  (funcall success-callback
-                           (if multi-output
-                               (llm-provider-utils-final-multi-output-result
-                                (append partial-result
-                                        `(:tool-results ,tool-use-and-results)
-                                        (when failed
-                                          (list :errors failed))))
-                             tool-use-and-results))
-                  (setq callback-executed t))))
+    (cl-flet* ((maybe-call-success ()
+                 (when (and (= (+ (length results) (length failed)) (length tool-uses))
+                            (> (length results) 0))
+                   (llm-provider-utils-populate-tool-uses
+                    provider prompt
+                    (append results failed-results))
+                   (funcall success-callback
+                            (if multi-output
+                                (llm-provider-utils-final-multi-output-result
+                                 (append partial-result
+                                         `(:tool-results ,tool-use-and-results)
+                                         (when failed
+                                           (list :errors failed))))
+                              tool-use-and-results))
+                   (setq callback-executed t))))
       (cl-loop
        for tool-use in tool-uses do
        (let* ((name (llm-provider-utils-tool-use-name tool-use))
@@ -1026,7 +1029,12 @@ function has returned results."
                                    (list :tool name
                                          :arg (symbol-name arg-key)))))))
          (if failure
-             (push failure failed)
+             (progn
+               (push failure failed)
+               (push (cons tool-use
+                           (format "Error %s calling tool: %s"
+                                   (car failure)
+                                   (cdr failure))) failed-results))
            (incf successes)
            (if (llm-tool-async tool)
                (apply (llm-tool-function tool)
@@ -1042,6 +1050,9 @@ function has returned results."
       ;; callback. We may have several errors, but we'll just report the last
       ;; one.
       (when (and (= 0 successes) failed)
+        (llm-provider-utils-populate-tool-uses
+         provider prompt
+         failed-results)
         (funcall error-callback (caar failed) (cdar failed))))))
 
 ;; This is a useful method for getting out of the request buffer when it's time
