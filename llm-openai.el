@@ -50,7 +50,7 @@
                                    default-chat-max-tokens
                                    default-chat-non-standard-params
                                    ((:key raw-key))
-                                   (chat-model "gpt-5.4-mini")
+                                   (chat-model "gpt-5.6-terra")
                                    (embedding-model "text-embedding-3-small")
                                    &aux
                                    (key (llm-provider-utils--wrap-key raw-key)))))
