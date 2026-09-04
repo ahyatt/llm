@@ -48,6 +48,11 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
   (list
    ;; https://platform.openai.com/docs/models
    (make-llm-model
+    :name "GPT-6 Astra" :symbol 'gpt-6-astra
+    :capabilities '(generation tool-use image-input json-response reasoning)
+    :context-length 1050000
+    :regex (rx (seq "gpt-6-astra")))
+   (make-llm-model
     :name "GPT-5.6 Sol" :symbol 'gpt-5-6-sol
     :capabilities '(generation tool-use image-input json-response reasoning)
     :context-length 1000000
@@ -216,6 +221,12 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 200000
     :regex "claude-opus-4-5")
    ;; https://ai.google.dev/gemini-api/docs/models/gemini
+   (make-llm-model
+    :name "Gemini 3.8 Flash" :symbol 'gemini-3-8-flash
+    :capabilities '(generation tool-use image-input audio-input video-input json-response
+                               pdf-input caching reasoning)
+    :context-length 1048576
+    :regex "gemini-3\\.8-flash")
    (make-llm-model
     :name "Gemini 3.7 Flash" :symbol 'gemini-3-7-flash
     :capabilities '(generation tool-use image-input audio-input video-input json-response
