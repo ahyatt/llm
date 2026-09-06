@@ -56,12 +56,13 @@ default to `http'.
 HOST is the host that Ollama is running on.  It is optional and
 default to localhost.
 
-PORT is the localhost port that Ollama is running on.  It is optional.
+PORT is the integer localhost port that Ollama is running on.  It is optional.
 
 CHAT-MODEL is the model to use for chat queries.  It is required.
 
 EMBEDDING-MODEL is the model to use for embeddings.  It is required."
-  (scheme "http") (host "localhost") (port 11434) chat-model embedding-model)
+  (scheme "http") (host "localhost")
+  (port 11434 :type 'integer) chat-model embedding-model)
 
 (cl-defstruct (llm-ollama-authed
                (:include llm-ollama)
@@ -95,8 +96,12 @@ EMBEDDING-MODEL is the model to use for embeddings.  It is required."
 
 (defun llm-ollama--url (provider method)
   "With ollama PROVIDER, return url for METHOD."
-  (format "%s://%s:%d/api/%s" (llm-ollama-scheme provider )(llm-ollama-host provider)
-          (llm-ollama-port provider) method))
+  (unless (integerp (llm-ollama-port provider))
+    (error "Ollama port must be an integer"))
+  (format "%s://%s:%d/api/%s" (llm-ollama-scheme provider)
+          (llm-ollama-host provider)
+          (llm-ollama-port provider)
+          method))
 
 (cl-defmethod llm-provider-embedding-url ((provider llm-ollama) &optional _)
   (llm-ollama--url provider "embed"))

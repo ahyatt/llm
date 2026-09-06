@@ -72,6 +72,8 @@ PATH is the path to append to the URL, not prefixed with a slash."
   (let ((scheme (llm-llamacpp-scheme provider))
         (host (llm-llamacpp-host provider))
         (port (llm-llamacpp-port provider)))
+    (unless (integerp port)
+      (error "LlamaCPP port must be an integer"))
     (format "%s://%s:%d/%s" scheme host port path)))
 
 (cl-defmethod llm-provider-embedding-url ((provider llm-llamacpp) &optional _)
