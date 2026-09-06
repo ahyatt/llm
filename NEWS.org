@@ -3,6 +3,7 @@
 - Add GPT 6.0 Astra, Gemini 3.8 Flash (now the default)
 - Throw meaningful error if ports are strings instead of integer; also fix the documentation
 - Fixed Qwen3 identification regex
+- No longer send Open AI reasoning if unset in the =llm-chat-prompt=, by [[https://github.com/isamert][İsa Mert Gürbüz]]. 
 * Version 0.32.0
 - Use success callback when there is partial tool call success, with multi-output =:errors= key
 - Always add errors to the prompt after tool calling
