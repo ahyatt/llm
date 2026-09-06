@@ -60,6 +60,9 @@ default the default GPT4all port."
 
 (cl-defmethod llm-provider-chat-url ((provider llm-gpt4all))
   "Return the URL for PATH, given the settings in PROVIDER."
+  (when (and (llm-gpt4all-port provider)
+             (not (integerp (llm-gpt4all-port provider))))
+    (error "GPT4All port, if set, must be an integer"))
   (format "http://%s:%d/v1/chat/completions" (or (llm-gpt4all-host provider) "localhost")
           (or (llm-gpt4all-port provider) 4891)))
 

@@ -1,6 +1,7 @@
 * Version 0.32.1
 - Added tool IDs to Ollama streaming for better context-keeping
 - Add GPT 6.0 Astra, Gemini 3.8 Flash (now the default)
+- Throw meaningful error if ports are strings instead of integer; also fix the documentation
 - Fixed Qwen3 identification regex
 * Version 0.32.0
 - Use success callback when there is partial tool call success, with multi-output =:errors= key
