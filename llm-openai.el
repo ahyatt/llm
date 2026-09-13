@@ -456,8 +456,8 @@ we need to check for a model post 5.2 (if it supports reasoning at all)."
                   msg-plist))))))
        interactions)))))
 
-(defun llm-openai--build-messages (prompt)
-  "Build the :messages field based on interactions in PROMPT."
+(defun llm-openai--build-messages (provider prompt)
+  "Build the :messages field for PROVIDER based on interactions in PROMPT."
   (let ((interactions (llm-chat-prompt-interactions prompt)))
     (list
      :messages
@@ -495,7 +495,7 @@ we need to check for a model post 5.2 (if it supports reasoning at all)."
                       (plist-put msg-plist :reasoning
                                  (list :id reasoning-id
                                        :encrypted_content encrypted-reasoning))))
-              msg-plist))))
+              (llm-provider-annotate-chat-message provider interaction msg-plist)))))
        interactions)))))
 
 (defun llm-openai--chat-completions-media-part (media)
@@ -579,7 +579,7 @@ STREAMING if non-nil, turn on response streaming."
            (llm-openai--build-response-format provider prompt)
            (llm-openai--build-tools prompt)
            (llm-openai--build-tool-choice prompt)
-           (llm-openai--build-messages prompt)))
+           (llm-openai--build-messages provider prompt)))
 
     ;; Merge non-standard params
     (setq request-plist (llm-provider-merge-non-standard-params non-standard-params request-plist))
