@@ -5,7 +5,7 @@
 ;; Author: Andrew Hyatt <ahyatt@gmail.com>
 ;; Homepage: https://github.com/ahyatt/llm
 ;; Package-Requires: ((emacs "28.1") (plz "0.8") (plz-event-source "0.1.1") (plz-media-type "0.2.1") (compat "29.1"))
-;; Package-Version: 0.32.1
+;; Package-Version: 0.31.3
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;
 ;; This program is free software; you can redistribute it and/or
@@ -72,7 +72,7 @@ See %s for the details on the restrictions on use." name tos)))
 
 Use of this directly is deprecated, instead use `llm-make-chat-prompt'."
   context examples interactions tools temperature max-tokens response-format
-  reasoning non-standard-params tool-options)
+  reasoning non-standard-params tool-options storage-kv)
 
 (cl-defstruct llm-tool-options
   "Contains standarized options for tool use.
