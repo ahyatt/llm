@@ -1,3 +1,5 @@
+* Version 0.32.2
+- Add Muse Spark and Muse Spark Contributor models (usable as Open AI compatible model, or with OpenRouter)
 * Version 0.32.1
 - Added tool IDs to Ollama streaming for better context-keeping, by [[https://github.com/yibie][yibie]]
 - Add GPT 6.0 Astra, Gemini 3.8 Flash (now the default)
