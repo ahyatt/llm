@@ -20,7 +20,7 @@ MAX-RESULT-SIZE is the largest we want this result to be at the end."
 
 (defun llm-context-key (id)
   "Return the key for the prompt KV store."
-  (format "llm-context %s" (car to-store)))
+  (format "context %s" (car to-store)))
 
 (defun llm-context-shorten (prompt max-result-size)
   "Make PROMPT use shorten and make available long tool results.
