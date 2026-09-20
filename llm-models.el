@@ -302,7 +302,16 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :capabilities '(embedding)
     :context-length 2048
     :regex "embedding-001")
-   ;; https://ollama.com/library?sort=popular
+   (make-llm-model
+    :name "Muse Spark Contributor" :symbol 'muse-spark-contributor
+    :capabilities '(generation tool-use image-input json-response reasoning)
+    :context-length 1000000
+    :regex "muse-spark.*contributor")
+   (make-llm-model
+    :name "Muse Spark" :symbol 'muse-spark
+    :capabilities '(generation tool-use image-input json-response reasoning)
+    :context-length 1000000
+    :regex "muse-spark-[1-9.]+")
    (make-llm-model
     :name "Llama 3.3" :symbol 'llama-3.3
     :capabilities '(generation tool-use)
