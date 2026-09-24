@@ -53,6 +53,16 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :context-length 1050000
     :regex (rx (seq "gpt-6-astra")))
    (make-llm-model
+    :name "GPT-6 Sol" :symbol 'gpt-6-sol
+    :capabilities '(generation tool-use image-input json-response reasoning)
+    :context-length 1050000
+    :regex (rx (seq "gpt-6-sol")))
+   (make-llm-model
+    :name "GPT-6 Luna" :symbol 'gpt-6-luna
+    :capabilities '(generation tool-use image-input json-response reasoning)
+    :context-length 1050000
+    :regex "gpt-6-luna")
+   (make-llm-model
     :name "GPT-5.6 Sol" :symbol 'gpt-5-6-sol
     :capabilities '(generation tool-use image-input json-response reasoning)
     :context-length 1000000
@@ -311,7 +321,7 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :name "Muse Spark" :symbol 'muse-spark
     :capabilities '(generation tool-use image-input json-response reasoning)
     :context-length 1000000
-    :regex "muse-spark-[1-9.]+")
+    :regex "muse-spark-[0-9.]+")
    (make-llm-model
     :name "Llama 3.3" :symbol 'llama-3.3
     :capabilities '(generation tool-use)
