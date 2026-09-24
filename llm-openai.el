@@ -397,16 +397,16 @@ we need to check for a model post 5.2 (if it supports reasoning at all)."
 (cl-defmethod llm-openai--build-reasoning ((provider llm-openai) prompt)
   (when (and (llm-openai--supports-reasoning provider) (llm-chat-prompt-reasoning prompt))
     (list :reasoning
-          (list :summary "auto"
-                :effort
-                (pcase (llm-chat-prompt-reasoning prompt)
-                  ('none "none")
-                  ('light "low")
-                  ('medium "medium")
-                  ('maximum "xhigh")
-                  (_ (signal 'llm-not-supported
-                             (list (format "Unknown reasoning effort option: %s"
-                                           (llm-chat-prompt-reasoning prompt))))))))))
+      (list :summary "auto"
+            :effort
+            (pcase (llm-chat-prompt-reasoning prompt)
+              ('none "none")
+              ('light "low")
+              ('medium "medium")
+              ('maximum "xhigh")
+              (_ (signal 'llm-not-supported
+                         (list (format "Unknown reasoning effort option: %s"
+                                       (llm-chat-prompt-reasoning prompt))))))))))
 
 (defun llm-openai--responses-api-build-messages (prompt)
   "Build the :messages field based on interactions in PROMPT."
