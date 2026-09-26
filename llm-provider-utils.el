@@ -275,6 +275,19 @@ turns.")
 This is the recording before the function calls were executed, in the prompt.
 CALLS are a list of `llm-provider-utils-tool-use'.")
 
+(cl-defgeneric llm-provider-annotate-tool-uses (provider interaction multi-turn)
+  "Attach provider-specific MULTI-TURN state to tool-use INTERACTION.")
+
+(cl-defmethod llm-provider-annotate-tool-uses
+  ((_ llm-standard-chat-provider) _interaction _multi-turn))
+
+(cl-defgeneric llm-provider-annotate-chat-message (provider interaction message)
+  "Return MESSAGE annotated with PROVIDER state from INTERACTION.")
+
+(cl-defmethod llm-provider-annotate-chat-message
+  ((_ llm-standard-chat-provider) _interaction message)
+  message)
+
 (cl-defgeneric llm-provider-collect-streaming-tool-uses (provider data)
   "Transform a list of streaming tool-uses DATA responses.
 
@@ -947,7 +960,13 @@ call results.
 
 SUCCESS-CALLBACK is the callback that will be run when at least one
 function has returned results."
-  (llm-provider-populate-tool-uses provider prompt tool-uses)
+  (let ((previous-interaction
+         (car (last (llm-chat-prompt-interactions prompt)))))
+    (llm-provider-populate-tool-uses provider prompt tool-uses)
+    (when-let* ((multi-turn (plist-get partial-result :multi-turn))
+                (interaction (car (last (llm-chat-prompt-interactions prompt)))))
+      (unless (eq interaction previous-interaction)
+        (llm-provider-annotate-tool-uses provider interaction multi-turn))))
   (let (results
         tool-use-and-results
         failed
