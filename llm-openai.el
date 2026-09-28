@@ -29,6 +29,7 @@
 (require 'llm)
 (require 'llm-provider-utils)
 (require 'llm-models)
+(require 'llm-typesafe)  ;; for OpenRouter, should move to its own file soon
 (require 'json)
 (require 'plz)
 (require 'plz-event-source)
@@ -98,14 +99,18 @@ https://api.example.com/v1/chat, then URL should be
                                    (chat-model "unset")
                                    (embedding-model "unset")
                                    (url "https://openrouter.ai/api/v1/")
-                                   decide-model
+                                   ((:decide-model decide-model))
                                    &aux
-                                   (key (llm-provider-utils--wrap-key raw-key)))))
+                                   (key (llm-provider-utils--wrap-key raw-key))
+                                   (decider (make-llm-typesafe-compatible
+                                             :model decide-model
+                                             :url "https://openrouter.ai/api/alpha/decisions"
+                                             :key (llm-provider-utils--wrap-key raw-key))))))
   "A structure for Open Router.
 
 This is mostly compatible with Open AI's API but has some minor API
 differences. It also supports `llm-decide'."
-  decide-model)
+  decider)
 
 (cl-defgeneric llm-openai-primary-chat-model (provider)
   "Return the primary chat model for the Open AI PROVIDER.")
@@ -750,66 +755,9 @@ STREAMING if non-nil, turn on response streaming."
   (llm-provider-utils-openai-collect-streaming-tool-uses data))
 
 (cl-defmethod llm-decide ((provider llm-openrouter) questions state)
-  (llm-provider-utils-decide provider questions state))
-
-(cl-defmethod llm-provider-decide-url ((_ llm-openrouter))
-  "https://openrouter.ai/api/alpha/decisions")
-
-(cl-defgeneric llm-openai-openrouter-question-request (question)
-  "Return a request alist for a question to be sent to OpenRouter.")
-
-(cl-defmethod llm-openai-openrouter-question-request ((question llm-question-bool))
-  (cons (llm-question-bool-name question)
-        (list :type "noul"
-              :instructions (llm-question-bool-instructions question)
-              :criteria
-              (list :false
-                    (llm-question-bool-false-description question)
-                    :true (llm-question-bool-true-description question)))))
-
-(cl-defmethod llm-openai-openrouter-question-request ((question llm-question-choice))
-  (cons (llm-question-choice-name question)
-        (list :type "choice"
-              :instructions (llm-question-choice-instructions question)
-
-              :criteria (llm-question-choice-choices question))))
-
-(cl-defmethod llm-openai-openrouter-question-request ((question llm-question-score))
-  (cons (llm-question-score-name question)
-        (list :type "score"
-              :instructions (llm-question-score-instructions question)
-              :criteria (apply #'vector (llm-question-score-scale question)))))
-
-(cl-defmethod llm-provider-decide-request ((provider llm-openrouter) questions state)
-  (list
-   :model (llm-openrouter-decide-model provider)
-   :questions (mapcar #'llm-openai-openrouter-question-request questions)
-   :state state))
-
-(cl-defmethod llm-provider-decide-extract-error ((_ llm-openrouter) response)
-  (assoc-default 'message (assoc-default 'error response)))
-
-(cl-defmethod llm-provider-decide-extract-result ((_ llm-openrouter) response)
-  (mapcar (lambda (answer)
-            (cons
-             (car answer)
-             (let ((answer-data (cdr answer)))
-               (pcase (assoc-default 'type answer-data)
-                 ("noul" (make-llm-decision-bool :confidence (assoc-default 'noul answer-data)))
-                 ("choice" (make-llm-decision-choice :confidence (assoc-default 'confidence answer-data)
-                                                     :choice (intern (assoc-default 'choice answer-data))
-                                                     :probabilities
-                                                     (assoc-default 'probabilities answer-data)))
-                 ("score" (make-llm-decision-score :confidence (assoc-default 'confidence answer-data)
-                                                   :score (assoc-default 'score answer-data)
-                                                   :probabilities
-                                                   ;; Probabilities come in as
-                                                   ;; index to value pairs
-                                                   (mapcar #'cdr
-                                                           (sort (assoc-default 'probabilities answer-data)
-                                                                 (lambda (a b)
-                                                                   (< (string-to-number (symbol-name (car a))) (string-to-number (symbol-name (car b)))))))))))))
-          (assoc-default 'answers response)))
+  ;; Synchronize the key, which may have been changed.
+  (setf (llm-typesafe-compatible-key (llm-openrouter-decider provider)) (llm-openrouter-key provider))
+  (llm-provider-utils-decide (llm-openrouter-decider provider) questions state))
 
 (cl-defmethod llm-name ((_ llm-openai))
   "Return the name of the provider."

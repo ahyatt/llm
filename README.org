@@ -365,9 +365,9 @@ correct models to use, because most models do not support video and audio.
 ** Decisions
 Decisions are a way to ask the LLM to make a fast decision based on a set of options.  The LLM will return the option it thinks is best along with a confidence, and probabilities.  *This is alpha functionality and the API may change in the future*. Decisions are synchronous calls, since they return very quickly, and are extremely cheap.
 
-Only OpenRouter currently supports this, and requires the ~decide-model~ to be set on it.
+The =llm-typesafe= module defines the TypeSafe API, which can be used with [[https://typesafe.ai/][TypeSafe AI]] as well as compatible open systems such as [[https://ollaya.dev/][Ollaya]].   OpenRouter also supports this, and requires the ~decide-model~ to be set on it.
 
-There are three types of questions you can ask with the =llm-decide= call.  You can ask a variety of questions in the same call about the input.  The =llm-decide= is called like ~(llm-decide provider questions state)~, where =questions= is a list of =llm-question= structs, and =state= is a string that is passed to the LLM to give it context; this is the input that all the questions are being asked against.  The =llm-question= objects can be one of three types, boolean, multiple choice, or free text.  The results are returned in an alist with the question name as the key and the result as the value.
+There are three types of questions you can ask with the =llm-decide= call.  You can ask a variety of questions in the same call about the input.  The =llm-decide= is called like ~(llm-decide provider questions state)~, where =questions= is a list of =llm-question= structs, and =state= is a string that is passed to the LLM to give it context; this is the input that all the questions are being asked against.  The =llm-question= objects can be one of three types, boolean, multiple choice, or a score.  The results are returned in an alist with the question name as the key and the result as the value.
 
 The three types of questions are:
 1. Boolean: This is a yes/no question, and the result is a =llm-decision-bool= struct with a confidence value that the question is true.

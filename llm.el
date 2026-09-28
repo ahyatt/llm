@@ -214,7 +214,12 @@ possible choices that will be evaluated."
   choices)
 
 (cl-defstruct (llm-question-bool (:include llm-question))
-  "A question to decide on, with a boolean answer."
+  "A question to decide on, with a boolean answer.
+
+TRUE-DESCRIPTION and FALSE-DESCRIPTION are descriptions of what true or
+false means; but the `instructions' slot can also be used for this same
+information.  These are optional in some APIs but not in all, so they
+should be considered required here."
   true-description false-description)
 
 (cl-defstruct (llm-question-score (:include llm-question))
