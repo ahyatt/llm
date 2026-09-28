@@ -198,6 +198,63 @@ multipart message."
                       part))
                   parts)))
 
+(cl-defstruct llm-question
+  "A base type for all questions.
+
+NAME is a symbol, and will be used as a key in the response alist.
+
+INSTRUCTIONS is a string instruction on how the question should be decided."
+  name instructions)
+
+(cl-defstruct (llm-question-choice (:include llm-question))
+  "A question to decide on.
+
+CHOICES in an alist of symbol and string description, enumerating the
+possible choices that will be evaluated."
+  choices)
+
+(cl-defstruct (llm-question-bool (:include llm-question))
+  "A question to decide on, with a boolean answer."
+  true-description false-description)
+
+(cl-defstruct (llm-question-score (:include llm-question))
+  "A question to decide on, given ordered criteria (lowest to highest on
+some scale).
+
+SCALE is a list of strings that are ordered according to some criteria."
+  scale)
+
+(cl-defstruct llm-decision
+  "A base type for types of LLM decisions.
+
+CONFIDENCE is the confidence in the answer, which, for boolean
+questions is assumed the answer of it being true.  It is a floating
+point number between 0 and 1."
+  confidence)
+
+(cl-defstruct (llm-decision-choice (:include llm-decision))
+  "The choice decision information.
+
+CHOICE is a single value corresponding to one of the `criteria' keys in
+struct `llm-question-choice'.
+
+CHOICE-PROBABILITIES is an alist of the `criteria' keys in struct
+`llm-question-choice' to a floating point probability."
+  choice probabilities)
+
+(cl-defstruct (llm-decision-bool (:include llm-decision))
+  "The answer for boolean decisions.
+
+This has only the probability of the answer being true.")
+
+(cl-defstruct (llm-decision-score (:include llm-decision))
+  "The score decision information.
+
+The SCORE represents the index on the original ordinal input criteria,
+but is a floating point somewhere on the scale of 0 to one less than the
+length of the original `criteria' slot in `llm-question-score'."
+  score probabilities)
+
 (cl-defun llm--log (type &key provider prompt msg)
   "Log a MSG of TYPE, given PROVIDER, PROMPT, and MSG.
 These are all optional, each one should be the normal meaning of
@@ -723,6 +780,32 @@ and a string message."
   "Issue a warning if the LLM is non-free."
   (when-let* ((info (llm-nonfree-message-info provider)))
     (llm--warn-on-nonfree (llm-name provider) info)))
+
+(cl-defgeneric llm-decide (provider questions state)
+  "Decide each element of QUESTIONS.
+
+PROVIDER is an llm provider object.
+
+QUESTIONS is a list of `llm-question' structs.
+
+STATE is a string that contains the information that will be used to
+make a decision.
+
+This will return an alist keyed by the name of each question, where the
+exact value is determined by the type of question.  A `llm-question-choice'
+question will return a `llm-decision-choice' struct.
+
+This is a fast call, so no async option should be necessary.")
+
+(cl-defmethod llm-decide :before (provider _ _)
+  "Issue a warning if the LLM is non-free."
+  (when-let* ((info (llm-nonfree-message-info provider)))
+    (llm--warn-on-nonfree (llm-name provider) info)))
+
+(cl-defmethod llm-decide ((_ (eql nil)) _ _)
+  "Catch trivial configuration mistake."
+  (signal 'llm-provider-unconfigured
+          '("LLM provider was nil.  Please set the provider in the application you are using")))
 
 (cl-defgeneric llm-count-tokens (provider string)
   "Return the number of tokens in STRING from PROVIDER.
