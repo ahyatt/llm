@@ -68,6 +68,9 @@ effect.  New values will have an effect, however."
   default-chat-temperature default-chat-max-tokens
   default-chat-non-standard-params)
 
+(cl-defstruct (llm-standard-decide-provider (:include llm-standard-provider))
+  "A struct for indicating a provider that implements decisions.")
+
 (cl-defstruct (llm-standard-full-provider (:include llm-standard-chat-provider))
   "A struct for providers that implements chat and embeddings.")
 
@@ -158,6 +161,20 @@ Return nil for the standard timeout.")
 (cl-defmethod llm-provider-chat-timeout ((_ llm-standard-provider))
   "By default, the standard provider has the standard timeout."
   nil)
+
+;; Methods for decisions
+
+(cl-defgeneric llm-provider-decide-url (provider)
+  "Return the URL for decisions for the PROVIDER.")
+
+(cl-defgeneric llm-provider-decide-request (provider questions state)
+  "Return the request for the PROVIDER for QUESTIONS and STATE.")
+
+(cl-defgeneric llm-provider-decide-extract-error (provider response)
+  "Return an error message from RESPONSE for the PROVIDER.")
+
+(cl-defgeneric llm-provider-decide-extract-result (provider response)
+  "Return the result from RESPONSE for the PROVIDER.")
 
 (defun llm-alist-p (v)
   "Return non-nil if V is an alist."
@@ -525,6 +542,18 @@ Any strings will be concatenated, integers will be added, etc."
                     (or (llm-provider-chat-extract-error
                          provider data)
                         "Unknown error")))))))
+
+;; This is not yet a cl-defmethod, because the support for providers is unknown,
+;; and adding a type provisionally would be difficult because structs do not
+;; support multiple inheritance.
+(defun llm-provider-utils-decide (provider questions state)
+  (llm-provider-request-prelude provider)
+  (let ((response (llm-request-plz-sync (llm-provider-decide-url provider)
+                                        :headers (llm-provider-headers provider)
+                                        :data (llm-provider-decide-request provider questions state))))
+    (if-let* ((err-msg (llm-provider-decide-extract-error provider response)))
+        (error err-msg)
+      (llm-provider-decide-extract-result provider response))))
 
 (defun llm-provider-utils-get-system-prompt (prompt &optional example-prelude)
   "From PROMPT, turn the context and examples into a string.

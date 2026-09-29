@@ -174,6 +174,7 @@ The error callback is called when something goes wrong, either something like an
 - ~llm-embedding-async provider string vector-callback error-callback~: Same as ~llm-embedding~ but this is processed asynchronously. ~vector-callback~ is called with the vector embedding, and, in case of error, ~error-callback~ is called with the same arguments as in ~llm-chat-async~.
 - ~llm-batch-embeddings provider strings~: same as ~llm-embedding~, but takes in a list of strings, and returns a list of vectors whose order corresponds to the ordering of the strings.
 - ~llm-batch-embeddings-async provider strings vectors-callback error-callback~: same as ~llm-embedding-async~, but takes in a list of strings, and returns a list of vectors whose order corresponds to the ordering of the strings.
+- ~llm-decide provider questions state~: Decide a list of questions based on the value of state.  This is a fast, synchronous function.  See the [[id:decisions][Decisions]] section for more information.
 - ~llm-count-tokens provider string~: Count how many tokens are in ~string~.  This may vary by ~provider~, because some provideres implement an API for this, but typically is always about the same.  This gives an estimate if the provider has no API support.
 - ~llm-cancel-request request~ Cancels the given request, if possible.  The ~request~ object is the return value of async and streaming functions.
 - ~llm-name provider~.  Provides a short name of the model or provider, suitable for showing to users.
@@ -362,6 +363,62 @@ Media can be used in =llm-chat= and related functions.  To use media, you can us
 =llm-media= object for other kinds of media.  Besides images, some models support
 video and audio.  For video and audio, the user should be steered towards the
 correct models to use, because most models do not support video and audio.
+** Decisions
+:PROPERTIES:
+:ID:       decisions
+:END:
+Decisions are a way to ask the LLM to make a fast decision based on a set of options.  The LLM will return the option it thinks is best along with a confidence, and probabilities.  *This is alpha functionality and the API may change in the future*. Decisions are synchronous calls, since they return very quickly, and are extremely cheap.
+
+The =llm-typesafe= module defines the TypeSafe API, which can be used with [[https://typesafe.ai/][TypeSafe AI]] as well as compatible open systems such as [[https://ollaya.dev/][Ollaya]].   OpenRouter also supports this, and requires the ~decide-model~ to be set on it.
+
+There are three types of questions you can ask with the =llm-decide= call.  You can ask a variety of questions in the same call about the input.  The =llm-decide= is called like ~(llm-decide provider questions state)~, where =questions= is a list of =llm-question= structs, and =state= is a string that is passed to the LLM to give it context; this is the input that all the questions are being asked against.  The =llm-question= objects can be one of three types, boolean, multiple choice, or a score.  The results are returned in an alist with the question name as the key and the result as the value.
+
+The three types of questions are:
+1. Boolean: This is a yes/no question, and the result is a =llm-decision-bool= struct with a confidence value that the question is true.
+2. Choice: This is a multiple choice question, and the result is a =llm-decision-choice= struct with a choice, a confidence value, and a probability for each choice.
+3. Score: This is a list of increasing ordinal values on some scale, and the result is a =llm-decision-score= struct with a floating-point index on that scale (between 0 and one minus the length of the list),  a confidence value, and a probability for each ordinal value.
+  
+For example, this demonstrates all three types of questions, and the results are returned in an alist with the question name as the key and the result as the value.
+#+begin_src emacs-lisp
+(let ((result (llm-decide
+               my-llm-provider
+               (list (make-llm-question-bool
+                      :name 'is_reasonable_todo_date
+                      :instructions "A task and date will be passed in, make sure this date is not unreasonably far away given the task.  Today is October 1st, 2026." :true-description "The date could possibly be reasonable" :false-description "The date is somehow unreasonable for the task, either too near or too far away.")
+                     (make-llm-question-choice
+                      :name 'context
+                      :instructions "For the task and date, choose the most appropriate context for the task."
+                      :choices
+                      '((home . "A task done at home")
+                        (work . "A task done at work")
+                        (errand . "A task done while running errands")
+                        (school . "A task done at school")
+                        (other . "A task done in another context")))
+                     (make-llm-question-score
+                      :name 'priority
+                      :instructions "Evaluate the priority of this task, assuming a normal situation."
+                      :scale '("Low" "Medium" "High" "Critical")))
+               "Task: Buy milk, Due Date: December 31, 2029")))
+  (concat
+   (format "Is the due date reasonable? %s (confidence: %0.02f)\n"
+           (if (> (llm-decision-bool-confidence (alist-get 'is_reasonable_todo_date result)) 0.5)
+               "Yes"
+             "No")
+           (llm-decision-bool-confidence (alist-get 'is_reasonable_todo_date result)))
+   (format "Context: %s (confidence: %0.02f)\n"
+           (llm-decision-choice-choice (alist-get 'context result))
+           (llm-decision-choice-confidence (alist-get 'context result)))
+   (format "Priority: %s (confidence: %0.02f)\n"
+           (llm-decision-score-score (alist-get 'priority result))
+           (llm-decision-score-confidence (alist-get 'priority result)))))
+#+end_src
+
+#+RESULTS:
+: Is the due date reasonable? No (confidence: 0.21)
+: Context: errand (confidence: 0.99)
+: Priority: 0.34 (confidence: 0.66)
+
+
 ** Advanced prompt creation
 The =llm-prompt= module provides helper functions to create prompts that can
 incorporate data from your application.  In particular, this should be very

@@ -47,6 +47,7 @@
 ;;   chat model and embedding model must be set for tests to run.
 ;; - GITHUB_TOKEN: The key for GitHub models. Can either be a GitHub token or
 ;;   an Azure production key.
+;; - TYPESAFE_KEY: The key for TypeSafe AI.
 ;;
 ;; If any of these are set (except for Azure, which needs multiple), the
 ;; corresponding provider will be tested.
@@ -167,7 +168,10 @@ else.  We really just want to see if it's in the right ballpark."
       ;; This variable is a list of models to test
       (push (make-llm-openrouter :chat-model (split-string chat-models ", ")
                                  :embedding-model embedding-model
-                                 :key key) providers))))
+                                 :key key) providers))
+    (when-let* ((key (getenv "TYPESAFE_KEY")))
+      (require 'llm-typesafe)
+      (push (make-llm-typesafe :key key) providers))))
 
 (defun llm-integration-test--verify-prompt (prompt)
   "Make sure PROMPT is valid after a round trip through the provider."
@@ -193,347 +197,379 @@ else.  We really just want to see if it's in the right ballpark."
            ,@body)))))
 
 (llm-def-integration-test llm-embedding (provider)
-                          (when (member 'embeddings (llm-capabilities provider))
-                            (let ((result (llm-embedding provider "Paris")))
-                              (should (vectorp result))
-                              (should (> (length result) 0)))))
+  (when (member 'embeddings (llm-capabilities provider))
+    (let ((result (llm-embedding provider "Paris")))
+      (should (vectorp result))
+      (should (> (length result) 0)))))
 
 (llm-def-integration-test llm-embedding-async (provider)
-                          (when (member 'embeddings (llm-capabilities provider))
-                            (let ((result nil)
-                                  (buf (current-buffer))
-                                  (llm-warn-on-nonfree nil))
-                              (llm-embedding-async
-                               provider
-                               "Paris"
-                               (lambda (response)
-                                 (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
-                                 (setq result response))
-                               (lambda (error)
-                                 (error "Error: %s" error)))
-                              (while (null result)
-                                (sleep-for 0.1))
-                              (should (vectorp result))
-                              (should (> (length result) 0)))))
+  (when (member 'embeddings (llm-capabilities provider))
+    (let ((result nil)
+          (buf (current-buffer))
+          (llm-warn-on-nonfree nil))
+      (llm-embedding-async
+       provider
+       "Paris"
+       (lambda (response)
+         (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
+         (setq result response))
+       (lambda (error)
+         (error "Error: %s" error)))
+      (while (null result)
+        (sleep-for 0.1))
+      (should (vectorp result))
+      (should (> (length result) 0)))))
 
 (llm-def-integration-test llm-batch-embeddings (provider)
-                          (when (member 'embeddings-batch (llm-capabilities provider))
-                            (let ((result (llm-batch-embeddings provider '("Paris" "France"))))
-                              (should (listp result))
-                              (should (= (length result) 2))
-                              (should (vectorp (aref result 0)))
-                              (should (vectorp (aref result 1))))))
+  (when (member 'embeddings-batch (llm-capabilities provider))
+    (let ((result (llm-batch-embeddings provider '("Paris" "France"))))
+      (should (listp result))
+      (should (= (length result) 2))
+      (should (vectorp (aref result 0)))
+      (should (vectorp (aref result 1))))))
 
 (llm-def-integration-test llm-batch-embedding-async (provider)
-                          (when (member 'embeddings-batch (llm-capabilities provider))
-                            (let ((result nil)
-                                  (buf (current-buffer))
-                                  (llm-warn-on-nonfree nil))
-                              (llm-batch-embeddings-async
-                               provider
-                               '("Paris" "France")
-                               (lambda (response)
-                                 (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
-                                 (setq result response))
-                               (lambda (error)
-                                 (error "Error: %s" error)))
-                              (while (null result)
-                                (sleep-for 0.1))
-                              (should (listp result))
-                              (should (= (length result) 2))
-                              (should (vectorp (aref result 0)))
-                              (should (vectorp (aref result 1))))))
+  (when (member 'embeddings-batch (llm-capabilities provider))
+    (let ((result nil)
+          (buf (current-buffer))
+          (llm-warn-on-nonfree nil))
+      (llm-batch-embeddings-async
+       provider
+       '("Paris" "France")
+       (lambda (response)
+         (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
+         (setq result response))
+       (lambda (error)
+         (error "Error: %s" error)))
+      (while (null result)
+        (sleep-for 0.1))
+      (should (listp result))
+      (should (= (length result) 2))
+      (should (vectorp (aref result 0)))
+      (should (vectorp (aref result 1))))))
 
 (llm-def-integration-test llm-chat (provider)
-                          (should (equal
-                                   (string-trim (llm-chat
-                                                 provider
-                                                 (llm-make-chat-prompt llm-integration-test-chat-prompt)))
-                                   llm-integration-test-chat-answer)))
+  (when (member 'generation (llm-capabilities provider))
+    (should (equal
+             (string-trim (llm-chat
+                           provider
+                           (llm-make-chat-prompt llm-integration-test-chat-prompt)))
+             llm-integration-test-chat-answer))))
 
 (llm-def-integration-test llm-chat-multi-output (provider)
-                          (should (equal
-                                   (string-trim (plist-get
-                                                 (llm-chat
-                                                  provider
-                                                  (llm-make-chat-prompt llm-integration-test-chat-prompt)
-                                                  t) :text))
-                                   llm-integration-test-chat-answer)))
+  (when (member 'generation (llm-capabilities provider))
+    (should (equal
+             (string-trim (plist-get
+                           (llm-chat
+                            provider
+                            (llm-make-chat-prompt llm-integration-test-chat-prompt)
+                            t) :text))
+             llm-integration-test-chat-answer))))
 
 (llm-def-integration-test llm-chat-async (provider)
-                          (let ((result nil)
-                                (buf (current-buffer))
-                                (llm-warn-on-nonfree nil)
-                                (err-result nil))
-                            (llm-chat-async
-                             provider
-                             (llm-make-chat-prompt llm-integration-test-chat-prompt)
-                             (lambda (response)
-                               (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
-                               (setq result response))
-                             (lambda (_ err)
-                               (setq err-result err)))
-                            (while (not (or result err-result))
-                              (sleep-for 0.1))
-                            (if err-result (error err-result))
-                            (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim result)))))
+  (when (member 'generation (llm-capabilities provider))
+    (let ((result nil)
+          (buf (current-buffer))
+          (llm-warn-on-nonfree nil)
+          (err-result nil))
+      (llm-chat-async
+       provider
+       (llm-make-chat-prompt llm-integration-test-chat-prompt)
+       (lambda (response)
+         (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
+         (setq result response))
+       (lambda (_ err)
+         (setq err-result err)))
+      (while (not (or result err-result))
+        (sleep-for 0.1))
+      (if err-result (error err-result))
+      (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim result))))))
 
 (llm-def-integration-test llm-chat-async-multi-output (provider)
-                          (let ((result nil)
-                                (buf (current-buffer))
-                                (llm-warn-on-nonfree nil)
-                                (err-result nil))
-                            (llm-chat-async
-                             provider
-                             (llm-make-chat-prompt llm-integration-test-chat-prompt)
-                             (lambda (response)
-                               (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
-                               (setq result response))
-                             (lambda (_ err)
-                               (setq err-result err))
-                             t)
-                            (while (not (or result err-result))
-                              (sleep-for 0.1))
-                            (if err-result (error err-result))
-                            (dolist (key '(:text :input-tokens))
-                              (should (plist-get result key)))
-                            (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim (plist-get result :text))))))
+  (when (member 'generation (llm-capabilities provider))
+    (let ((result nil)
+          (buf (current-buffer))
+          (llm-warn-on-nonfree nil)
+          (err-result nil))
+      (llm-chat-async
+       provider
+       (llm-make-chat-prompt llm-integration-test-chat-prompt)
+       (lambda (response)
+         (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
+         (setq result response))
+       (lambda (_ err)
+         (setq err-result err))
+       t)
+      (while (not (or result err-result))
+        (sleep-for 0.1))
+      (if err-result (error err-result))
+      (dolist (key '(:text :input-tokens))
+        (should (plist-get result key)))
+      (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim (plist-get result :text)))))))
 
 (llm-def-integration-test llm-chat-streaming (provider)
-                          (when (member 'streaming (llm-capabilities provider))
-                            (let ((streamed-result "")
-                                  (returned-result nil)
-                                  (llm-warn-on-nonfree nil)
-                                  (buf (current-buffer))
-                                  (start-time (current-time))
-                                  (err-result nil))
-                              (llm-chat-streaming
-                               provider
-                               (llm-make-chat-prompt llm-integration-test-chat-prompt)
-                               (lambda (partial-response)
-                                 (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
-                                 (setq streamed-result (concat streamed-result partial-response)))
-                               (lambda (response)
-                                 (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
-                                 (setq returned-result response))
-                               (lambda (_ err)
-                                 (setq err-result err)))
-                              (while (and (or (null returned-result)
-                                              (= (length streamed-result) 0))
-                                          (null err-result)
-                                          (time-less-p (time-subtract (current-time) start-time) 60))
-                                (sleep-for 0.1))
-                              (if err-result (error err-result))
-                              (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim returned-result)))
-                              (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim streamed-result))))))
+  (when (member 'streaming (llm-capabilities provider))
+    (let ((streamed-result "")
+          (returned-result nil)
+          (llm-warn-on-nonfree nil)
+          (buf (current-buffer))
+          (start-time (current-time))
+          (err-result nil))
+      (llm-chat-streaming
+       provider
+       (llm-make-chat-prompt llm-integration-test-chat-prompt)
+       (lambda (partial-response)
+         (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
+         (setq streamed-result (concat streamed-result partial-response)))
+       (lambda (response)
+         (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
+         (setq returned-result response))
+       (lambda (_ err)
+         (setq err-result err)))
+      (while (and (or (null returned-result)
+                      (= (length streamed-result) 0))
+                  (null err-result)
+                  (time-less-p (time-subtract (current-time) start-time) 60))
+        (sleep-for 0.1))
+      (if err-result (error err-result))
+      (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim returned-result)))
+      (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim streamed-result))))))
 
 (llm-def-integration-test llm-chat-streaming-multi-output (provider)
-                          (when (member 'streaming (llm-capabilities provider))
-                            (let ((streamed-result "")
-                                  (returned-result nil)
-                                  (llm-warn-on-nonfree nil)
-                                  (buf (current-buffer))
-                                  (start-time (current-time))
-                                  (err-result nil))
-                              (llm-chat-streaming
-                               provider
-                               (llm-make-chat-prompt llm-integration-test-chat-prompt)
-                               (lambda (partial-response)
-                                 (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
-                                 (setq streamed-result partial-response))
-                               (lambda (response)
-                                 (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
-                                 (setq returned-result response))
-                               (lambda (_ err)
-                                 (setq err-result err))
-                               t)
-                              (while (and (or (null returned-result)
-                                              (= (length streamed-result) 0))
-                                          (null err-result)
-                                          (time-less-p (time-subtract (current-time) start-time) 60))
-                                (sleep-for 0.1))
-                              (if err-result (error err-result))
-                              (dolist (key '(:text :input-tokens))
-                                (should (plist-get returned-result key)))
-                              (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim (plist-get returned-result :text))))
-                              (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim (plist-get streamed-result :text)))))))
+  (when (member 'streaming (llm-capabilities provider))
+    (let ((streamed-result "")
+          (returned-result nil)
+          (llm-warn-on-nonfree nil)
+          (buf (current-buffer))
+          (start-time (current-time))
+          (err-result nil))
+      (llm-chat-streaming
+       provider
+       (llm-make-chat-prompt llm-integration-test-chat-prompt)
+       (lambda (partial-response)
+         (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
+         (setq streamed-result partial-response))
+       (lambda (response)
+         (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
+         (setq returned-result response))
+       (lambda (_ err)
+         (setq err-result err))
+       t)
+      (while (and (or (null returned-result)
+                      (= (length streamed-result) 0))
+                  (null err-result)
+                  (time-less-p (time-subtract (current-time) start-time) 60))
+        (sleep-for 0.1))
+      (if err-result (error err-result))
+      (dolist (key '(:text :input-tokens))
+        (should (plist-get returned-result key)))
+      (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim (plist-get returned-result :text))))
+      (should (llm-integration-test-string-eq llm-integration-test-chat-answer (string-trim (plist-get streamed-result :text)))))))
 
 (llm-def-integration-test llm-tool-use (provider)
-                          (when (member 'tool-use (llm-capabilities provider))
-                            (let ((prompt (llm-integration-test-tool-use-prompt)))
-                              (should (equal
-                                       (llm-chat provider prompt)
-                                       llm-integration-test-fc-answer))
-                              (llm-integration-test--verify-prompt prompt)
-                              ;; Test that we can send the function back to the provider without error.
-                              (llm-chat provider prompt))))
+  (when (member 'tool-use (llm-capabilities provider))
+    (let ((prompt (llm-integration-test-tool-use-prompt)))
+      (should (equal
+               (llm-chat provider prompt)
+               llm-integration-test-fc-answer))
+      (llm-integration-test--verify-prompt prompt)
+      ;; Test that we can send the function back to the provider without error.
+      (llm-chat provider prompt))))
 
 (llm-def-integration-test llm-boolean-tool-use (provider)
-                          (when (member 'tool-use (llm-capabilities provider))
-                            ;; We test if it is a list to verify that the tool was used.  We can't test
-                            ;; the exact value due to the statement, value, which is necessary for worse
-                            ;; model to pass, since they just feel the need to always pass a statement.
-                            (should (listp
-                                     (llm-chat provider (llm-make-chat-prompt
-                                                         "Is Lyon the capital of France?  You must answer using the verifier tool."
-                                                         :tools
-                                                         (list (llm-make-tool
-                                                                :function (lambda (result &optional _)
-                                                                            (should-not result))
-                                                                :name "verifier"
-                                                                :description "Record the LLM's decision on the veracity of the statement."
-                                                                :args '((:name "decision"
-                                                                               :description "The true/false judgement on the veracity of the statement"
-                                                                               :type boolean
-                                                                               :required t)
-                                                                        (:name "statement"
-                                                                               :description "Statement explaining the decision"
-                                                                               :type string))
-                                                                :async nil))
-                                                         :tool-options (make-llm-tool-options :tool-choice 'any)))))))
+  (when (member 'tool-use (llm-capabilities provider))
+    ;; We test if it is a list to verify that the tool was used.  We can't test
+    ;; the exact value due to the statement, value, which is necessary for worse
+    ;; model to pass, since they just feel the need to always pass a statement.
+    (should (listp
+             (llm-chat provider (llm-make-chat-prompt
+                                 "Is Lyon the capital of France?  You must answer using the verifier tool."
+                                 :tools
+                                 (list (llm-make-tool
+                                        :function (lambda (result &optional _)
+                                                    (should-not result))
+                                        :name "verifier"
+                                        :description "Record the LLM's decision on the veracity of the statement."
+                                        :args '((:name "decision"
+                                                       :description "The true/false judgement on the veracity of the statement"
+                                                       :type boolean
+                                                       :required t)
+                                                (:name "statement"
+                                                       :description "Statement explaining the decision"
+                                                       :type string))
+                                        :async nil))
+                                 :tool-options (make-llm-tool-options :tool-choice 'any)))))))
 
 (llm-def-integration-test llm-tool-use-multi-output (provider)
-                          (when (member 'tool-use (llm-capabilities provider))
-                            (let* ((prompt (llm-integration-test-tool-use-prompt))
-                                   (result (llm-chat provider prompt t)))
-                              (should (equal
-                                       (plist-get result :tool-results)
-                                       llm-integration-test-fc-answer))
-                              (should (plist-get result :tool-uses))
-                              (if (plist-get result :text)
-                                  (should (> (length (plist-get result :text)) 0)))
-                              (llm-integration-test--verify-prompt prompt)
-                              ;; Test that we can send the function back to the provider without error.
-                              (llm-chat provider prompt t))))
+  (when (member 'tool-use (llm-capabilities provider))
+    (let* ((prompt (llm-integration-test-tool-use-prompt))
+           (result (llm-chat provider prompt t)))
+      (should (equal
+               (plist-get result :tool-results)
+               llm-integration-test-fc-answer))
+      (should (plist-get result :tool-uses))
+      (if (plist-get result :text)
+          (should (> (length (plist-get result :text)) 0)))
+      (llm-integration-test--verify-prompt prompt)
+      ;; Test that we can send the function back to the provider without error.
+      (llm-chat provider prompt t))))
 
 (llm-def-integration-test llm-tool-use-streaming-multi-output (provider)
-                          (when (member 'streaming-tool-use (llm-capabilities provider))
-                            (let* ((prompt (llm-integration-test-tool-use-prompt))
-                                   (result nil))
-                              (llm-chat-streaming provider prompt #'ignore (lambda (response) (setq result response)) (lambda (_ err) (error err)) t)
-                              (while (null result)
-                                (sleep-for 0.1))
-                              (should (equal
-                                       (plist-get result :tool-results)
-                                       llm-integration-test-fc-answer))
-                              (should (plist-get result :tool-uses))
-                              (llm-integration-test--verify-prompt prompt)
-                              (if (plist-get result :text)
-                                  (should (> (length (plist-get result :text)) 0))))))
+  (when (member 'streaming-tool-use (llm-capabilities provider))
+    (let* ((prompt (llm-integration-test-tool-use-prompt))
+           (result nil))
+      (llm-chat-streaming provider prompt #'ignore (lambda (response) (setq result response)) (lambda (_ err) (error err)) t)
+      (while (null result)
+        (sleep-for 0.1))
+      (should (equal
+               (plist-get result :tool-results)
+               llm-integration-test-fc-answer))
+      (should (plist-get result :tool-uses))
+      (llm-integration-test--verify-prompt prompt)
+      (if (plist-get result :text)
+          (should (> (length (plist-get result :text)) 0))))))
 
 (llm-def-integration-test llm-tool-use-multiple (provider)
-                          (when (member 'tool-use (llm-capabilities provider))
-                            (let ((prompt (llm-integration-test-fc-multiple-prompt)))
-                              ;; Sending back multiple answers often doesn't happen, so we can't reliably
-                              ;; check for this yet.
-                              (llm-chat provider prompt)
-                              (llm-integration-test--verify-prompt prompt)
-                              ;; Test that we can send the function back to the provider without error.
-                              (llm-chat provider prompt))))
+  (when (member 'tool-use (llm-capabilities provider))
+    (let ((prompt (llm-integration-test-fc-multiple-prompt)))
+      ;; Sending back multiple answers often doesn't happen, so we can't reliably
+      ;; check for this yet.
+      (llm-chat provider prompt)
+      (llm-integration-test--verify-prompt prompt)
+      ;; Test that we can send the function back to the provider without error.
+      (llm-chat provider prompt))))
 
 (llm-def-integration-test llm-reasoning (provider)
-                          ;; Right now `reasoning' means both the capability of doing reasoning, and the
-                          ;; output of reasoning.  These should probably be split in the future, but for
-                          ;; now, Open AI is the only provider that does reasoning and doesn't also
-                          ;; output the reasoning, so we just ignore Open AI here.
-                          (when (and (member 'reasoning (llm-capabilities provider))
-                                     (or (not (llm-openai-p provider))
-                                         (llm-openai-compatible-p provider)))
-                            (let ((prompt (llm-make-chat-prompt "Will interest rates fall in the next year?" :reasoning 'medium)))
-                              (should (plist-get (llm-chat provider prompt t) :reasoning))
-                              (llm-integration-test--verify-prompt prompt))))
+  ;; Right now `reasoning' means both the capability of doing reasoning, and the
+  ;; output of reasoning.  These should probably be split in the future, but for
+  ;; now, Open AI is the only provider that does reasoning and doesn't also
+  ;; output the reasoning, so we just ignore Open AI here.
+  (when (and (member 'reasoning (llm-capabilities provider))
+             (or (not (llm-openai-p provider))
+                 (llm-openai-compatible-p provider)))
+    (let ((prompt (llm-make-chat-prompt "Will interest rates fall in the next year?" :reasoning 'medium)))
+      (should (plist-get (llm-chat provider prompt t) :reasoning))
+      (llm-integration-test--verify-prompt prompt))))
 
 (llm-def-integration-test llm-reasoning-streaming (provider)
-                          (when (member 'streaming-reasoning (llm-capabilities provider))
-                            (let ((prompt (llm-make-chat-prompt "Will interest rates fall in the next year?" :reasoning 'medium))
-                                  (result nil))
-                              (llm-chat-streaming provider prompt #'ignore
-                                                  (lambda (response) (setq result response))
-                                                  (lambda (_ err) (error err)) t)
-                              (while (null result)
-                                (sleep-for 0.1))
-                              (should (plist-get result :reasoning))
-                              (llm-integration-test--verify-prompt prompt))))
+  (when (member 'streaming-reasoning (llm-capabilities provider))
+    (let ((prompt (llm-make-chat-prompt "Will interest rates fall in the next year?" :reasoning 'medium))
+          (result nil))
+      (llm-chat-streaming provider prompt #'ignore
+                          (lambda (response) (setq result response))
+                          (lambda (_ err) (error err)) t)
+      (while (null result)
+        (sleep-for 0.1))
+      (should (plist-get result :reasoning))
+      (llm-integration-test--verify-prompt prompt))))
 
 (llm-def-integration-test llm-image-chat (provider)
-                          ;; On github, the emacs we use doesn't have image support, so we can't use
-                          ;; image objects.
-                          (when (member 'image-input (llm-capabilities provider))
-                            (let* ((image-bytes
-                                    (with-temp-buffer (set-buffer-multibyte nil)
-                                                      (insert-file-contents-literally
-                                                       (expand-file-name "animal.jpeg" llm-integration-current-directory))
-                                                      (buffer-string)))
-                                   (result (llm-chat
-                                            provider
-                                            (llm-make-chat-prompt
-                                             (llm-make-multipart
-                                              "What is this animal?  You should have an image, if not please let me know.  If you do have the image, please answer in one word, without punctuation or whitespace."
-                                              (make-llm-media :mime-type "image/jpeg" :data image-bytes))))))
-                              (should (stringp result))
-                              (should (llm-integration-test-string-eq "owl" (string-trim (downcase result)))))))
+  ;; On github, the emacs we use doesn't have image support, so we can't use
+  ;; image objects.
+  (when (member 'image-input (llm-capabilities provider))
+    (let* ((image-bytes
+            (with-temp-buffer (set-buffer-multibyte nil)
+                              (insert-file-contents-literally
+                               (expand-file-name "animal.jpeg" llm-integration-current-directory))
+                              (buffer-string)))
+           (result (llm-chat
+                    provider
+                    (llm-make-chat-prompt
+                     (llm-make-multipart
+                      "What is this animal?  You should have an image, if not please let me know.  If you do have the image, please answer in one word, without punctuation or whitespace."
+                      (make-llm-media :mime-type "image/jpeg" :data image-bytes))))))
+      (should (stringp result))
+      (should (llm-integration-test-string-eq "owl" (string-trim (downcase result)))))))
 
 (llm-def-integration-test llm-audio-chat (provider)
-                          (when (member 'audio-input (llm-capabilities provider))
-                            (let ((audio-data
-                                   (with-temp-buffer
-                                     (set-buffer-multibyte nil)
-                                     (insert-file-contents-literally
-                                      (expand-file-name "test.wav" llm-integration-current-directory))
-                                     (buffer-string))))
-                              (let ((result
-                                     (llm-chat
-                                      provider
-                                      (llm-make-chat-prompt
-                                       (llm-make-multipart
-                                        "Transcribe the single city name in this audio. Answer with one word."
-                                        (make-llm-media :mime-type "audio/wav" :data audio-data))))))
-                                (should (stringp result))
-                                (should (llm-integration-test-string-eq
-                                         "Paris" (string-trim result)))))))
+  (when (member 'audio-input (llm-capabilities provider))
+    (let ((audio-data
+           (with-temp-buffer
+             (set-buffer-multibyte nil)
+             (insert-file-contents-literally
+              (expand-file-name "test.wav" llm-integration-current-directory))
+             (buffer-string))))
+      (let ((result
+             (llm-chat
+              provider
+              (llm-make-chat-prompt
+               (llm-make-multipart
+                "Transcribe the single city name in this audio. Answer with one word."
+                (make-llm-media :mime-type "audio/wav" :data audio-data))))))
+        (should (stringp result))
+        (should (llm-integration-test-string-eq
+                 "Paris" (string-trim result)))))))
 
 (llm-def-integration-test
- llm-pdf-chat (provider)
- (when (member 'pdf-input (llm-capabilities provider))
-   (let* ((pdf-data
-           (with-temp-buffer (set-buffer-multibyte nil)
-                             (insert-file-contents-literally
-                              (expand-file-name "test.pdf" llm-integration-current-directory))
-                             (buffer-string)))
-          (result (llm-chat
-                   provider
-                   (llm-make-chat-prompt
-                    (llm-make-multipart
-                     "What symbol occurs in the PDF file?  If you do not see a PDF file, please let me know.  If you do, please answer in one letter, without punctuation or whitespace."
-                     (make-llm-media :mime-type "application/pdf" :data pdf-data))))))
-     (should (stringp result))
-     (should (llm-integration-test-string-eq "x" (string-trim (downcase result)))))))
+  llm-pdf-chat (provider)
+  (when (member 'pdf-input (llm-capabilities provider))
+    (let* ((pdf-data
+            (with-temp-buffer (set-buffer-multibyte nil)
+                              (insert-file-contents-literally
+                               (expand-file-name "test.pdf" llm-integration-current-directory))
+                              (buffer-string)))
+           (result (llm-chat
+                    provider
+                    (llm-make-chat-prompt
+                     (llm-make-multipart
+                      "What symbol occurs in the PDF file?  If you do not see a PDF file, please let me know.  If you do, please answer in one letter, without punctuation or whitespace."
+                      (make-llm-media :mime-type "application/pdf" :data pdf-data))))))
+      (should (stringp result))
+      (should (llm-integration-test-string-eq "x" (string-trim (downcase result)))))))
 
 (llm-def-integration-test llm-json-test (provider)
-                          (when (member 'json-response (llm-capabilities provider))
-                            (let ((result (llm-chat
-                                           provider
-                                           (llm-make-chat-prompt
-                                            "List the 3 largest cities in France in order of population, giving the results in JSON."
-                                            :response-format
-                                            '(:type "object"
-                                                    :properties
-                                                    (:cities (:type array :items (:type string)))
-                                                    :required ["cities"])))))
-                              (should (equal
-                                       (llm-test-normalize '(:cities ["Lyon" "Marseille" "Paris"]))
-                                       (llm-test-normalize (json-parse-string result :object-type 'plist)))))))
+  (when (member 'json-response (llm-capabilities provider))
+    (let ((result (llm-chat
+                   provider
+                   (llm-make-chat-prompt
+                    "List the 3 largest cities in France in order of population, giving the results in JSON."
+                    :response-format
+                    '(:type "object"
+                            :properties
+                            (:cities (:type array :items (:type string)))
+                            :required ["cities"])))))
+      (should (equal
+               (llm-test-normalize '(:cities ["Lyon" "Marseille" "Paris"]))
+               (llm-test-normalize (json-parse-string result :object-type 'plist)))))))
+
+(ert-deftest llm-decide ()
+  (dolist (provider (seq-filter (lambda (provider)
+                                  (member 'decision (llm-capabilities provider)))
+                                (llm-integration-test-providers)))
+    (let ((result (llm-decide
+                   provider
+                   (list (make-llm-question-bool
+                          :name 'is_reasonable_todo_date
+                          :instructions "A task and date will be passed in, make sure this date is not unreasonably far away given the task.  Today is October 1st, 2026." :true-description "The date could possibly be reasonable" :false-description "The date is somehow unreasonable for the task, either too near or too far away.")
+                         (make-llm-question-choice
+                          :name 'context
+                          :instructions "For the task and date, choose the most appropriate context for the task."
+                          :choices
+                          '((home . "A task done at home")
+                            (work . "A task done at work")
+                            (errand . "A task done while running errands")
+                            (school . "A task done at school")
+                            (other . "A task done in another context")))
+                         (make-llm-question-score
+                          :name 'priority
+                          :instructions "Evaluate the priority of this task, assuming a normal situation."
+                          :scale '("Low" "Medium" "High" "Critical")))
+                   "Task: Buy milk, Due Date: December 31, 2029")))
+      ;; These are very easy tests that should always be true
+      (should (< (llm-decision-bool-confidence (alist-get 'is_reasonable_todo_date result)) 0.8))
+      (should (eq 'errand (llm-decision-choice-choice (alist-get 'context result))))
+      (should (< (llm-decision-score-score (alist-get 'priority result)) 4)))))
 
 (llm-def-integration-test llm-count-tokens (provider)
-                          (let ((result (llm-count-tokens provider "What is the capital of France?")))
-                            (should (integerp result))
-                            (should (> result 0))))
+  (let ((result (llm-count-tokens provider "What is the capital of France?")))
+    (should (integerp result))
+    (should (> result 0))))
 
 (llm-def-integration-test llm-models (provider)
-                          (when (member 'model-list (llm-capabilities provider))
-                            (let ((models (llm-models provider)))
-                              (should models)
-                              (should (listp models))
-                              (should (> (length models) 0)))))
+  (when (member 'model-list (llm-capabilities provider))
+    (let ((models (llm-models provider)))
+      (should models)
+      (should (listp models))
+      (should (> (length models) 0)))))
 
 (provide 'llm-integration-test)

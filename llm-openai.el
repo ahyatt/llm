@@ -29,6 +29,7 @@
 (require 'llm)
 (require 'llm-provider-utils)
 (require 'llm-models)
+(require 'llm-typesafe)  ;; for OpenRouter, should move to its own file soon
 (require 'json)
 (require 'plz)
 (require 'plz-event-source)
@@ -98,12 +99,19 @@ https://api.example.com/v1/chat, then URL should be
                                    (chat-model "unset")
                                    (embedding-model "unset")
                                    (url "https://openrouter.ai/api/v1/")
+                                   ((:decide-model decide-model))
                                    &aux
-                                   (key (llm-provider-utils--wrap-key raw-key)))))
+                                   (key (llm-provider-utils--wrap-key raw-key))
+                                   (decider (when decide-model
+                                              (make-llm-typesafe-compatible
+                                               :key (llm-provider-utils--wrap-key raw-key)
+                                               :model decide-model
+                                               :url "https://openrouter.ai/api/alpha/decisions"))))))
   "A structure for Open Router.
 
 This is mostly compatible with Open AI's API but has some minor API
-differences.")
+differences. It also supports `llm-decide'."
+  decider)
 
 (cl-defgeneric llm-openai-primary-chat-model (provider)
   "Return the primary chat model for the Open AI PROVIDER.")
@@ -397,16 +405,16 @@ we need to check for a model post 5.2 (if it supports reasoning at all)."
 (cl-defmethod llm-openai--build-reasoning ((provider llm-openai) prompt)
   (when (and (llm-openai--supports-reasoning provider) (llm-chat-prompt-reasoning prompt))
     (list :reasoning
-      (list :summary "auto"
-            :effort
-            (pcase (llm-chat-prompt-reasoning prompt)
-              ('none "none")
-              ('light "low")
-              ('medium "medium")
-              ('maximum "xhigh")
-              (_ (signal 'llm-not-supported
-                         (list (format "Unknown reasoning effort option: %s"
-                                       (llm-chat-prompt-reasoning prompt))))))))))
+          (list :summary "auto"
+                :effort
+                (pcase (llm-chat-prompt-reasoning prompt)
+                  ('none "none")
+                  ('light "low")
+                  ('medium "medium")
+                  ('maximum "xhigh")
+                  (_ (signal 'llm-not-supported
+                             (list (format "Unknown reasoning effort option: %s"
+                                           (llm-chat-prompt-reasoning prompt))))))))))
 
 (defun llm-openai--responses-api-build-messages (prompt)
   "Build the :messages field based on interactions in PROMPT."
@@ -747,6 +755,13 @@ STREAMING if non-nil, turn on response streaming."
 (cl-defmethod llm-provider-collect-streaming-tool-uses ((_ llm-openai-compatible) data)
   (llm-provider-utils-openai-collect-streaming-tool-uses data))
 
+(cl-defmethod llm-decide ((provider llm-openrouter) questions state)
+  (unless (llm-openrouter-decider provider)
+    (error "No decider model was set for the OpenRouter provider, please re-construct with a decider model"))
+  ;; Synchronize the key, which may have been changed.
+  (setf (llm-typesafe-compatible-key (llm-openrouter-decider provider)) (llm-openrouter-key provider))
+  (llm-provider-utils-decide (llm-openrouter-decider provider) questions state))
+
 (cl-defmethod llm-name ((_ llm-openai))
   "Return the name of the provider."
   "Open AI")
@@ -777,10 +792,13 @@ STREAMING if non-nil, turn on response streaming."
           (when-let* ((model (llm-models-match (llm-openai-primary-chat-model provider))))
             (llm-model-capabilities model))))
 
-(cl-defmethod llm-capabilities ((_ llm-openrouter))
-  (seq-remove
-   (lambda (c) (eq c 'embeddings-batch))
-   (cl-call-next-method)))
+(cl-defmethod llm-capabilities ((provider llm-openrouter))
+  (append
+   (seq-remove
+    (lambda (c) (eq c 'embeddings-batch))
+    (cl-call-next-method))
+   (when (llm-openrouter-decider provider)
+     (list 'decision))))
 
 (cl-defmethod llm-models ((provider llm-openai))
   (mapcar (lambda (model)
