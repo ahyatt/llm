@@ -69,10 +69,7 @@ effect.  New values will have an effect, however."
   default-chat-non-standard-params)
 
 (cl-defstruct (llm-standard-decide-provider (:include llm-standard-provider))
-  "A struct for indicating a provider that implements decisions.
-
-CHOICE-TYPE is the type given to the API for choices."
-  choice-type)
+  "A struct for indicating a provider that implements decisions.")
 
 (cl-defstruct (llm-standard-full-provider (:include llm-standard-chat-provider))
   "A struct for providers that implements chat and embeddings.")

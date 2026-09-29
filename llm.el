@@ -670,15 +670,18 @@ This possible values are only those things that are not the bare
 minimum of functionality to be included in this package, which is
 non-streaming chat:
 
-`streaming': the LLM can actually stream responses in the
-streaming call.  Calls to `llm-chat-streaming' will work
-regardless even if the LLM doesn't support streaming, it just
-won't have any partial responses, so basically just operates like
-`llm-chat-async'.
+`generation': the LLM supports chat APIs.
 
 `embeddings': the LLM can return vector embeddings of text.
 
 `embeddings-batch': the LLM can return many vector embeddings at the same time.
+
+`decisions': The LLM supports a decision API (for `llm-decide').
+
+`streaming': the LLM can actually stream responses in the streaming call
+for chat APIs.  Calls to `llm-chat-streaming' will work regardless even
+if the LLM doesn't support streaming, it just won't have any partial
+responses, so basically just operates like `llm-chat-async'.
 
 `tool-use': the LLM can call functions.
 

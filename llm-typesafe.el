@@ -137,6 +137,9 @@ e.g. http://localhost:11435/v1/systemone."
                                                (symbol-name (car b)))))))))))))
           (assoc-default 'answers response)))
 
+(cl-defmethod llm-capabilities ((_ llm-typesafe-compatible))
+  '(decision))
+
 (provide 'llm-typesafe)
 
 ;;; llm-typesafe.el ends here

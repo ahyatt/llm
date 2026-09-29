@@ -102,10 +102,11 @@ https://api.example.com/v1/chat, then URL should be
                                    ((:decide-model decide-model))
                                    &aux
                                    (key (llm-provider-utils--wrap-key raw-key))
-                                   (decider (make-llm-typesafe-compatible
-                                             :model decide-model
-                                             :url "https://openrouter.ai/api/alpha/decisions"
-                                             :key (llm-provider-utils--wrap-key raw-key))))))
+                                   (decider (when decide-model
+                                              (make-llm-typesafe-compatible
+                                               :key (llm-provider-utils--wrap-key raw-key)
+                                               :model decide-model
+                                               :url "https://openrouter.ai/api/alpha/decisions"))))))
   "A structure for Open Router.
 
 This is mostly compatible with Open AI's API but has some minor API
@@ -755,6 +756,8 @@ STREAMING if non-nil, turn on response streaming."
   (llm-provider-utils-openai-collect-streaming-tool-uses data))
 
 (cl-defmethod llm-decide ((provider llm-openrouter) questions state)
+  (unless (llm-openrouter-decider provider)
+    (error "No decider model was set for the OpenRouter provider, please re-construct with a decider model."))
   ;; Synchronize the key, which may have been changed.
   (setf (llm-typesafe-compatible-key (llm-openrouter-decider provider)) (llm-openrouter-key provider))
   (llm-provider-utils-decide (llm-openrouter-decider provider) questions state))
@@ -789,10 +792,13 @@ STREAMING if non-nil, turn on response streaming."
           (when-let* ((model (llm-models-match (llm-openai-primary-chat-model provider))))
             (llm-model-capabilities model))))
 
-(cl-defmethod llm-capabilities ((_ llm-openrouter))
-  (seq-remove
-   (lambda (c) (eq c 'embeddings-batch))
-   (cl-call-next-method)))
+(cl-defmethod llm-capabilities ((provider llm-openrouter))
+  (append
+   (seq-remove
+    (lambda (c) (eq c 'embeddings-batch))
+    (cl-call-next-method))
+   (when (llm-openrouter-decider provider)
+     (list 'decision))))
 
 (cl-defmethod llm-models ((provider llm-openai))
   (mapcar (lambda (model)
