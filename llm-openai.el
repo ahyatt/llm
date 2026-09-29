@@ -757,7 +757,7 @@ STREAMING if non-nil, turn on response streaming."
 
 (cl-defmethod llm-decide ((provider llm-openrouter) questions state)
   (unless (llm-openrouter-decider provider)
-    (error "No decider model was set for the OpenRouter provider, please re-construct with a decider model."))
+    (error "No decider model was set for the OpenRouter provider, please re-construct with a decider model"))
   ;; Synchronize the key, which may have been changed.
   (setf (llm-typesafe-compatible-key (llm-openrouter-decider provider)) (llm-openrouter-key provider))
   (llm-provider-utils-decide (llm-openrouter-decider provider) questions state))

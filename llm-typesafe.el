@@ -74,7 +74,7 @@ e.g. http://localhost:11435/v1/systemone."
   (llm-typesafe-compatible-url provider))
 
 (cl-defgeneric llm-typesafe-question-request (question)
-  "Return a request alist for a question to be sent to the TypeSafe API.")
+  "Return a request alist for QUESTION to be sent to the TypeSafe API.")
 
 (cl-defmethod llm-typesafe-question-request ((question llm-question-bool))
   (cons (llm-question-bool-name question)
