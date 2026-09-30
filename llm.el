@@ -815,6 +815,74 @@ This is a fast call, so no async option should be necessary.")
   (signal 'llm-provider-unconfigured
           '("LLM provider was nil.  Please set the provider in the application you are using")))
 
+(cl-defun llm-decide-bool (provider question context &key target-threshold)
+  "Ask PROVIDER whether QUESTION is true, given CONTEXT.
+
+Wrapper for `llm-decide' bool decisions.
+
+If the confidence that QUESTION is true equals or exceeds
+TARGET-THRESHOLD (by default 0.7), return a non-nil value, otherwise,
+return nil.
+
+CONTEXT is a string."
+  (>= (llm-decision-bool-confidence
+       (alist-get 'question
+                  (llm-decide provider
+                              (list (make-llm-question-bool
+                                     :name 'question
+                                     :instructions question))
+                              context)))
+      (or target-threshold 0.7)))
+
+(cl-defun llm-decide-choice (provider instructions choices-alist context &key target-threshold)
+  "Ask PROVIDER to choose one of CHOICES, about the CONTEXT.
+
+INSTRUCTIONS is a string explaining how to make the choice.
+
+CHOICES-ALIST are an alist of symbols to an explanation of their
+meaning. CONTEXT is the context that the choices will be judged against.
+The model has to have confidence of TARGET-THRESHOLD or above (by
+default 0.7), and will be used to judge if the model is sufficiently
+confident in the choice.
+
+This returns either one of the symbols in the CHOICES-ALIST or nil, if
+the answer could not be determined with sufficient confidence."
+  (let* ((result (llm-decide
+                  provider
+                  (list (make-llm-question-choice
+                         :name 'choice
+                         :choices choices-alist
+                         :instructions instructions))
+                  context))
+         (choice-result (alist-get 'choice result)))
+    (when (>= (llm-decision-choice-confidence choice-result)
+              (or target-threshold 0.7))
+      (llm-decision-choice-choice choice-result))))
+
+(cl-defun llm-decide-score (provider instructions scale context &key target-threshold)
+  "Ask PROVIDER to choose a score on SCALE, given CONTEXT.
+
+INSTRUCTIONS is a string providing information on how to evaluate the
+scale against the context.
+
+SCALE is a list strings, which are ordinal and increasing
+categories (such as small, medium, large or low, medium, high).
+
+This returns a floating point number among the SCALE, whose value can be
+between 0 and the length of the scale minus 1, if the confidence meets
+or exceeds TARGET-THRESHOLD (by default 0.7).  Otherwise, return nil."
+  (let* ((result (llm-decide
+                  provider
+                  (list (make-llm-question-score
+                         :name 'score
+                         :instructions instructions
+                         :scale scale))
+                  context))
+         (score-result (alist-get 'score result)))
+    (when (>= (llm-decision-score-confidence score-result)
+              (or target-threshold 0.7))
+      (llm-decision-score-score score-result))))
+
 (cl-defgeneric llm-count-tokens (provider string)
   "Return the number of tokens in STRING from PROVIDER.
 This may be an estimate if the LLM does not provide an exact
