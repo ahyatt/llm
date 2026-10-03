@@ -803,7 +803,10 @@ This will return an alist keyed by the name of each question, where the
 exact value is determined by the type of question.  A `llm-question-choice'
 question will return a `llm-decision-choice' struct.
 
-This is a fast call, so no async option should be necessary.")
+This is a fast call all the time, although there is always the chance of
+a slow call, especially with local providers that may need warming up.
+When it is fast, it usually is fast enough that the user may not notice
+a lag.")
 
 (cl-defmethod llm-decide :before (provider _ _)
   "Issue a warning if the LLM is non-free."
@@ -811,6 +814,27 @@ This is a fast call, so no async option should be necessary.")
     (llm--warn-on-nonfree (llm-name provider) info)))
 
 (cl-defmethod llm-decide ((_ (eql nil)) _ _)
+  "Catch trivial configuration mistake."
+  (signal 'llm-provider-unconfigured
+          '("LLM provider was nil.  Please set the provider in the application you are using")))
+
+(cl-defgeneric llm-decide-async (provider questions state success-callback error-callback)
+  "Decide each element of QUESTIONS.
+
+PROVIDER, QUESTIONS, and STATE are all the same as `llm-decide'.
+
+SUCCESS-CALLBACK is a single-argument callback that will be called with
+the result, an alist keyed by the name of each question.
+
+ERROR-CALLBACK is a two argument callback that is called with the error
+type and the error object (usually a message) in the result of an error.")
+
+(cl-defmethod llm-decide-async :before (provider _ _ _ _)
+  "Issue a warning if the LLM is non-free."
+  (when-let* ((info (llm-nonfree-message-info provider)))
+    (llm--warn-on-nonfree (llm-name provider) info)))
+
+(cl-defmethod llm-decide-async ((_ (eql nil)) _ _ _ _)
   "Catch trivial configuration mistake."
   (signal 'llm-provider-unconfigured
           '("LLM provider was nil.  Please set the provider in the application you are using")))

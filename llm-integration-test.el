@@ -560,6 +560,36 @@ else.  We really just want to see if it's in the right ballpark."
       (should (eq 'errand (llm-decision-choice-choice (alist-get 'context result))))
       (should (< (llm-decision-score-score (alist-get 'priority result)) 4)))))
 
+(ert-deftest llm-decide-async ()
+  (dolist (provider (seq-filter (lambda (provider)
+                                  (member 'decision (llm-capabilities provider)))
+                                (llm-integration-test-providers)))
+    (let ((result nil)
+          (buf (current-buffer))
+          (llm-warn-on-nonfree nil)
+          (err-result nil))
+      (llm-decide-async
+       provider
+       (list (make-llm-question-choice
+              :name 'context
+              :instructions "For the task and date, choose the most appropriate context for the task."
+              :choices
+              '((home . "A task done at home")
+                (work . "A task done at work")
+                (errand . "A task done while running errands")
+                (school . "A task done at school")
+                (other . "A task done in another context"))))
+       "Task: Buy milk, Due Date: December 31, 2029"
+       (lambda (r)
+         (should (or (not (buffer-live-p buf)) (eq (current-buffer) buf)))
+         (setq result r))
+       (lambda (_ err)
+         (setq err-result err)))
+      (while (not (or result err-result))
+        (sleep-for 0.1))
+      (when err-result (error "%s" err-result))
+      (should (eq 'errand (llm-decision-choice-choice (alist-get 'context result)))))))
+
 (llm-def-integration-test llm-count-tokens (provider)
   (let ((result (llm-count-tokens provider "What is the capital of France?")))
     (should (integerp result))

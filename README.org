@@ -175,6 +175,7 @@ The error callback is called when something goes wrong, either something like an
 - ~llm-batch-embeddings provider strings~: same as ~llm-embedding~, but takes in a list of strings, and returns a list of vectors whose order corresponds to the ordering of the strings.
 - ~llm-batch-embeddings-async provider strings vectors-callback error-callback~: same as ~llm-embedding-async~, but takes in a list of strings, and returns a list of vectors whose order corresponds to the ordering of the strings.
 - ~llm-decide provider questions state~: Decide a list of questions based on the value of state.  This is a fast, synchronous function.  See the [[id:decisions][Decisions]] section for more information.
+- ~llm-decide-async provider questions state result-callback error-callback~: Decide a list of questions based on the value of state, asynchronously.   See the [[id:decisions][Decisions]] section for more information.
 - ~llm-count-tokens provider string~: Count how many tokens are in ~string~.  This may vary by ~provider~, because some provideres implement an API for this, but typically is always about the same.  This gives an estimate if the provider has no API support.
 - ~llm-cancel-request request~ Cancels the given request, if possible.  The ~request~ object is the return value of async and streaming functions.
 - ~llm-name provider~.  Provides a short name of the model or provider, suitable for showing to users.
@@ -369,7 +370,7 @@ correct models to use, because most models do not support video and audio.
 :PROPERTIES:
 :ID:       decisions
 :END:
-Decisions are a way to ask the LLM to make a fast decision based on a set of options.  The LLM will return the option it thinks is best along with a confidence, and probabilities.  *This is alpha functionality and the API may change in the future*. Decisions are synchronous calls, since they return very quickly, and are extremely cheap.
+Decisions are a way to ask the LLM to make a fast decision based on a set of options.  The LLM will return the option it thinks is best along with a confidence, and probabilities.  *This is alpha functionality and the API may change in the future*. Decisions can be synchronous calls without significant wait times for the user, since they return very quickly (in the low hundreds of milliseconds, typically), and are extremely cheap.
 
 The =llm-typesafe= module defines the TypeSafe API, which can be used with [[https://typesafe.ai/][TypeSafe AI]] as well as compatible open systems such as [[https://ollaya.dev/][Ollaya]].   OpenRouter also supports this, and requires the ~decide-model~ to be set on it.
 
@@ -420,6 +421,8 @@ For example, this demonstrates all three types of questions, and the results are
 : Context: errand (confidence: 0.99)
 : Priority: 0.34 (confidence: 0.66)
 
+~llm-decide-async~ is also available, and has the same callback structure as the
+rest of the library.
 
 ** Advanced prompt creation
 The =llm-prompt= module provides helper functions to create prompts that can

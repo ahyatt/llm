@@ -70,6 +70,9 @@ e.g. http://localhost:11435/v1/systemone."
 (cl-defmethod llm-decide ((provider llm-typesafe-compatible) questions state)
   (llm-provider-utils-decide provider questions state))
 
+(cl-defmethod llm-decide-async ((provider llm-typesafe-compatible) questions state result-callback error-callback)
+  (llm-provider-utils-decide-async provider questions state result-callback error-callback))
+
 (cl-defmethod llm-provider-decide-url ((provider llm-typesafe-compatible))
   (llm-typesafe-compatible-url provider))
 
