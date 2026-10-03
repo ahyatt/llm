@@ -174,7 +174,10 @@ The error callback is called when something goes wrong, either something like an
 - ~llm-embedding-async provider string vector-callback error-callback~: Same as ~llm-embedding~ but this is processed asynchronously. ~vector-callback~ is called with the vector embedding, and, in case of error, ~error-callback~ is called with the same arguments as in ~llm-chat-async~.
 - ~llm-batch-embeddings provider strings~: same as ~llm-embedding~, but takes in a list of strings, and returns a list of vectors whose order corresponds to the ordering of the strings.
 - ~llm-batch-embeddings-async provider strings vectors-callback error-callback~: same as ~llm-embedding-async~, but takes in a list of strings, and returns a list of vectors whose order corresponds to the ordering of the strings.
-- ~llm-decide provider questions state~: Decide a list of questions based on the value of state.  This is a fast, synchronous function.  See the [[id:decisions][Decisions]] section for more information.
+- ~llm-decide provider questions state~: Decide a list of questions based on the value of state.  This is a fast, synchronous function.  See the [[id:decisions][Decisions]] section for more information on this and the other decision functions.
+- ~llm-decide-bool~: Decide a single boolean question, a convenience function for ~llm-decide~.
+- ~llm-decide-choice~: Decide a single multiple choice question, a convenience function for ~llm-decide~.
+- ~llm-decide-score~: Decide a score along a scale, a convenience function for ~llm-decide~.
 - ~llm-count-tokens provider string~: Count how many tokens are in ~string~.  This may vary by ~provider~, because some provideres implement an API for this, but typically is always about the same.  This gives an estimate if the provider has no API support.
 - ~llm-cancel-request request~ Cancels the given request, if possible.  The ~request~ object is the return value of async and streaming functions.
 - ~llm-name provider~.  Provides a short name of the model or provider, suitable for showing to users.
@@ -420,6 +423,29 @@ For example, this demonstrates all three types of questions, and the results are
 : Context: errand (confidence: 0.99)
 : Priority: 0.34 (confidence: 0.66)
 
+There are also methods to make this easier, when dealing with single questions.  This, for example, returns =nil=.
+
+#+begin_src emacs-lisp
+(llm-decide-bool my-llm-provider "Is this text Spanish?" "Meu aerobarco está cheio de enguias")
+#+end_src
+
+This returns one of several choices, in this case, returning =pt=.
+
+#+begin_src emacs-lisp
+(llm-decide-choice my-llm-provider "What language is this text in?" '((pt . "Portuguese") (it . "Italian") (es . "Spanish")) "Meu aerobarco está cheio de enguias")
+#+end_src
+
+#+RESULTS:
+: pt
+
+And this returns a score on a scale, in this case returning a float such as =2.78=, close to "Very unusual".
+
+#+begin_src emacs-lisp
+(llm-decide-score my-llm-provider "Rate how unusual the sentence is" '("Common" "Ordinary" "Unusual" "Very unusual") "Meu aerobarco está cheio de enguias")
+#+end_src
+
+#+RESULTS:
+: 2.78
 
 ** Advanced prompt creation
 The =llm-prompt= module provides helper functions to create prompts that can
