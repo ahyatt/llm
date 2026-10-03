@@ -543,10 +543,7 @@ Any strings will be concatenated, integers will be added, etc."
                          provider data)
                         "Unknown error")))))))
 
-;; This is not yet a cl-defmethod, because the support for providers is unknown,
-;; and adding a type provisionally would be difficult because structs do not
-;; support multiple inheritance.
-(defun llm-provider-utils-decide (provider questions state)
+(cl-defmethod llm-decide ((provider llm-standard-decide-provider) questions state)
   (llm-provider-request-prelude provider)
   (let ((response (llm-request-plz-sync (llm-provider-decide-url provider)
                                         :headers (llm-provider-headers provider)
@@ -555,7 +552,8 @@ Any strings will be concatenated, integers will be added, etc."
         (signal 'llm-request-error (list err-msg))
       (llm-provider-decide-extract-result provider response))))
 
-(defun llm-provider-utils-decide-async (provider questions state result-callback error-callback)
+(cl-defmethod llm-decide-async ((provider llm-standard-decide-provider) questions state
+                                result-callback error-callback)
   (llm-provider-request-prelude provider)
   (let ((buf (current-buffer)))
     (llm-request-plz-async
