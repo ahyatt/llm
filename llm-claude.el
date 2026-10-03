@@ -43,7 +43,7 @@
                                    &aux
                                    (key (llm-provider-utils--wrap-key raw-key)))))
   (key nil :read-only t)
-  (chat-model "claude-sonnet-4-6" :read-only t))
+  (chat-model "claude-sonnet-5-5" :read-only t))
 
 (cl-defmethod llm-nonfree-message-info ((_ llm-claude))
   "Return Claude's nonfree ToS."

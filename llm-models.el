@@ -181,6 +181,16 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :regex "text-embedding-ada-002")
    ;; https://docs.anthropic.com/en/docs/about-claude/models
    (make-llm-model
+    :name "Claude 5.5 Opus" :symbol 'claude-opus-5-5
+    :capabilities '(generation tool-use image-input pdf-input caching json-response reasoning)
+    :context-length 1000000
+    :regex "claude-opus-5-5")
+   (make-llm-model
+    :name "Claude 5.5 Sonnet" :symbol 'claude-sonnet-5-5
+    :capabilities '(generation tool-use image-input pdf-input caching json-response reasoning)
+    :context-length 1000000
+    :regex "claude-sonnet-5-5")
+   (make-llm-model
     :name "Claude 5 Fable" :symbol 'claude-5-fable
     :capabilities '(generation tool-use image-input pdf-input caching json-response reasoning)
     :context-length 1000000
