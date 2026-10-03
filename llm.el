@@ -840,10 +840,10 @@ CONTEXT is a string."
 INSTRUCTIONS is a string explaining how to make the choice.
 
 CHOICES-ALIST are an alist of symbols to an explanation of their
-meaning. CONTEXT is the context that the choices will be judged against.
-The model has to have confidence of TARGET-THRESHOLD or above (by
-default 0.7), and will be used to judge if the model is sufficiently
-confident in the choice.
+meaning.  CONTEXT is the context that the choices will be judged
+against.  The model has to have confidence of TARGET-THRESHOLD or
+above (by default 0.7), and will be used to judge if the model is
+sufficiently confident in the choice.
 
 This returns either one of the symbols in the CHOICES-ALIST or nil, if
 the answer could not be determined with sufficient confidence."
