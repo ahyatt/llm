@@ -925,6 +925,10 @@ This should only be used for logging or debugging."
 (define-error
  'llm-request-authentication-error "LLM request authentication failed" 'llm-request-error)
 (define-error
+ 'llm-request-too-many-requests "Too many requests by client" 'llm-request-error)
+(define-error
+ 'llm-request-service-unavailable "LLM provider is unavailable" 'llm-request-error)
+(define-error
  'llm-request-bad-request "LLM request was invalid" 'llm-request-error)
 (define-error
  'llm-request-refusal "LLM provider refused the request" 'llm-request-error)

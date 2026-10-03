@@ -258,6 +258,8 @@ All LLM-related errors inherit from ~llm-error~:
     - ~llm-request-timeout~: Signaled when a request times out.
     - ~llm-request-authentication-error~: Signaled when authentication fails (e.g., invalid API key).
     - ~llm-request-bad-request~: Signaled when the request was invalid (e.g., bad format).
+    - ~llm-request-too-many-requests~: Signaled when the client has exceeded their rate limit.
+    - ~llm-request-service-unavailable~: Signaled when the LLM service provider is temporarily unavailable.
   - ~llm-tool-call-error~: The base error for all tool calling errors.
     - ~llm-tool-unknown-tool~: Signaled when an LLM attempts to call a tool that was not provided in the prompt's tools list.
     - ~llm-tool-unknown-argument~: Signaled when an LLM calls a tool with an argument that is not defined in the tool's argument specification.

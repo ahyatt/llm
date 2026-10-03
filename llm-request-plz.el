@@ -83,6 +83,10 @@ TIMEOUT is the number of seconds to wait for a response."
              (signal 'llm-request-authentication-error (list body)))
             ((eq status 400)
              (signal 'llm-request-bad-request (list body)))
+            ((eq status 429)
+             (signal 'llm-request-too-many-requests (list body)))
+            ((eq status 503)
+             (signal 'llm-request-service-unavailable (list body)))
             (t
              (signal 'llm-request-error
                      (list (format "LLM request failed with code %d: %s (additional information: %s)"
@@ -113,6 +117,10 @@ TIMEOUT is the number of seconds to wait for a response."
              (funcall on-error 'llm-request-authentication-error body))
             ((eq status 400)
              (funcall on-error 'llm-request-bad-request body))
+            ((eq status 429)
+             (funcall on-error 'llm-request-too-many-requests body))
+            ((eq status 503)
+             (funcall on-error 'llm-request-service-unavailable body))
             (t
              (funcall on-error 'llm-request-error body)))))
         ((plz-error-message error)
