@@ -762,6 +762,13 @@ STREAMING if non-nil, turn on response streaming."
   (setf (llm-typesafe-compatible-key (llm-openrouter-decider provider)) (llm-openrouter-key provider))
   (llm-provider-utils-decide (llm-openrouter-decider provider) questions state))
 
+(cl-defmethod llm-decide-async ((provider llm-openrouter) questions state result-callback error-callback)
+  (unless (llm-openrouter-decider provider)
+    (error "No decider model was set for the OpenRouter provider, please re-construct with a decider model"))
+  ;; Synchronize the key, which may have been changed.
+  (setf (llm-typesafe-compatible-key (llm-openrouter-decider provider)) (llm-openrouter-key provider))
+  (llm-provider-utils-decide-async (llm-openrouter-decider provider) questions state result-callback error-callback))
+
 (cl-defmethod llm-name ((_ llm-openai))
   "Return the name of the provider."
   "Open AI")

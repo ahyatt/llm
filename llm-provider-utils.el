@@ -328,7 +328,7 @@ return a list of `llm-chat-prompt-tool-use' structs.")
      :on-success (lambda (data)
                    (if-let* ((err-msg (llm-provider-embedding-extract-error provider data)))
                        (llm-provider-utils-callback-in-buffer
-                        buf error-callback 'error
+                        buf error-callback 'llm-error
                         err-msg)
                      (llm-provider-utils-callback-in-buffer
                       buf vector-callback
@@ -363,7 +363,7 @@ return a list of `llm-chat-prompt-tool-use' structs.")
      :on-success (lambda (data)
                    (if-let* ((err-msg (llm-provider-embedding-extract-error provider data)))
                        (llm-provider-utils-callback-in-buffer
-                        buf error-callback 'error
+                        buf error-callback 'llm-error
                         err-msg)
                      (llm-provider-utils-callback-in-buffer
                       buf vector-callback
@@ -431,7 +431,7 @@ return a list of `llm-chat-prompt-tool-use' structs.")
                                           (generate-new-buffer " *llm-temp*" t))
                      (if-let* ((err-msg (llm-provider-chat-extract-error provider data)))
                          (llm-provider-utils-callback-in-buffer
-                          buf error-callback 'error
+                          buf error-callback 'llm-error
                           err-msg)
                        (llm-provider-utils-process-result
                         provider prompt
@@ -513,7 +513,7 @@ Any strings will be concatenated, integers will be added, etc."
                          buf partial-callback callback-val))))
                   (lambda (err)
                     (llm-provider-utils-callback-in-buffer
-                     buf error-callback 'error
+                     buf error-callback 'llm-error
                      err)))
      :on-success
      (lambda (_)
@@ -554,6 +554,29 @@ Any strings will be concatenated, integers will be added, etc."
     (if-let* ((err-msg (llm-provider-decide-extract-error provider response)))
         (signal 'llm-request-error (list err-msg))
       (llm-provider-decide-extract-result provider response))))
+
+(defun llm-provider-utils-decide-async (provider questions state result-callback error-callback)
+  (llm-provider-request-prelude provider)
+  (let ((buf (current-buffer)))
+    (llm-request-plz-async
+     (llm-provider-decide-url provider)
+     :headers (llm-provider-headers provider)
+     :data (llm-provider-decide-request provider questions state)
+     :on-success (lambda (data)
+                   (with-current-buffer (if (buffer-live-p buf)
+                                            buf
+                                          (generate-new-buffer " *llm-temp*" t))
+                     (if-let* ((err-msg (llm-provider-decide-extract-error provider data)))
+                         (llm-provider-utils-callback-in-buffer
+                          buf error-callback 'llm-error err-msg)
+                       (llm-provider-utils-callback-in-buffer
+                        buf result-callback (llm-provider-decide-extract-result provider data)))))
+     :on-error (lambda (type data)
+                 (llm-provider-utils-callback-in-buffer
+                  buf error-callback type
+                  (if (stringp data) data
+                    (or (llm-provider-decide-extract-error provider data)
+                        "Unknown error")))))))
 
 (defun llm-provider-utils-get-system-prompt (prompt &optional example-prelude)
   "From PROMPT, turn the context and examples into a string.
