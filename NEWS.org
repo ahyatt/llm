@@ -1,6 +1,7 @@
 * Version 0.33.0
 - Add =llm-decide=, a way to get fast decisions
 - Add new error subtypes =llm-request-too-many-requests= and =llm-request-service-unavailable= and ensure that async callbacks always get a correct error type, instead of just =error=.
+- Add Claude Opus 5.5 and Sonnet 5.5, and make Sonnet 5.5 the default Claude model.
 * Version 0.32.2
 - Add Muse Spark and Muse Spark Contributor models (usable as Open AI compatible model, or with OpenRouter), and add GPT 6 Sol and Luna
 - Set default Open AI model to GPT 6 Sol
