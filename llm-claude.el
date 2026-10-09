@@ -39,7 +39,7 @@
                                    default-chat-max-tokens
                                    default-chat-non-standard-params
                                    ((:key raw-key))
-                                   (chat-model "claude-sonnet-5")
+                                   (chat-model "claude-sonnet-5-5")
                                    &aux
                                    (key (llm-provider-utils--wrap-key raw-key)))))
   (key nil :read-only t)
