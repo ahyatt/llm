@@ -1,3 +1,5 @@
+* Version 0.33.1
+- Add Claude Haiku 5.5, fix update for Claude default model to be Sonnet 5.5
 * Version 0.33.0
 - Add =llm-decide=, a way to get fast decisions
 - Add new error subtypes =llm-request-too-many-requests= and =llm-request-service-unavailable= and ensure that async callbacks always get a correct error type, instead of just =error=.
