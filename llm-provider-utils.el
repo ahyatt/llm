@@ -407,9 +407,7 @@ return a list of `llm-chat-prompt-tool-use' structs.")
                                           provider response)
                                          multi-output
                                          (lambda (result)
-                                           (setq final-result result))
-                                         (lambda (type msg)
-                                           (signal type msg))))
+                                           (setq final-result result))))
     ;; In most cases, final-result will be available immediately.  However, when
     ;; executing tools, we need to wait for their callbacks, and only after
     ;; those are called with this be ready.
@@ -439,10 +437,7 @@ return a list of `llm-chat-prompt-tool-use' structs.")
                         multi-output
                         (lambda (result)
                           (llm-provider-utils-callback-in-buffer
-                           buf success-callback result))
-                        (lambda (type msg)
-                          (llm-provider-utils-callback-in-buffer
-                           buf error-callback type msg))))))
+                           buf success-callback result))))))
      :on-error (lambda (type data)
                  (llm-provider-utils-callback-in-buffer
                   buf error-callback type
@@ -870,8 +865,7 @@ ROLE will be `assistant' by default, but can be passed in for other roles."
                                       tool-results)
                        :multi-turn-plist multi-turn)))))
 
-(defun llm-provider-utils-process-result (provider prompt partial-result multi-output success-callback
-                                                   error-callback)
+(defun llm-provider-utils-process-result (provider prompt partial-result multi-output success-callback)
   "Process the RESPONSE from the provider for PROMPT.
 This execute function calls if there are any, does any result
 appending to the prompt, and returns an appropriate response for
@@ -885,9 +879,7 @@ MULTI-OUTPUT is true if multiple outputs are expected to be passed to
 SUCCESS-CALLBACK.
 
 SUCCESS-CALLBACK is the callback that will be run when all functions
-complete.
-
-ERROR-CALLBACK is the callback that will be run on error."
+complete."
   (when (and (plist-get partial-result :text)
              (> (length (plist-get partial-result :text)) 0))
     (llm-provider-append-to-prompt provider prompt (plist-get partial-result :text)
@@ -898,7 +890,7 @@ ERROR-CALLBACK is the callback that will be run on error."
       ;; will be done inside `llm-provider-utils-execute-tool-uses'.
       (llm-provider-utils-execute-tool-uses
        provider prompt tool-uses multi-output
-       partial-result success-callback error-callback)
+       partial-result success-callback)
     (funcall success-callback
              (if multi-output (llm-provider-utils--sanitize-result partial-result)
                (plist-get partial-result :text)))))
@@ -977,8 +969,7 @@ This will convert all :json-false and :false values to FALSE-VAL."
     cleaned))
 
 (defun llm-provider-utils-execute-tool-uses (provider prompt tool-uses multi-output
-                                                      partial-result success-callback
-                                                      error-callback)
+                                                      partial-result success-callback)
   "Execute TOOL-USES, a list of `llm-provider-utils-tool-use'.
 
 A response suitable for returning to the client will be returned.
@@ -1005,8 +996,7 @@ function has returned results."
         callback-executed
         (successes 0))
     (cl-flet* ((maybe-call-success ()
-                 (when (and (= (+ (length results) (length failed)) (length tool-uses))
-                            (> (length results) 0))
+                 (when (= (+ (length results) (length failed)) (length tool-uses))
                    (llm-provider-utils-populate-tool-uses
                     provider prompt
                     (append results failed-results))
@@ -1051,7 +1041,7 @@ function has returned results."
                                                                            :tool name
                                                                            :arg arg))))
                                                     nil))))))
-              (end-func (when (and tool tool-uses)
+              (end-func (when tool-uses
                           (lambda (result)
                             (llm--log
                              'api-funcall
@@ -1081,10 +1071,14 @@ function has returned results."
          (if failure
              (progn
                (push failure failed)
-               (push (cons tool-use
-                           (format "Error %s calling tool: %s"
-                                   (car failure)
-                                   (cdr failure))) failed-results))
+               ;; We have a failure, but a failure in a tool call should look
+               ;; like a success that has a string error.  This is because tool
+               ;; calls need to proceed, and send back the result to the
+               ;; provider.  Otherwise, we're left with a broken state that's
+               ;; hard to recover from.
+               (funcall end-func (format "Error %s calling tool: %s"
+                                         (car failure)
+                                         (cdr failure))))
            (incf successes)
            (if (llm-tool-async tool)
                (apply (llm-tool-function tool)
@@ -1095,15 +1089,7 @@ function has returned results."
       ;; We may have failed at the end, meaning we never realized we had to
       ;; execute the success callback. Let's give ourselves a chance to do that
       ;; now.
-      (unless callback-executed (maybe-call-success))
-      ;; Nothing was callable, and something failed, so we call the error
-      ;; callback. We may have several errors, but we'll just report the last
-      ;; one.
-      (when (and (= 0 successes) failed)
-        (llm-provider-utils-populate-tool-uses
-         provider prompt
-         failed-results)
-        (funcall error-callback (caar failed) (cdar failed))))))
+      (unless callback-executed (maybe-call-success)))))
 
 ;; This is a useful method for getting out of the request buffer when it's time
 ;; to make callbacks.
