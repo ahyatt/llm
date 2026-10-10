@@ -222,7 +222,7 @@ PROVIDER is the Open AI provider struct."
   (let ((errdata (assoc-default 'error err-response)))
     (when errdata
       (format "Open AI returned error: %s message: %s"
-              (cdr (assoc 'error_type (assoc 'metadata errdata)))
+              (cdr (assoc 'error_type (assoc-default 'metadata errdata)))
               (cdr (assoc 'message errdata))))))
 
 (cl-defmethod llm-provider-chat-extract-error ((provider llm-openai) err-response)
