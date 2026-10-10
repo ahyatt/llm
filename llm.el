@@ -1024,6 +1024,19 @@ This should only be used for logging or debugging."
  'llm-request-bad-request "LLM request was invalid" 'llm-request-error)
 (define-error
  'llm-request-refusal "LLM provider refused the request" 'llm-request-error)
+(define-error
+ 'llm-tool-call-error "An error occurred when calling an LLM tool" 'llm-error)
+(define-error
+ 'llm-tool-unknown-tool "An LLM tool was called, but not found in the available tools"
+ 'llm-tool-call-error)
+(define-error
+ 'llm-tool-unknown-argument
+ "An LLM tool was called with an unknown argument"
+ 'llm-tool-call-error)
+(define-error
+ 'llm-tool-missing-argument
+ "A tool was called missing a required argument"
+ 'llm-tool-call-error)
 
 (provide 'llm)
 ;;; llm.el ends here

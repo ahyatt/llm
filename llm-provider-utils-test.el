@@ -253,20 +253,27 @@
                                             :expected-result success)))
                   (:name "Unknown tool"
                          :tools ,(list tool)
-                         :tool-uses ((:name "missing-tool" :expected-error (llm-tool-unknown-tool . (:tool "missing-tool")))))
+                         :tool-uses ((:name "missing-tool"
+                                            :expected-result "Unknown tool"
+                                            :expected-error (llm-tool-unknown-tool . (:tool "missing-tool")))))
                   (:name "Unknown tool with args"
                          :tools ,(list tool)
                          :tool-uses ((:name "missing-tool" :args ((arg1 . "value1"))
+                                            :expected-result "Unknown tool"
                                             :expected-error (llm-tool-unknown-tool . (:tool "missing-tool")))))
                   (:name "Unknown tool partial"
                          :tools ,(list tool)
                          :tool-uses ((:name "tool-a"
                                             :args ((arg1 . "value1"))
                                             :expected-result ("value1" nil))
-                                     (:name "missing-tool" :expected-error (llm-tool-unknown-tool . (:tool "missing-tool")))))
+                                     (:name "missing-tool"
+                                            :expected-result "Unknown tool"
+                                            :expected-error (llm-tool-unknown-tool . (:tool "missing-tool")))))
                   (:name "Unknown tool partial reversed"
                          :tools ,(list tool)
-                         :tool-uses ((:name "missing-tool" :expected-error (llm-tool-unknown-tool . (:tool "missing-tool")))
+                         :tool-uses ((:name "missing-tool"
+                                            :expected-result "Unknown tool"
+                                            :expected-error (llm-tool-unknown-tool . (:tool "missing-tool")))
                                      (:name "tool-a"
                                             :args ((arg1 . "value1"))
                                             :expected-result ("value1" nil))))
@@ -274,6 +281,7 @@
                          :tools ,(list tool)
                          :tool-uses ((:name "tool-a"
                                             :args ((bad-arg . "value1"))
+                                            :expected-result "Unknown argument: bad-arg"
                                             :expected-error (llm-tool-unknown-argument . (:tool "tool-a"
                                                                                                 :arg "bad-arg")))))
                   (:name "Unknown arg partial result"
@@ -283,12 +291,14 @@
                                             :expected-result ("value1" nil))
                                      (:name "tool-a"
                                             :args ((bad-arg . "value1"))
+                                            :expected-result "Unknown argument: bad-arg"
                                             :expected-error (llm-tool-unknown-argument . (:tool "tool-a"
                                                                                                 :arg "bad-arg")))))
                   (:name "Unknown arg partial result reversed"
                          :tools ,(list tool)
                          :tool-uses ((:name "tool-a"
                                             :args ((bad-arg . "value1"))
+                                            :expected-result "Unknown argument: bad-arg"
                                             :expected-error (llm-tool-unknown-argument . (:tool "tool-a"
                                                                                                 :arg "bad-arg")))
                                      (:name "tool-a"
@@ -297,6 +307,7 @@
                   (:name "Missing required arg"
                          :tools ,(list tool)
                          :tool-uses ((:name "tool-a" :args ((arg2 . "value2"))
+                                            :expected-result "Missing required argument: arg1"
                                             :expected-error (llm-tool-missing-argument . (:tool "tool-a"
                                                                                                 :arg (:name "arg1" :type string :description "Argument 1" :optional nil))))))
                   (:name "Missing required arg partial success"
@@ -305,6 +316,7 @@
                                             :args ((arg1 . "value1"))
                                             :expected-result ("value1" nil))
                                      (:name "tool-a" :args ((arg2 . "value2"))
+                                            :expected-result "Missing required argument: arg1"
                                             :expected-error
                                             (llm-tool-missing-argument
                                              .
@@ -330,11 +342,7 @@
                                     tools))))
                 callback-executed
                 (tool-id 0)
-                id-to-tool-use
-                (expected-errors (seq-filter #'identity
-                                             (mapcan (lambda (call)
-                                                       (list (plist-get call :expected-error)))
-                                                     (plist-get test :tool-uses)))))
+                id-to-tool-use)
             (ert-info ((format "Test %s, multi-output: %s, async: %s"
                                (plist-get test :name) multi-output async))
               (llm-provider-utils-execute-tool-uses
@@ -365,20 +373,15 @@
                             (if multi-output (append
                                               (list :text "partial result"
                                                     :tool-results expected-results)
-                                              (when expected-errors
+                                              (when-let* ((expected-errors
+                                                           (mapcan (lambda (tool-use)
+                                                                     (when-let* ((expected-error (plist-get tool-use :expected-error)))
+                                                                       (list (plist-get tool-use :expected-error))))
+                                                                   tool-uses)))
                                                 (list :errors expected-errors)))
                               expected-results)))
                      (ert-info ((format "Testing to see if the result is equal to expected %s" full-expectation))
-                       (should (equal result full-expectation)))
-                   (ert-fail "success callback should not be called")))
-               ;; error callback
-               (lambda (type _)
-                 (setq callback-executed t)
-                 (if expected-errors
-                     ;; We use caar here because we just need the type of the *first* expected error.
-                     (ert-info ((format "Testing to see if errors are equal to expected errors: %S" (caar expected-errors)))
-                       (should (equal (caar expected-errors) type)))
-                   (ert-fail "error callback should not be called"))))
+                       (should (equal result full-expectation))))))
               (ert-info ((format "Testing to make sure a callback was called"))
                 (should callback-executed))
               (let* ((last-interaction (car (last (llm-chat-prompt-interactions prompt))))

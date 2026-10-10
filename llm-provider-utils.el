@@ -526,9 +526,7 @@ Any strings will be concatenated, integers will be added, etc."
                             provider tool-uses-raw))))
           multi-output
           (lambda (result)
-            (llm-provider-utils-callback-in-buffer buf response-callback result))
-          (lambda (type msg)
-            (llm-provider-utils-callback-in-buffer buf error-callback type msg)))))
+            (llm-provider-utils-callback-in-buffer buf response-callback result)))))
      :on-error (lambda (type data)
                  (llm-provider-utils-callback-in-buffer
                   buf error-callback type
@@ -992,14 +990,11 @@ function has returned results."
   (let (results
         tool-use-and-results
         failed
-        failed-results  ;; Similar to results but for errors, for populating in prompt.
-        callback-executed
-        (successes 0))
+        callback-executed)
     (cl-flet* ((maybe-call-success ()
-                 (when (= (+ (length results) (length failed)) (length tool-uses))
+                 (when (= (length results) (length tool-uses))
                    (llm-provider-utils-populate-tool-uses
-                    provider prompt
-                    (append results failed-results))
+                    provider prompt results)
                    (funcall success-callback
                             (if multi-output
                                 (llm-provider-utils-final-multi-output-result
@@ -1076,10 +1071,20 @@ function has returned results."
                ;; calls need to proceed, and send back the result to the
                ;; provider.  Otherwise, we're left with a broken state that's
                ;; hard to recover from.
-               (funcall end-func (format "Error %s calling tool: %s"
-                                         (car failure)
-                                         (cdr failure))))
-           (incf successes)
+               (funcall end-func
+                        (pcase (car failure)
+                          ('llm-tool-unknown-tool "Unknown tool")
+                          ('llm-tool-unknown-argument (format
+                                                       "Unknown argument: %s"
+                                                       (plist-get (cdr failure)
+                                                                  :arg)))
+                          ('llm-tool-missing-argument (format
+                                                       "Missing required argument: %s"
+                                                       (plist-get
+                                                        (plist-get (cdr failure)
+                                                                   :arg)
+                                                        :name)))
+                          (_ "Malformed tool call"))))
            (if (llm-tool-async tool)
                (apply (llm-tool-function tool)
                       (append (list end-func) call-args))

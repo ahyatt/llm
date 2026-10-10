@@ -264,6 +264,10 @@ All LLM-related errors inherit from ~llm-error~:
     - ~llm-request-bad-request~: Signaled when the request was invalid (e.g., bad format).
     - ~llm-request-too-many-requests~: Signaled when the client has exceeded their rate limit.
     - ~llm-request-service-unavailable~: Signaled when the LLM service provider is temporarily unavailable.
+  - ~llm-tool-call-error~: The base error for all tool calling errors.
+    - ~llm-tool-unknown-tool~: Signaled when an LLM attempts to call a tool that was not provided in the prompt's tools list.
+    - ~llm-tool-unknown-argument~: Signaled when an LLM calls a tool with an argument that is not defined in the tool's argument specification.
+    - ~llm-tool-missing-argument~: Signaled when an LLM calls a tool but omits a required (non-optional) argument.
 
 *** Error data
 Most errors return a list with a string as their data (the same as the standard error).
@@ -356,8 +360,17 @@ Be aware that there is no gaurantee that the tool will be called correctly.  Whi
 
 Examples can be found in =llm-tester=. There is also a tool call to generate tool calls from existing elisp functions in =utilities/elisp-to-tool.el=. Tool use can be controlled by the =:tool-options= param in =llm-make-chat-prompt= that takes a =llm-tool-options= struct.  This can be set to force or forbid tool calling, or to force a specific tool to be called.  This is useful when a converastion with tools happens and the tools remain constant but how they are used may need to change.  Ollama does not support currently support this.
 *** Tool calling errors
+In the case of tool calling, there could be specific problems that happen due to model quality issues such as an unknown tool being called, or called with the wrong arguments.  If that happens, we can't raise an error because that leaves the prompt in an invalid state.  Success or failure, the result must be sent back to the model so the next call can succeed.  Because of this, everything looks like a success.  However, if you use =multi-output=, then tool calling errors will be returned in the =:errors= property.
 
-In the case of tool calling, there could be specific problems that happen due to model quality issues: an unknown tool is called, or called with the wrong arguments.  If that happens, we can't raise an error because that leaves the prompt in an invalid state.  Success or failure, the result must be sent back to the model so the next call can succeed.  So, in this case, we don't call any tool, and instead have the result of the tool call be an error string.  The caller therefore will not know that there was an error.  Instead, nothing will be called. 
+When an error happens, instead of the return value of the tool function, the error string is returned.  This can happen with just some tools, while others have succeeded.  An example response is:
+
+#+begin_src emacs-lisp
+(:tool-uses ((:name "capital_of_country" :args (("country" . "France" )))
+             (:name "find_capital" :args (("country" . "Germany"))))
+            :tool-results (("capital_of_country" . "Paris")
+                           ("find_capital" . "Unknown tool"))
+            :errors ((llm-tool-unknown-tool . (:tool "find_capital"))))
+#+end_src
 ** Media input
 Media can be used in =llm-chat= and related functions.  To use media, you can use
 =llm-multipart= in =llm-make-chat-prompt=, and pass it an Emacs image or an
