@@ -1,3 +1,5 @@
+* Version 0.34.0
+- Simplify error handling by never calling the error callback when tool calling, but instead auto-populating responses
 * Version 0.33.1
 - Add Claude Haiku 5.5, fix update for Claude default model to be Sonnet 5.5
 - Fix OpenRouter error type not getting populated
