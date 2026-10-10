@@ -218,6 +218,13 @@ PROVIDER is the Open AI provider struct."
               (cdr (assoc 'type errdata))
               (cdr (assoc 'message errdata))))))
 
+(cl-defmethod llm-provider-embedding-extract-error ((_ llm-openrouter) err-response)
+  (let ((errdata (assoc-default 'error err-response)))
+    (when errdata
+      (format "Open AI returned error: %s message: %s"
+              (cdr (assoc 'error_type (assoc 'metadata errdata)))
+              (cdr (assoc 'message errdata))))))
+
 (cl-defmethod llm-provider-chat-extract-error ((provider llm-openai) err-response)
   (llm-provider-embedding-extract-error provider err-response))
 
