@@ -51,7 +51,7 @@
                                    default-chat-max-tokens
                                    default-chat-non-standard-params
                                    ((:key raw-key))
-                                   (chat-model "gpt-6-sol")
+                                   (chat-model "gpt-6.1-sol")
                                    (embedding-model "text-embedding-3-small")
                                    ((:decide-model decide-model))
                                    &aux
