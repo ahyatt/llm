@@ -51,10 +51,15 @@
                                    default-chat-max-tokens
                                    default-chat-non-standard-params
                                    ((:key raw-key))
-                                   (chat-model "gpt-6-sol")
+                                   (chat-model "gpt-6.1-sol")
                                    (embedding-model "text-embedding-3-small")
+                                   ((:decide-model decide-model))
                                    &aux
-                                   (key (llm-provider-utils--wrap-key raw-key)))))
+                                   (key (llm-provider-utils--wrap-key raw-key))
+                                   (decider (make-llm-openai-decide
+                                             :key raw-key
+                                             :model (or decide-model
+                                                        "gpt-6-luna"))))))
   "A structure for holding information needed by Open AI's API.
 
 KEY is the API key for Open AI, which is required.
@@ -64,12 +69,23 @@ will use a reasonable default.
 
 EMBEDDING-MODEL is the model to use for embeddings.  If unset, it
 will use a reasonable default."
-  key (chat-model "gpt-5.4-mini") (embedding-model "text-embedding-3-small"))
+  key chat-model embedding-model decider)
+
+(cl-defstruct
+    (llm-openai-decide
+     (:include llm-standard-decide-provider)
+     (:constructor make-llm-openai-decide
+                   (&key (model "gpt-6-luna")
+                         ((:key raw-key))
+                         &aux
+                         (key (llm-provider-utils--wrap-key raw-key)))))
+  key model)
 
 (cl-defstruct (llm-openai-compatible
                (:include llm-openai
                          (chat-model "unset")
-                         (embedding-model "unset"))
+                         (embedding-model "unset")
+                         (decider nil))
                (:constructor make-llm-openai-compatible
                              (&key default-chat-temperature
                                    default-chat-max-tokens
@@ -77,6 +93,7 @@ will use a reasonable default."
                                    ((:key raw-key))
                                    (chat-model "unset")
                                    (embedding-model "unset")
+                                   (decider nil)
                                    url
                                    &aux
                                    (key (llm-provider-utils--wrap-key raw-key)))))
@@ -110,8 +127,7 @@ https://api.example.com/v1/chat, then URL should be
   "A structure for Open Router.
 
 This is mostly compatible with Open AI's API but has some minor API
-differences. It also supports `llm-decide'."
-  decider)
+differences. It also supports `llm-decide'.")
 
 (cl-defgeneric llm-openai-primary-chat-model (provider)
   "Return the primary chat model for the Open AI PROVIDER.")
@@ -173,8 +189,9 @@ PROVIDER is the Open AI provider struct."
 (cl-defgeneric llm-openai--headers (provider)
   "Return the headers to use for a request from PROVIDER.")
 
-(cl-defmethod llm-openai--headers ((provider llm-openai))
-  (when-let* ((key (llm-openai-key provider)))
+(defun llm-openai--auth-headers (key)
+  "Return the auth headers with KEY."
+  (when key
     ;; If the key is a function, call it.  The `auth-source' API uses functions
     ;; to wrap secrets and to obfuscate them in the Emacs heap.
     (when (functionp key)
@@ -186,15 +203,22 @@ PROVIDER is the Open AI provider struct."
     ;; which always returns multibyte.
     `(("Authorization" . ,(format "Bearer %s" (encode-coding-string key 'utf-8))))))
 
+(cl-defmethod llm-openai--headers ((provider llm-openai))
+  (llm-openai--auth-headers (llm-openai-key provider)))
+
 (cl-defmethod llm-provider-headers ((provider llm-openai))
   (llm-openai--headers provider))
+
+(defun llm-openai--v1-url (command)
+  "Return the URL for COMMAND for Open AI's API."
+  (concat "https://api.openai.com/v1/" command))
 
 ;; Obsolete, but we keep them here for backward compatibility.
 (cl-defgeneric llm-openai--url (provider command)
   "Return the URL for COMMAND for PROVIDER.")
 
 (cl-defmethod llm-openai--url ((_ llm-openai) command)
-  (concat "https://api.openai.com/v1/" command))
+  (llm-openai--v1-url command))
 
 (cl-defmethod llm-provider-embedding-url ((provider llm-openai) &optional _)
   (llm-openai--url provider "embeddings"))
@@ -211,12 +235,16 @@ PROVIDER is the Open AI provider struct."
           (unless (string-suffix-p "/" (llm-openai-compatible-url provider))
             "/") command))
 
-(cl-defmethod llm-provider-embedding-extract-error ((_ llm-openai) err-response)
+(defun llm-openai-extract-error (err-response)
+  "Extract the error message from ERR-RESPONSE."
   (let ((errdata (assoc-default 'error err-response)))
     (when errdata
       (format "Open AI returned error: %s message: %s"
               (cdr (assoc 'type errdata))
               (cdr (assoc 'message errdata))))))
+
+(cl-defmethod llm-provider-embedding-extract-error ((_ llm-openai) err-response)
+  (llm-openai-extract-error err-response))
 
 (cl-defmethod llm-provider-embedding-extract-error ((_ llm-openrouter) err-response)
   (let ((errdata (assoc-default 'error err-response)))
@@ -674,7 +702,6 @@ STREAMING if non-nil, turn on response streaming."
      (assoc-default 'reasoning_content message)
      (assoc-default 'reasoning message))))
 
-
 (cl-defmethod llm-provider-populate-tool-uses ((_ llm-openai) prompt tool-uses)
   (llm-provider-utils-append-to-prompt prompt tool-uses nil nil 'assistant))
 
@@ -762,6 +789,115 @@ STREAMING if non-nil, turn on response streaming."
 (cl-defmethod llm-provider-collect-streaming-tool-uses ((_ llm-openai-compatible) data)
   (llm-provider-utils-openai-collect-streaming-tool-uses data))
 
+(cl-defgeneric llm-openai-question-request (question)
+  "Return a request plist for QUESTION to be sent to Open AI.")
+
+(cl-defmethod llm-openai-question-request ((question llm-question-bool))
+  (list :type "predicate"
+        :name (symbol-name (llm-question-bool-name question))
+        :instructions (llm-question-bool-instructions question)))
+
+(cl-defmethod llm-openai-question-request ((question llm-question-choice))
+  (list :type "choice"
+        :name (symbol-name (llm-question-choice-name question))
+        :instructions (llm-question-choice-instructions question)
+        :choices (apply #'vector
+                        (mapcar (lambda (choice)
+                                  (list :value (symbol-name (car choice))
+                                        :description (cdr choice)))
+                                (llm-question-choice-choices question)))))
+
+(cl-defmethod llm-openai-question-request ((question llm-question-score))
+  (list :type "score"
+        :name (symbol-name (llm-question-score-name question))
+        :instructions (llm-question-score-instructions question)
+        :levels (apply #'vector
+                       (mapcar (lambda (scale)
+                                 (list :label scale
+                                       ;; Open AI expects a description, which
+                                       ;; isn't in the API, so we'll just
+                                       ;; duplicate the label as the description
+                                       ;; for now.
+                                       :description scale))
+                               (llm-question-score-scale question)))))
+
+(cl-defmethod llm-decide ((provider llm-openai) questions state)
+  (unless (llm-openai-decider provider)
+    (error "No decider model was set for the OpenAI provider, please re-construct with a decider model"))
+  ;; Synchronize the key, which may have been changed.
+  (setf (llm-openai-decide-key (llm-openai-decider provider))
+        (llm-openai-key provider))
+  (llm-decide (llm-openai-decider provider) questions state))
+
+(cl-defmethod llm-decide-async ((provider llm-openai) questions state result-callback error-callback)
+  (unless (llm-openai-decider provider)
+    (error "No decider model was set for the OpenAI provider, please re-construct with a decider model"))
+  ;; Synchronize the key, which may have been changed.
+  (setf (llm-openai-decide-key (llm-openai-decider provider))
+        (llm-openai-key provider))
+  (llm-decide-async (llm-openai-decider provider) questions state result-callback error-callback))
+
+(cl-defmethod llm-nonfree-message-info ((_ llm-openai-decide))
+  "Return Open AI's nonfree terms of service."
+  "https://openai.com/policies/terms-of-use")
+
+(cl-defmethod llm-provider-request-prelude ((provider llm-openai-decide))
+  (unless (llm-openai-decide-key provider)
+    (signal 'llm-provider-unconfigured
+            '("To call Open AI API, add a key to the `llm-openai' provider"))))
+
+(cl-defmethod llm-provider-headers ((provider llm-openai-decide))
+  (llm-openai--auth-headers (llm-openai-decide-key provider)))
+
+(cl-defmethod llm-provider-decide-url ((_ llm-openai-decide))
+  (llm-openai--v1-url "decisions"))
+
+(cl-defmethod llm-provider-decide-request ((provider llm-openai-decide) questions state)
+  (list
+   :model (llm-openai-decide-model provider)
+   :input (vector
+           (list :role "user"
+                 :content (vector
+                           (list :type "input_text"
+                                 :text state))))
+   :questions (apply #'vector
+                     (mapcar #'llm-openai-question-request questions))))
+
+(cl-defmethod llm-provider-decide-extract-error ((_ llm-openai-decide) response)
+  (llm-openai-extract-error response))
+
+(cl-defmethod llm-provider-decide-extract-result ((_ llm-openai-decide) response)
+  (mapcar (lambda (answer)
+            (cons
+             (intern (alist-get 'name answer))
+             (pcase (alist-get 'type answer)
+               ("predicate"
+                (make-llm-decision-bool :confidence (alist-get 'probability answer)))
+               ("choice"
+                (make-llm-decision-choice
+                 :confidence (alist-get 'confidence answer)
+                 :choice (intern (alist-get 'choice answer))
+                 :probabilities
+                 (mapcar (lambda (prob)
+                           (cons
+                            (intern (alist-get 'value prob))
+                            (alist-get 'probability prob)))
+                         (alist-get 'probabilities answer))))
+               ("score"
+                (make-llm-decision-score
+                 :confidence (alist-get 'confidence answer)
+                 :score (alist-get 'score answer)
+                 :probabilities
+                 (mapcar #'cdr
+                         (sort (mapcar (lambda (prob)
+                                         (cons
+                                          (alist-get 'value prob)
+                                          (alist-get 'probability prob)))
+                                       (alist-get 'probabilities answer))
+                               (lambda (a b)
+                                 (> (cdr a) (cdr b))))))))))
+          (alist-get 'answers response)))
+
 (cl-defmethod llm-decide ((provider llm-openrouter) questions state)
   (unless (llm-openrouter-decider provider)
     (error "No decider model was set for the OpenRouter provider, please re-construct with a decider model"))
@@ -795,7 +931,9 @@ STREAMING if non-nil, turn on response streaming."
    (append '(streaming embeddings tool-use streaming-tool-use json-response model-list)
            (when-let* ((model (llm-models-match (llm-openai-chat-model provider))))
              (seq-intersection (llm-model-capabilities model)
-                               '(image-input reasoning))))))
+                               '(image-input reasoning)))
+           (when (llm-openai-decider provider)
+             (list 'decision)))))
 
 (cl-defmethod llm-capabilities ((provider llm-openai-compatible))
   (append '(streaming model-list)

@@ -48,6 +48,11 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
   (list
    ;; https://platform.openai.com/docs/models
    (make-llm-model
+    :name "GPT-6.1 Sol" :symbol 'gpt-6-1-sol
+    :capabilities '(generation tool-use image-input json-response reasoning)
+    :context-length 1050000
+    :regex (rx (seq "gpt-6\\.1-sol")))
+   (make-llm-model
     :name "GPT-6 Astra" :symbol 'gpt-6-astra
     :capabilities '(generation tool-use image-input json-response reasoning)
     :context-length 1050000
