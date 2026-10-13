@@ -360,7 +360,9 @@ Be aware that there is no gaurantee that the tool will be called correctly.  Whi
 
 Examples can be found in =llm-tester=. There is also a tool call to generate tool calls from existing elisp functions in =utilities/elisp-to-tool.el=. Tool use can be controlled by the =:tool-options= param in =llm-make-chat-prompt= that takes a =llm-tool-options= struct.  This can be set to force or forbid tool calling, or to force a specific tool to be called.  This is useful when a converastion with tools happens and the tools remain constant but how they are used may need to change.  Ollama does not support currently support this.
 *** Tool calling errors
-In the case of tool calling, there could be specific problems that happen due to model quality issues such as an unknown tool being called, or called with the wrong arguments.  If that happens, we can't raise an error because that leaves the prompt in an invalid state.  Success or failure, the result must be sent back to the model so the next call can succeed.  Because of this, everything looks like a success.  However, if you use =multi-output=, then tool calling errors will be returned in the =:errors= property.
+In the case of tool calling, there could be specific problems that happen due to model quality issues such as an unknown tool being called, or called with the wrong arguments.  If that happens, we can't raise an error because that leaves the prompt in an invalid state.  Success or failure, the result must be sent back to the model as a tool result, so the next call can succeed.  There still may be errors thrown when using tools, but only normal errors such as authentication, overload, or similar errors that can happen on any call.
+
+The actual errors are actually returned if you use =multi-output=.  Errors will be returned in the =:errors= property.
 
 When an error happens, instead of the return value of the tool function, the error string is returned.  This can happen with just some tools, while others have succeeded.  An example response is:
 
@@ -371,6 +373,8 @@ When an error happens, instead of the return value of the tool function, the err
                            ("find_capital" . "Unknown tool"))
             :errors ((llm-tool-unknown-tool . (:tool "find_capital"))))
 #+end_src
+
+For similar reasons, any error raised during calling a tool call function will return a string error as the tool call result, so will look like a success.
 ** Media input
 Media can be used in =llm-chat= and related functions.  To use media, you can use
 =llm-multipart= in =llm-make-chat-prompt=, and pass it an Emacs image or an

@@ -227,6 +227,12 @@
                         :description "No Args"
                         :function (lambda () 'success)
                         :args '()))
+         (error-tool (llm-make-tool
+                      :name "error-tool"
+                      :description "Error Tool"
+                      ;; Use a random signal name just to test that we get it back.
+                      :function (lambda (&rest r) (signal 'llm-request-refusal (list "Tool error" 123)))
+                      :args '()))
          (tests `((:name "Successful call no optional"
                          :tools ,(list tool)
                          :tool-uses ((:name "tool-a" :args ((arg1 . "value1"))
@@ -322,7 +328,12 @@
                                              .
                                              (:tool "tool-a"
                                                     :arg (:name "arg1" :type string
-                                                                :description "Argument 1" :optional nil)))))))))
+                                                                :description "Argument 1" :optional nil))))))
+                  (:name "Error in tool"
+                         :tools ,(list error-tool)
+                         :tool-uses ((:name "error-tool"
+                                            :expected-result "Tool call error: (llm-request-refusal Tool error 123)"
+                                            :expected-error (llm-tool-call-error . (:tool "error-tool" :error (llm-request-refusal "Tool error" 123)))))))))
     (dolist (test tests)
       (dolist (multi-output (list nil t))
         (dolist (async (list nil t))

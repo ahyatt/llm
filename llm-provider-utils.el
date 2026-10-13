@@ -1086,10 +1086,22 @@ function has returned results."
                                                         :name)))
                           (_ "Malformed tool call"))))
            (if (llm-tool-async tool)
-               (apply (llm-tool-function tool)
-                      (append (list end-func) call-args))
-             (funcall end-func (apply (llm-tool-function tool)
-                                      (llm-provider-utils--normalize-args call-args)))))))
+               (condition-case err
+                   (apply (llm-tool-function tool)
+                          (append (list end-func) call-args))
+                 ;; If the call returned with an error, we can assume it didn't
+                 ;; execute asynchronously, so we deal with the error here.
+                 (error
+                  (push (cons 'llm-tool-call-error (list :tool name :error err)) failed)
+                  (funcall end-func
+                           (format "Tool call error: %s" err))))
+             (condition-case err
+                 (funcall end-func (apply (llm-tool-function tool)
+                                          (llm-provider-utils--normalize-args call-args)))
+               (error
+                (push (cons 'llm-tool-call-error (list :tool name :error err)) failed)
+                (funcall end-func
+                         (format "Tool call error: %s" err))))))))
 
       ;; We may have failed at the end, meaning we never realized we had to
       ;; execute the success callback. Let's give ourselves a chance to do that
