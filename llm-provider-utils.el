@@ -1085,21 +1085,14 @@ function has returned results."
                                                                    :arg)
                                                         :name)))
                           (_ "Malformed tool call"))))
-           (if (llm-tool-async tool)
-               (condition-case err
-                   (apply (llm-tool-function tool)
-                          (append (list end-func) call-args))
-                 ;; If the call returned with an error, we can assume it didn't
-                 ;; execute asynchronously, so we deal with the error here.
-                 (error
-                  (push (cons 'llm-tool-call-error (list :tool name :error err)) failed)
-                  (funcall end-func
-                           (format "Tool call error: %s" err))))
-             (let ((apply-result (condition-case err
-                                     (apply (llm-tool-function tool)
-                                            (llm-provider-utils--normalize-args call-args))
-                                   (error (push (cons 'llm-tool-call-error (list :tool name :error err)) failed)
-                                          (format "Tool call error: %s" err)))))
+           (let ((apply-result (condition-case err
+                                   (apply (llm-tool-function tool)
+                                          (append
+                                           (when (llm-tool-async tool) (list end-func))
+                                           (llm-provider-utils--normalize-args call-args)))
+                                 (error (push (cons (car err) (list :tool name :error (cdr err))) failed)
+                                        (format "Tool call error: %s" err)))))
+             (unless (llm-tool-async tool)
                (funcall end-func apply-result))))))
 
       ;; We may have failed at the end, meaning we never realized we had to
