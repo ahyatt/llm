@@ -252,6 +252,12 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :regex "claude-opus-4-5")
    ;; https://ai.google.dev/gemini-api/docs/models/gemini
    (make-llm-model
+    :name "Gemini 4 Argon" :symbol 'gemini-4-argon
+    :capabilities '(generation tool-use image-input audio-input video-input json-response
+                               pdf-input caching reasoning)
+    :context-length 1048576
+    :regex "gemini-4-argon")
+   (make-llm-model
     :name "Gemini 3.8 Flash" :symbol 'gemini-3-8-flash
     :capabilities '(generation tool-use image-input audio-input video-input json-response
                                pdf-input caching reasoning)
@@ -332,6 +338,17 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :capabilities '(embedding)
     :context-length 2048
     :regex "embedding-001")
+   (make-llm-model
+    :name "Muse Wonder" :symbol 'muse-wonder
+    :capabilities '(generation tool-use image-input json-response reasoning)
+    :context-length 1048576
+    :regex "muse-wonder-[0-9.]+")
+   (make-llm-model
+    :name "Muse Glimmer" :symbol 'muse-glimmer
+    ;; Apache 2.0 License
+    :capabilities '(generation tool-use image-input json-response reasoning free-software)
+    :context-length 131000
+    :regex "muse-glimmer")
    (make-llm-model
     :name "Muse Spark Contributor" :symbol 'muse-spark-contributor
     :capabilities '(generation tool-use image-input json-response reasoning)
