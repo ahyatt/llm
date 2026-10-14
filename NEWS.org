@@ -1,3 +1,5 @@
+* Version 0.34.1
+- Add Gemini 4 Argon, and Muse Wonder and Muse Glimmer
 * Version 0.34.0
 - Simplify error handling by never calling the error callback when tool calling, but instead auto-populating responses
 * Version 0.33.1
