@@ -412,5 +412,55 @@
                                   (equal (llm-chat-prompt-tool-result-result tool-result)
                                          expected-result))))))))))))))
 
+(ert-deftest llm-provider-utils-raise-on-callback-error ()
+  (define-error 'llm-provider-utils-test-error "Client callback failed")
+  (should-error
+   (llm-provider-utils-execute-tool-uses
+    (make-llm-testing-provider)
+    (llm-make-chat-prompt
+     ""
+     :tools (list (make-llm-tool
+                   :name "tool-a"
+                   :args nil
+                   :function #'ignore)))
+    (list (make-llm-provider-utils-tool-use
+           :id "foo"
+           :name "tool-a"
+           :args nil))
+    ;; multi-output
+    nil
+    ;; partial result
+    nil
+    ;; success callback
+    (lambda (result)
+      (signal 'llm-provider-utils-test-error nil)))
+   :type 'llm-provider-utils-test-error))
+
+(ert-deftest llm-provider-utils-raise-on-callback-error-async ()
+  (define-error 'llm-provider-utils-test-error "Client callback failed")
+  (should-error
+   (llm-provider-utils-execute-tool-uses
+    (make-llm-testing-provider)
+    (llm-make-chat-prompt
+     ""
+     :tools (list (make-llm-tool
+                   :name "tool-a"
+                   :args nil
+                   :function (lambda (callback)
+                               (funcall callback nil))
+                   :async t)))
+    (list (make-llm-provider-utils-tool-use
+           :id "foo"
+           :name "tool-a"
+           :args nil))
+    ;; multi-output
+    nil
+    ;; partial result
+    nil
+    ;; success callback
+    (lambda (result)
+      (signal 'llm-provider-utils-test-error nil)))
+   :type 'llm-provider-utils-test-error))
+
 (provide 'llm-provider-utils-test)
 ;;; llm-provider-utils-test.el ends here
