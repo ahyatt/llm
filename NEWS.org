@@ -1,6 +1,7 @@
 * Version 0.34.1
 - Add Gemini 4 Argon, and Muse Wonder and Muse Glimmer
 - Let errors in the async tool callback propagate
+- Add output tokens when streaming for Open AI compatible calls, if available
 * Version 0.34.0
 - Simplify error handling by never calling the error callback when tool calling, but instead auto-populating responses
 * Version 0.33.1
