@@ -1085,21 +1085,35 @@ function has returned results."
                                                                    :arg)
                                                         :name)))
                           (_ "Malformed tool call"))))
-           (if (llm-tool-async tool)
-               (condition-case err
-                   (apply (llm-tool-function tool)
-                          (append (list end-func) call-args))
-                 ;; If the call returned with an error, we can assume it didn't
-                 ;; execute asynchronously, so we deal with the error here.
-                 (error
-                  (push (cons 'llm-tool-call-error (list :tool name :error err)) failed)
-                  (funcall end-func
-                           (format "Tool call error: %s" err))))
-             (let ((apply-result (condition-case err
-                                     (apply (llm-tool-function tool)
-                                            (llm-provider-utils--normalize-args call-args))
-                                   (error (push (cons 'llm-tool-call-error (list :tool name :error err)) failed)
-                                          (format "Tool call error: %s" err)))))
+           (let* (call-finished
+                  (apply-result (condition-case err
+                                    (apply (llm-tool-function tool)
+                                           (append
+                                            (when (llm-tool-async tool)
+                                              ;; The callback should mark the
+                                              ;; call finished, because only
+                                              ;; after that, we shouldn't return
+                                              ;; errors.
+                                              (list (lambda (result)
+                                                      (setq call-finished t)
+                                                      (funcall end-func result))))
+                                            (llm-provider-utils--normalize-args call-args)))
+                                  (error (if call-finished
+                                             (signal (car err) (cdr err))
+                                           ;; The call didn't finished, we're
+                                           ;; still in the tool call, so this
+                                           ;; should be an error reported as the
+                                           ;; result, not re-raised.
+                                           (push (cons 'llm-tool-call-error (list :tool name :error err)) failed)
+                                           (let ((err-str (format "Tool call error: %s" err)))
+                                             ;; If we are async, we assume that there
+                                             ;; was an issue in the function so
+                                             ;; therefore the callback won't be
+                                             ;; called, so we have to call it here.
+                                             (if (llm-tool-async tool)
+                                                 (funcall end-func err-str)
+                                               err-str)))))))
+             (unless (llm-tool-async tool)
                (funcall end-func apply-result))))))
 
       ;; We may have failed at the end, meaning we never realized we had to
