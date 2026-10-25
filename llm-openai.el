@@ -113,7 +113,7 @@ https://api.example.com/v1/chat, then URL should be
                                    default-chat-max-tokens
                                    default-chat-non-standard-params
                                    ((:key raw-key))
-                                   (chat-model "unset")
+                                   (chat-model "auto")
                                    (embedding-model "unset")
                                    (url "https://openrouter.ai/api/v1/")
                                    ((:decide-model decide-model))
