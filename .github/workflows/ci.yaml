@@ -16,11 +16,9 @@ jobs:
         emacs_version:
           # Add more lines like this if you want to test on different Emacs versions.
           - 28.1
-          - 28.2
           - 29.1
-          - 29.2
-          - 29.3
           - 29.4
+          - 30.1
     steps:
     - name: Set up Nix
       uses: cachix/install-nix-action@v31
