@@ -651,7 +651,9 @@ STREAMING if non-nil, turn on response streaming."
 
 (cl-defmethod llm-provider-extract-token-use ((_ llm-openai-compatible) response)
   (let ((usage (assoc-default 'usage response)))
-    `(:input-tokens ,(assoc-default 'prompt_tokens usage))))
+    (append `(:input-tokens ,(assoc-default 'prompt_tokens usage))
+            (when (assoc-default 'completion_tokens usage)
+              `(:output-tokens ,(assoc-default ':completion_tokens usage))))))
 
 (cl-defmethod llm-provider-extract-tool-uses ((_ llm-openai) response)
   (mapcar (lambda (call)
