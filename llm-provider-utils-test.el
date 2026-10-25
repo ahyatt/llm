@@ -360,7 +360,7 @@
                (make-llm-testing-provider)
                prompt
                (mapcar (lambda (tool-use)
-                         (incf tool-id)
+                         (cl-incf tool-id)
                          (let ((id-str (format "%d" tool-id)))
                            (setf (alist-get id-str id-to-tool-use) tool-use)
                            (make-llm-provider-utils-tool-use
