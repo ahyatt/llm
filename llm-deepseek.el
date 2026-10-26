@@ -54,6 +54,59 @@
                          (assoc-default 'message (aref choices 0)))))
     (assoc-default 'reasoning_content message)))
 
+(cl-defmethod llm-provider-extract-for-multi-turn ((provider llm-deepseek) response)
+  (when-let* ((reasoning-content (llm-provider-extract-reasoning provider response)))
+    (list :deepseek-reasoning-content reasoning-content)))
+
+(cl-defmethod llm-provider-annotate-tool-uses ((_ llm-deepseek) interaction multi-turn)
+  "Keep DeepSeek reasoning with assistant tool-call INTERACTION."
+  (setf (llm-chat-prompt-interaction-multi-turn-plist interaction) multi-turn))
+
+(cl-defmethod llm-provider-annotate-chat-message
+  ((_ llm-deepseek) interaction message)
+  "Add DeepSeek replayable reasoning from INTERACTION to MESSAGE."
+  (when-let* ((reasoning-content
+               (plist-get (llm-chat-prompt-interaction-multi-turn-plist interaction)
+                          :deepseek-reasoning-content)))
+    (setq message (plist-put message :reasoning_content reasoning-content)))
+  message)
+
+(cl-defmethod llm-provider-chat-request ((_provider llm-deepseek) _prompt _streaming)
+  "Build a DeepSeek request with complete assistant tool-call messages.
+Assistant text and tool calls as adjacent interactions but DeepSeek
+requires one assistant message containing both."
+  (let* ((request (cl-call-next-method))
+         (original-messages (plist-get request :messages))
+         (remaining (append original-messages nil))
+         combined)
+    (while remaining
+      (let ((message (pop remaining))
+            (next (car remaining)))
+        (when (and next
+                   (equal (plist-get message :role) "assistant")
+                   (or (stringp (plist-get message :content))
+                       (plist-get message :reasoning_content))
+                   (equal (plist-get next :role) "assistant")
+                   (plist-get next :tool_calls))
+          (let ((content (or (plist-get message :content) :null))
+                (reasoning-content
+                 (or (plist-get message :reasoning_content)
+                     (plist-get next :reasoning_content))))
+            (setq message (pop remaining))
+            (setq message (plist-put message :content content))
+            (when reasoning-content
+              (setq message
+                    (plist-put message :reasoning_content reasoning-content)))))
+        ;; Assistant content is required, even if it's null.
+        (when (and (equal (plist-get message :role) "assistant")
+                   (plist-get message :tool_calls)
+                   (not (plist-member message :content)))
+          (setq message (plist-put message :content :null)))
+        (push message combined)))
+    (plist-put
+     request :messages
+     (vconcat (nreverse combined)))))
+
 (defun llm-deepseek--get-partial-chat-response (response)
   "Return the text and reasoning in RESPONSE.
 RESPONSE can be nil if the response is complete."
@@ -70,7 +123,10 @@ RESPONSE can be nil if the response is complete."
                        (assoc-default 'reasoning_content delta))))
       (append (when content (list :text content))
               (when tool-calls `(:tool-uses-raw ,tool-calls))
-              (when reasoning (list :reasoning reasoning))
+              (when reasoning
+                (list :reasoning reasoning
+                      :multi-turn
+                      (list :deepseek-reasoning-content reasoning)))
               (when (and usage (not (eq usage :null)))
                 (list :input-tokens (assoc-default 'prompt_tokens usage)
                       :output-tokens (assoc-default 'completion_tokens usage)))))))
