@@ -29,8 +29,10 @@
   ;; the models to ensure that the first match is the unique match.
   (let ((models-names-to-test '("llama3" "gemini-3.5-flash"
                                 "gemma3" "qwen-3.7" "kimi-k3"
-                                "gpt-5.5" "claude-opus-4-8"
-                                "claude-fable-5" "deepseek-r1")))
+                                "gpt-6.1-sol" "gpt-5.6-sol" "gpt-5.5"
+                                "gpt-5.4" "gpt-5.3" "gpt-5.2" "gpt-5.1" "gpt-5"
+                                "gpt-5.1-2026-01-01" "gpt-5-2026-01-01"
+                                "claude-opus-4-8" "claude-fable-5" "deepseek-r1")))
     (dolist (model-name models-names-to-test)
       (let ((model-forward (llm-models-match model-name))
             (model-reverse (let ((llm-models (reverse llm-models)))
