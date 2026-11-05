@@ -51,17 +51,17 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :name "GPT-6.1 Sol" :symbol 'gpt-6-1-sol
     :capabilities '(generation tool-use image-input json-response reasoning)
     :context-length 1050000
-    :regex (rx (seq "gpt-6\\.1-sol")))
+    :regex "gpt-6\\.1-sol")
    (make-llm-model
     :name "GPT-6 Astra" :symbol 'gpt-6-astra
     :capabilities '(generation tool-use image-input json-response reasoning)
     :context-length 1050000
-    :regex (rx (seq "gpt-6-astra")))
+    :regex "gpt-6-astra")
    (make-llm-model
     :name "GPT-6 Sol" :symbol 'gpt-6-sol
     :capabilities '(generation tool-use image-input json-response reasoning)
     :context-length 1050000
-    :regex (rx (seq "gpt-6-sol")))
+    :regex "gpt-6-sol")
    (make-llm-model
     :name "GPT-6 Luna" :symbol 'gpt-6-luna
     :capabilities '(generation tool-use image-input json-response reasoning)
@@ -71,27 +71,27 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :name "GPT-5.6 Sol" :symbol 'gpt-5-6-sol
     :capabilities '(generation tool-use image-input json-response reasoning)
     :context-length 1000000
-    :regex (rx (seq "gpt-5\\.6-sol")))
+    :regex "gpt-5\\.6-sol")
    (make-llm-model
     :name "GPT-5.6 Terra" :symbol 'gpt-5-6-terra
     :capabilities '(generation tool-use image-input json-response reasoning)
     :context-length 1000000
-    :regex (rx (seq "gpt-5\\.6-terra" (or string-end (seq (or "-" ".") (+ digit))))))
+    :regex "gpt-5\\.6-terra")
    (make-llm-model
     :name "GPT-5.6 Luna" :symbol 'gpt-5-6-luna
     :capabilities '(generation tool-use image-input json-response reasoning)
     :context-length 1000000
-    :regex (rx (seq "gpt-5\\.6-luna" (or string-end (seq (or "-" ".") (+ digit))))))
+    :regex "gpt-5\\.6-luna")
    (make-llm-model
     :name "GPT-5.5" :symbol 'gpt-5-5
     :capabilities '(generation tool-use image-input json-response reasoning)
     :context-length 1000000
-    :regex (rx (seq "gpt-5\\.5" (or string-end (seq (or "-" ".") (+ digit))))))
+    :regex "gpt-5\\.5")
    (make-llm-model
     :name "GPT-5.4" :symbol 'gpt-5-4
     :capabilities '(generation tool-use image-input json-response reasoning)
     :context-length 1000000
-    :regex (rx (seq "gpt-5\\.4" (or string-end (seq (or "-" ".") (+ digit))))))
+    :regex "gpt-5\\.4")
    (make-llm-model
     :name "GPT-5 Chat" :symbol 'gpt-5-chat
     :capabilities '(generation tool-use image-input json-response reasoning)
@@ -101,7 +101,7 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :name "GPT-5" :symbol 'gpt-5
     :capabilities '(generation tool-use image-input json-response reasoning)
     :context-length 400000
-    :regex (rx (seq "gpt-5" (or string-end (seq (or "-" ".") (+ digit))))))
+    :regex "gpt-5\\(?:\\.[1-3]\\)?\\(?:-[-0-9]\\{10\\}\\)?$")
    (make-llm-model
     :name "GPT-5 Nano" :symbol 'gpt-5-nano
     :capabilities '(generation tool-use image-input json-response reasoning)
