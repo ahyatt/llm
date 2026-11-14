@@ -124,12 +124,9 @@ information than standard tool use."
 (cl-defmethod llm-provider-embedding-extract-result ((_ llm-vertex) response)
   (assoc-default 'values (assoc-default 'embeddings (aref (assoc-default 'predictions response) 0))))
 
-(cl-defmethod llm-provider-embedding-extract-error ((provider llm-google) err-response)
-  (llm-provider-chat-extract-error provider err-response))
-
-(cl-defmethod llm-provider-chat-extract-error ((provider llm-google) err-response)
+(defun llm-google--extract-error (err-response)
   (if (vectorp err-response)
-      (llm-provider-chat-extract-error provider (aref err-response 0))
+      (llm-google--extract-error (aref err-response 0))
     (if-let* ((err (assoc-default 'error err-response)))
         (format "Problem calling GCloud Vertex AI: status: %s message: %s"
                 (assoc-default 'code err)
@@ -142,11 +139,20 @@ information than standard tool use."
             (format "Could not finish due to detected Gemini safety violations: %s"
                     (assoc-default 'safetyRatings (aref candidates 0))))))))
 
+(cl-defmethod llm-provider-embedding-extract-error ((provider llm-google) err-response)
+  (llm-provider-chat-extract-error provider err-response))
+
+(cl-defmethod llm-provider-chat-extract-error ((_ llm-google) err-response)
+  (llm-google--extract-error err-response))
+
 (cl-defmethod llm-provider-embedding-request ((_ llm-vertex) string)
   `(:instances [(:content ,string)]))
 
+(defun llm-vertex--auth-headers (key)
+  `(("Authorization" . ,(format "Bearer %s" key))))
+
 (cl-defmethod llm-provider-headers ((provider llm-vertex))
-  `(("Authorization" . ,(format "Bearer %s" (llm-vertex-key provider)))))
+  (llm-vertex--auth-headers (llm-vertex-key provider)))
 
 (cl-defmethod llm-provider-chat-extract-result ((provider llm-google) response)
   (pcase (type-of response)
@@ -382,7 +388,7 @@ which is necessary to properly set some paremeters."
         (plz-media-type:application/json-array
          :handler
          (lambda (element)
-           (when-let* ((err-response (llm-provider-chat-extract-error provider element)))
+           (when-let* ((err-response (llm-google--extract-error element)))
              (funcall err-receiver err-response))
            (if-let* ((response (llm-provider-chat-extract-result provider element))
                      (usage (llm-provider-extract-token-use provider element)))

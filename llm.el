@@ -87,7 +87,7 @@ Not all providers can force a particular tool use."
 
 (cl-defstruct llm-chat-prompt-interaction
   "This defines a single interaction given as part of a chat prompt.
-ROLE can a symbol, of either `user', `assistant', or `tool-results'.
+ROLE can be a symbol, of either `user', `assistant', or `tool-results'.
 
 CONTENT is the content of the interaction.  It should be either
 string, an `llm-multipart' object or a list of function calls.
@@ -239,8 +239,7 @@ point number between 0 and 1."
 
 (cl-defstruct (llm-decision-choice (:include llm-decision))
   "The choice decision information.
-
-CHOICE is a single value corresponding to one of the `criteria' keys in
+CHOICE is a single value corresponding to one of the `choices' in
 struct `llm-question-choice'.
 
 CHOICE-PROBABILITIES is an alist of the `criteria' keys in struct

@@ -21,7 +21,7 @@
 
 ;;; Commentary:
 ;; This file implements the llm functionality defined in llm.el, for Google's
-;; Gemini AI.  he documentation is at
+;; Gemini AI.  The documentation is at
 ;; https://ai.google.dev/tutorials/rest_quickstart.
 
 ;;; Code:
@@ -30,7 +30,20 @@
 (require 'llm)
 (require 'llm-vertex)
 (require 'llm-provider-utils)
+(require 'llm-typesafe)
 (require 'json)
+
+(defconst llm-gemini--base-url "https://generativelanguage.googleapis.com/v1beta")
+
+(cl-defstruct (llm-gemini-decide
+               (:include llm-typesafe-compatible)
+               (:constructor make-llm-gemini-decide
+                             (&key (model "gemini-decision-1")
+                                   ((:key raw-key))
+                                   &aux
+                                   (key (llm-provider-utils--wrap-key raw-key))
+                                   (url (concat llm-gemini--base-url "/decisions")))))
+  "A Gemini Decision model provider.")
 
 (cl-defstruct (llm-gemini
                (:include llm-google)
@@ -42,12 +55,19 @@
                                    (embedding-model "gemini-embedding-001")
                                    (chat-model "gemini-3.8-flash")
                                    &aux
-                                   (key (llm-provider-utils--wrap-key raw-key)))))
+                                   (key (llm-provider-utils--wrap-key raw-key))
+                                   (decider (make-llm-gemini-decide
+                                             :key raw-key)))))
   "A struct representing a Gemini client.
 
 KEY is the API key for the client.
 You can get this at https://makersuite.google.com/app/apikey."
-  key embedding-model chat-model)
+  key embedding-model chat-model decider)
+
+(defun llm-gemini--auth-headers (key)
+  `(("x-goog-api-key" . ,(if (functionp key)
+                             (funcall key)
+                           key))))
 
 (cl-defmethod llm-nonfree-message-info ((_ llm-gemini))
   "Return nonfree terms of service for Gemini."
@@ -55,11 +75,11 @@ You can get this at https://makersuite.google.com/app/apikey."
 
 (cl-defmethod llm-provider-embedding-url ((provider llm-gemini) &optional _)
   "Return the URL for the EMBEDDING request for STRING from PROVIDER."
-  (format "https://generativelanguage.googleapis.com/v1beta/models/%s:embedContent?key=%s"
-          (llm-gemini-embedding-model provider)
-          (if (functionp (llm-gemini-key provider))
-              (funcall (llm-gemini-key provider))
-            (llm-gemini-key provider))))
+  (format "https://generativelanguage.googleapis.com/v1beta/models/%s:embedContent"
+          (llm-gemini-embedding-model provider)))
+
+(cl-defmethod llm-provider-headers ((provider llm-gemini))
+  (llm-gemini--auth-headers (llm-gemini-key provider)))
 
 (cl-defmethod llm-provider-embedding-request ((provider llm-gemini) string)
   `(:model ,(llm-gemini-embedding-model provider)
@@ -68,19 +88,14 @@ You can get this at https://makersuite.google.com/app/apikey."
 (cl-defmethod llm-provider-embedding-extract-result ((_ llm-gemini) response)
   (assoc-default 'values (assoc-default 'embedding response)))
 
-(defconst llm-gemini--base-url "https://generativelanguage.googleapis.com/v1beta/models/")
-
 ;; from https://ai.google.dev/tutorials/rest_quickstart
 (defun llm-gemini--chat-url (provider streaming-p)
   "Return the URL for the chat request, using PROVIDER.
 If STREAMING-P is non-nil, use the streaming endpoint."
-  (format "%s%s:%s?key=%s"
+  (format "%s/models/%s:%s"
           llm-gemini--base-url
           (llm-gemini-chat-model provider)
-          (if streaming-p "streamGenerateContent" "generateContent")
-          (if (functionp (llm-gemini-key provider))
-              (funcall (llm-gemini-key provider))
-            (llm-gemini-key provider))))
+          (if streaming-p "streamGenerateContent" "generateContent")))
 
 (cl-defmethod llm-provider-chat-url ((provider llm-gemini))
   (llm-gemini--chat-url provider nil))
@@ -102,9 +117,68 @@ If STREAMING-P is non-nil, use the streaming endpoint."
   (llm-provider-utils-model-token-limit (llm-gemini-chat-model provider)
                                         1048576))
 
+;;; Decision model code; Gemini is mostly but not quite compatible with
+;;; Typesafe's AI.
+
+(cl-defmethod llm-decide ((provider llm-gemini) questions state)
+  ;; Synchronize the key, which may have been changed.
+  (setf (llm-gemini-decide-key (llm-gemini-decider provider))
+        (llm-gemini-key provider))
+  (llm-decide (llm-gemini-decider provider) questions state))
+
+(cl-defmethod llm-decide-async ((provider llm-gemini) questions state result-callback error-callback)
+  ;; Synchronize the key, which may have been changed.
+  (setf (llm-gemini-decide-key (llm-gemini-decider provider))
+        (llm-gemini-key provider))
+  (llm-decide-async (llm-gemini-decider provider) questions state result-callback error-callback))
+
+(cl-defmethod llm-nonfree-message-info ((_ llm-gemini-decide))
+  "Return Gemini's nonfree terms of service."
+  "https://policies.google.com/terms/generative-ai")
+
+(cl-defmethod llm-provider-request-prelude ((provider llm-gemini-decide))
+  (unless (llm-gemini-decide-key provider)
+    (signal 'llm-provider-unconfigured
+            '("To call Gemini API, add a key to the `llm-gemini' provider"))))
+
+(cl-defmethod llm-provider-headers ((provider llm-gemini-decide))
+  (llm-gemini--auth-headers (llm-gemini-decide-key provider)))
+
+(cl-defmethod llm-provider-decide-url ((provider llm-gemini-decide))
+  (llm-gemini-decide-url provider))
+
+(cl-defmethod llm-provider-headers ((provider llm-gemini-decide))
+  (llm-gemini--auth-headers (llm-gemini-decide-key provider)))
+
+(cl-defmethod llm-provider-decide-extract-error ((provider llm-gemini-decide) response)
+  (llm-google--extract-error response))
+
+(cl-defmethod llm-provider-decide-request ((provider llm-gemini-decide) questions state)
+  (list
+   :model (llm-typesafe-compatible-model provider)
+   :questions (mapcar (lambda (q)
+                        (if (llm-question-bool-p q)
+                            (llm-gemini--bool-question-request q)
+                          (llm-typesafe-question-request q)))
+                      questions)
+   :input state))
+
+(defun llm-gemini--bool-question-request (question)
+  (cons (llm-question-bool-name question)
+        (append
+         (list :type "noul"
+               :instructions (llm-question-bool-instructions question))
+         (when (or (llm-question-bool-true-description question)
+                   (llm-question-bool-false-description question))
+           (list :criteria (append
+                            (when (llm-question-bool-true-description question)
+                              (list :true_description (llm-question-bool-true-description question)))
+                            (when (llm-question-bool-false-description question)
+                              (list :false_description (llm-question-bool-false-description question)))))))))
+
 (cl-defmethod llm-capabilities ((provider llm-gemini))
   (append
-   '(streaming embeddings model-list)
+   '(streaming embeddings model-list decision)
    (when-let* ((model (llm-models-match (llm-gemini-chat-model provider)))
                (capabilities (llm-model-capabilities model)))
      (seq-uniq (append
@@ -116,10 +190,7 @@ If STREAMING-P is non-nil, use the streaming endpoint."
   (mapcar (lambda (model)
             (plist-get model :name))
           (append
-           (plist-get (plz 'get (format "%s?key=%s" llm-gemini--base-url
-                                        (if (functionp (llm-gemini-key provider))
-                                            (funcall (llm-gemini-key provider))
-                                          (llm-gemini-key provider)))
+           (plist-get (plz 'get (format "%s/models/" llm-gemini--base-url)
                         :as (lambda () (json-parse-buffer :object-type 'plist)))
                       :models)
            nil)))
