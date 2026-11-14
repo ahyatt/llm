@@ -150,7 +150,7 @@ If STREAMING-P is non-nil, use the streaming endpoint."
 (cl-defmethod llm-provider-headers ((provider llm-gemini-decide))
   (llm-gemini--auth-headers (llm-gemini-decide-key provider)))
 
-(cl-defmethod llm-provider-decide-extract-error ((provider llm-gemini-decide) response)
+(cl-defmethod llm-provider-decide-extract-error ((_ llm-gemini-decide) response)
   (llm-google--extract-error response))
 
 (cl-defmethod llm-provider-decide-request ((provider llm-gemini-decide) questions state)
@@ -191,6 +191,7 @@ If STREAMING-P is non-nil, use the streaming endpoint."
             (plist-get model :name))
           (append
            (plist-get (plz 'get (format "%s/models/" llm-gemini--base-url)
+                        :headers (llm-gemini--auth-headers (llm-gemini-key provider))
                         :as (lambda () (json-parse-buffer :object-type 'plist)))
                       :models)
            nil)))
