@@ -53,7 +53,7 @@
                                    default-chat-non-standard-params
                                    ((:key raw-key))
                                    (embedding-model "gemini-embedding-001")
-                                   (chat-model "gemini-3.8-flash")
+                                   (chat-model "gemini-4-hydrogen")
                                    &aux
                                    (key (llm-provider-utils--wrap-key raw-key))
                                    (decider (make-llm-gemini-decide

@@ -41,7 +41,7 @@ If the binary is not in the PATH, the full path must be specified."
   :type 'file
   :group 'llm-vertex)
 
-(defcustom llm-vertex-gcloud-region "us-central1"
+(defcustom llm-vertex-gcloud-region "global"
   "The gcloud region to use to connect to Vertex AI."
   :type 'string
   :group 'llm-vertex)
@@ -59,7 +59,7 @@ and there is no default.  The maximum value possible here is 2049."
   :type 'integer
   :group 'llm-vertex)
 
-(defcustom llm-vertex-default-chat-model "gemini-2.5-pro"
+(defcustom llm-vertex-default-chat-model "gemini-4-hydrogen"
   "The default model to ask for.
 This should almost certainly be a chat model, other models are
 for more specialized uses."
@@ -113,10 +113,15 @@ information than standard tool use."
       ;; the user is using multibyte strings.
       (setf (llm-vertex-key provider) (encode-coding-string result 'utf-8)))
     (setf (llm-vertex-key-gentime provider) (current-time))))
+(defun llm-vertex--domain ()
+  "Return the domain of the `llm-vertex' endpoint."
+  (if (equal "global" llm-vertex-gcloud-region)
+      "aiplatform.googleapis.com"
+    (format "%s-aiplatform.googleapis.com" llm-vertex-gcloud-region)))
 
 (cl-defmethod llm-provider-embedding-url ((provider llm-vertex) &optional _)
-  (format "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:predict"
-          llm-vertex-gcloud-region
+  (format "https://%s/v1/projects/%s/locations/%s/publishers/google/models/%s:predict"
+          (llm-vertex--domain)
           (llm-vertex-project provider)
           llm-vertex-gcloud-region
           (or (llm-vertex-embedding-model provider) "textembedding-gecko")))
@@ -319,6 +324,12 @@ information than standard tool use."
                                            (llm-model-symbol model)
                                          'unknown))))
 
+(defconst llm-vertex-models-without-low-support
+  '(gemini-3-pro gemini-3-1-flash-lite))
+
+(defconst llm-vertex-models-needing-reasoning-budget
+  '(gemini-2.5-pro gemini-2.5-flash gemini-2.5-flash-lite))
+
 (defun llm-vertex--supports-temperature (model)
   "Return non-nil if MODEL symbol supports temperature parameter."
   (not (member model '(gemini-3-5-flash-lite
@@ -348,32 +359,32 @@ which is necessary to properly set some paremeters."
     (let* (thinking-plist
            (model-data (llm-models-by-symbol model)))
       (when (and model-data (member 'reasoning (llm-model-capabilities model-data)))
-        (setq thinking-plist '(:includeThoughts t))
+        (setq thinking-plist (list :includeThoughts t))
         (when-let* ((budget (llm-chat-prompt-reasoning prompt))
                     (max-budget (if (eq model 'gemini-2.5-pro) 32768 24576)))
           (if (and (or (eq model 'gemini-2.5-pro)
                        (eq model 'gemini-3-pro))
                    (eq budget 'none))
               (display-warning 'llm :warning "Cannot turn off reasoning in selected model, ignoring reasoning setting")
-            (if (string-match "3-" (symbol-name model))
+            (if (member model llm-vertex-models-needing-reasoning-budget)
                 (setq thinking-plist (plist-put thinking-plist
-                                                :thinking_level
+                                                :thinkingBudget
                                                 (pcase budget
-                                                  ;; Gemini 3.1 Pro cannot turn off thinking.
-                                                  ;; See https://ai.google.dev/gemini-api/docs/thinking#set-budget
-                                                  ('none (if (eq model 'gemini-3-1-pro)
-                                                             "low" "minimal"))
-                                                  ('light "low")
-                                                  ;; Medium is currently not supported, coming soon.
-                                                  ('medium "high")
-                                                  ('maximum "high"))))
+                                                  ('none 0)
+                                                  ('light 1024)
+                                                  ('medium (/ max-budget 2))
+                                                  ('maximum max-budget))))
               (setq thinking-plist (plist-put thinking-plist
-                                              :thinkingBudget
+                                              :thinking_level
                                               (pcase budget
-                                                ('none 0)
-                                                ('light 1024)
-                                                ('medium (/ max-budget 2))
-                                                ('maximum max-budget))))))))
+                                                ;; Gemini 3.1 Pro cannot turn off thinking.
+                                                ;; See https://ai.google.dev/gemini-api/docs/thinking#set-budget
+                                                ('none (if (member model llm-vertex-models-without-low-support)
+                                                           "minimal" "low"))
+                                                ('light "low")
+                                                ;; Medium is currently not supported, coming soon.
+                                                ('medium "high")
+                                                ('maximum "high"))))))))
       (when thinking-plist
         (setq params-plist (plist-put params-plist :thinkingConfig thinking-plist))))
     (when params-plist
@@ -403,8 +414,8 @@ which is necessary to properly set some paremeters."
 (defun llm-vertex--chat-url (provider &optional streaming)
   "Return the correct url to use for PROVIDER.
 If STREAMING is non-nil, use the URL for the streaming API."
-  (format "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:%s"
-          llm-vertex-gcloud-region
+  (format "https://%s/v1/projects/%s/locations/%s/publishers/google/models/%s:%s"
+          (llm-vertex--domain)
           (llm-vertex-project provider)
           llm-vertex-gcloud-region
           (llm-vertex-chat-model provider)

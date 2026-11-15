@@ -252,6 +252,18 @@ REGEX is a regular expression that can be used to identify the model, uniquely (
     :regex "claude-opus-4-5")
    ;; https://ai.google.dev/gemini-api/docs/models/gemini
    (make-llm-model
+    :name "Gemini 4 Hydrogen" :symbol 'gemini-4-hydrogen
+    :capabilities '(generation tool-use image-input audio-input video-input json-response
+                               pdf-input caching reasoning)
+    :context-length 1048576
+    :regex "gemini-4-hydrogen")
+   (make-llm-model
+    :name "Gemini 4 Carbon" :symbol 'gemini-4-carbon
+    :capabilities '(generation tool-use image-input audio-input video-input json-response
+                               pdf-input caching reasoning)
+    :context-length 1048576
+    :regex "gemini-4-carbon")
+   (make-llm-model
     :name "Gemini 4 Argon" :symbol 'gemini-4-argon
     :capabilities '(generation tool-use image-input audio-input video-input json-response
                                pdf-input caching reasoning)
