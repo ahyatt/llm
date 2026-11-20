@@ -1,7 +1,7 @@
 * Version 0.34.2
 - Support Gemini decision models
 - Fix model recognition issues, by [[https://github.com/Tekki][Tekki]]
-- Add Gemini 4 Carbon and Hydrogen, and set Hydrogen to be the default model
+- Add Gemini 4 Carbon, Hydrogen, and Neon, and set Hydrogen to be the default model
 - Fix reasoning specification with a range of Gemini models
 * Version 0.34.1
 - Add Gemini 4 Argon, and Muse Wonder and Muse Glimmer
